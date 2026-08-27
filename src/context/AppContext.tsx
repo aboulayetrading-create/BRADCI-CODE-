@@ -1,0 +1,3566 @@
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import confetti from 'canvas-confetti';
+import { 
+  User, 
+  Product, 
+  DeliveryJob, 
+  EscrowRecord, 
+  KYCRecord, 
+  UserRole, 
+  SellerPlan, 
+  DriverPlan,
+  GPSLocation,
+  ShopProfile,
+  WithdrawalRequest,
+  FinancialTransaction,
+  AdminAlert,
+  TimeFilter,
+  PaymentMethod,
+  SentAdminMessage,
+  AppNotification,
+  AppLanguage,
+  AppTheme,
+  MapProvider,
+  ReviewRecord,
+  FraudIncidentRecord
+} from '../types';
+import { 
+  INITIAL_USERS, 
+  INITIAL_PRODUCTS, 
+  INITIAL_FREIGHT_JOBS, 
+  INITIAL_ESCROW_RECORDS, 
+  INITIAL_KYC_RECORDS,
+  INITIAL_WITHDRAWAL_REQUESTS,
+  INITIAL_FINANCIAL_TRANSACTIONS,
+  INITIAL_ADMIN_ALERTS
+} from '../data/mockData';
+import { calculateHaversineDistance, findNearestCommune, getCommuneCoords, calculateDeliveryFee } from '../data/communes';
+import { getTranslation, TranslationKey } from '../utils/translations';
+import { detectFraudulentContact, detectImageFraud, BRAD_CI_TERMS } from '../utils/fraudFilter';
+import { 
+  voiceNavigator, 
+  playOrderAlertSound, 
+  playSuccessChime, 
+  announceDriverIncomingOrder,
+  announcePurchaseSuccess,
+  announceSaleSuccess
+} from '../utils/voiceNavigator';
+
+interface ToastNotification {
+  id: string;
+  title: string;
+  desc: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+}
+
+interface AppContextType {
+  currentUser: User | null;
+  users: User[];
+  products: Product[];
+  freightJobs: DeliveryJob[];
+  escrowRecords: EscrowRecord[];
+  kycRecords: KYCRecord[];
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+
+  // Language, Theme, Voice, Map Provider
+  language: AppLanguage;
+  setLanguage: (lang: AppLanguage) => void;
+  t: (key: TranslationKey) => string;
+  translate: (fr: string, en: string) => string;
+  theme: AppTheme;
+  effectiveTheme: 'dark' | 'light';
+  setTheme: (theme: AppTheme) => void;
+  toggleTheme: () => void;
+  voiceEnabled: boolean;
+  toggleVoice: () => void;
+  readCurrentScreenAloud: () => void;
+  mapProvider: MapProvider;
+  setMapProvider: (provider: MapProvider) => void;
+
+  // KYC Modal & Anti-Fraud
+  kycModalOpen: boolean;
+  setKycModalOpen: (open: boolean) => void;
+  adminInstantApproveMyKYC: () => void;
+
+  // Auth & Email OTP & Google Profile
+  registerUser: (data: { firstName: string; lastName: string; city: string; email: string; phone: string; role: UserRole; password?: string }) => { success: boolean; otpCode: string };
+  verifyEmailOtp: (email: string, enteredOtp: string) => { success: boolean };
+  loginWithEmail: (email: string, password?: string) => { success: boolean };
+  loginWithGoogle: (role?: UserRole) => { success: boolean; needsProfileCompletion: boolean; user?: User };
+  completeGoogleProfile: (data: { firstName: string; lastName: string; phone: string; city: string; role: UserRole }) => void;
+
+  // 30s Driver Dispatch Engine
+  pendingOrderOffer: DeliveryJob | null;
+  orderOfferCountdown: number;
+  triggerOrderDispatchToDriver: (job: DeliveryJob) => void;
+  driverAcceptIncomingOffer: () => void;
+  driverDeclineIncomingOffer: () => void;
+
+  // Rating & Review Suite
+  reviewModalJob: DeliveryJob | null;
+  setReviewModalJob: (job: DeliveryJob | null) => void;
+  reviews: ReviewRecord[];
+  submitReview: (data: { jobId: string; productId: string; productTitle: string; sellerRating: number; sellerComment: string; sellerQuickTags: string[]; driverRating: number; driverComment: string; driverQuickTags: string[] }) => void;
+  
+  // GPS & Location States (Mandatory GPS)
+  userLocation: GPSLocation | null;
+  gpsPermissionStatus: 'prompt' | 'granted' | 'denied';
+  gpsModalOpen: boolean;
+  setGpsModalOpen: (open: boolean) => void;
+  requestGpsPermission: (forcePrompt?: boolean) => Promise<GPSLocation | null>;
+  setUserManualLocation: (communeName: string, customAddress?: string) => void;
+
+  // Modals & UI States
+  authModalOpen: boolean;
+  setAuthModalOpen: (open: boolean) => void;
+  pricingModalOpen: boolean;
+  setPricingModalOpen: (open: boolean) => void;
+  targetPlanForPricing: SellerPlan | DriverPlan | 'boost' | null;
+  setTargetPlanForPricing: (plan: SellerPlan | DriverPlan | 'boost' | null) => void;
+  productDetailModal: Product | null;
+  setProductDetailModal: (p: Product | null) => void;
+  fiveBiddersModalProduct: Product | null;
+  setFiveBiddersModalProduct: (p: Product | null) => void;
+  buyerDepositModalProduct: Product | null;
+  setBuyerDepositModalProduct: (p: Product | null) => void;
+  newProductModalOpen: boolean;
+  setNewProductModalOpen: (open: boolean) => void;
+  gpsTrackingJob: DeliveryJob | null;
+  setGpsTrackingJob: (job: DeliveryJob | null) => void;
+  selectedShopForView: ShopProfile | null;
+  setSelectedShopForView: (shop: ShopProfile | null) => void;
+  updateShopProfile: (shopData: Partial<ShopProfile>) => void;
+  getShopBySellerId: (sellerId: string) => ShopProfile | undefined;
+  buyShopProductDirect: (productId: string, paymentMethod?: PaymentMethod) => boolean;
+  
+  // Profile Avatar & Identity
+  profileAvatarModalOpen: boolean;
+  setProfileAvatarModalOpen: (open: boolean) => void;
+  updateUserAvatar: (avatarUrl: string) => void;
+  updateUserProfile: (data: Partial<User>) => void;
+
+  toasts: ToastNotification[];
+  addToast: (title: string, desc: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
+  removeToast: (id: string) => void;
+
+  // ================= ADMIN SUITE & FINANCIALS =================
+  isAdminAuthenticated: boolean;
+  adminLogin: (identifier: string, pass: string) => boolean;
+  adminLogout: () => void;
+  isMaintenanceMode: boolean;
+  maintenanceNotice: string;
+  toggleMaintenanceMode: (enabled?: boolean, notice?: string) => void;
+  withdrawalRequests: WithdrawalRequest[];
+  financialTransactions: FinancialTransaction[];
+  adminAlerts: AdminAlert[];
+  sentAdminMessages: SentAdminMessage[];
+  activeLiveVisitorsCount: number;
+  newRegistrationsTodayCount: number;
+  adminApproveWithdrawal: (requestId: string) => boolean;
+  adminRejectWithdrawal: (requestId: string, reason: string) => boolean;
+  requestUserWithdrawal: (amount: number, method: PaymentMethod, phone: string) => { success: boolean; message: string };
+  adminToggleUserSuspension: (userId: string, reason?: string) => void;
+  adminToggleShopClosure: (shopId: string, reason?: string) => void;
+  adminSendMessageToUser: (recipientId: string, channel: 'in_app' | 'sms' | 'whatsapp', message: string, subject?: string) => boolean;
+  adminReassignDriver: (jobId: string, newDriverId: string) => void;
+  adminCancelDeliveryJob: (jobId: string, reason: string) => void;
+  markAlertAsRead: (alertId: string) => void;
+  dismissAlert: (alertId: string) => void;
+  adminExportModalOpen: boolean;
+  setAdminExportModalOpen: (open: boolean) => void;
+  adminSelectedMemberForModal: User | null;
+  setAdminSelectedMemberForModal: (user: User | null) => void;
+  adminMessageModalRecipient: User | null;
+  setAdminMessageModalRecipient: (user: User | null) => void;
+  exportFinancialsExcel: (timeFilter: TimeFilter) => void;
+
+  // Notifications & Live Dispatch
+  notifications: AppNotification[];
+  unreadNotificationsCount: number;
+  notificationsModalOpen: boolean;
+  setNotificationsModalOpen: (open: boolean) => void;
+  addNotification: (notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => void;
+  markNotificationAsRead: (notifId: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearAllNotifications: () => void;
+  browserNotificationsEnabled: boolean;
+  requestBrowserNotificationPermission: () => Promise<boolean>;
+  pushBrowserNotification: (title: string, body: string, icon?: string) => void;
+
+  // Actions
+  loginAsUser: (userId: string) => void;
+  loginWithRole: (role: UserRole) => void;
+  logout: () => void;
+  getSellerBlockedBalance: (sellerNameOrId?: string) => number;
+  getBuyerBlockedBalance: (buyerNameOrId?: string) => number;
+  canUserPublishProduct: (user?: User | null) => { allowed: boolean; reason?: string; limit: number; current: number };
+  publishProduct: (productData: Partial<Product>) => boolean;
+  placeBid: (productId: string, amount: number) => boolean;
+  sellerChooseWinner: (productId: string, winnerId: string) => void;
+  sellerSelectBidder: (productId: string, bidderId: string) => void;
+  buyerCompleteEscrowDeposit: (productId: string, paymentMethod?: PaymentMethod) => boolean;
+  buyerDeclineSelectedOffer: (productId: string, reason?: string) => void;
+  purgeExpiredSoldProduct: (productId: string) => void;
+  sellerCancelAuction: (productId: string) => void;
+  simulateFiveBids: (productId: string) => void;
+  canDriverTakeDeliveries: (driver?: User | null) => { allowed: boolean; reason?: string; remaining: number };
+  toggleDriverAvailability: () => void;
+  switchDriverAccount: (driverId: string) => void;
+  driverAcceptJob: (jobId: string) => boolean;
+  driverConfirmPickup: (jobId: string, enteredCode: string) => boolean;
+  driverDeclareArrival: (jobId: string) => boolean;
+  driverSetInspectionVerdict: (jobId: string, verdict: 'client_confirmed_good' | 'client_confirmed_bad') => boolean;
+  driverConfirmDeliveryOTP: (jobId: string, enteredOtp: string) => boolean;
+  buyerConfirmDeliveryOTP: (jobId: string, enteredOtp: string) => boolean;
+  buyerCancelAndReturnPackage: (jobId: string, reason: string) => { success: boolean; returnOtpCode: string; message: string };
+  driverConfirmReturnOTP: (jobId: string, enteredOtp: string) => boolean;
+  sellerConfirmReturnReceived: (jobId: string) => boolean;
+  submitKYC: (
+    dataOrDocType: {
+      docType: 'cni' | 'passeport' | 'attestation' | 'permis';
+      docNumber: string;
+      photoUrl: string;
+      selfieUrl: string;
+      driverLicenseUrl?: string;
+      driverLicenseSelfieUrl?: string;
+      vehicleRegistrationUrl?: string;
+    } | 'cni' | 'passeport' | 'attestation' | 'permis',
+    docNumber?: string,
+    photoUrl?: string,
+    selfieUrl?: string
+  ) => { success: boolean; isDuplicate: boolean; message: string };
+  adminApproveKYC: (kycId: string) => void;
+  adminRejectKYC: (kycId: string, reason: string) => void;
+  adminApproveProduct: (productId: string, type?: 'flash' | 'standard') => void;
+  adminRejectProduct: (productId: string, reason?: string) => void;
+  purchaseSubscription: (plan: SellerPlan | DriverPlan | 'boost', paymentMethod: string, targetProductId?: string) => void;
+  boostProduct: (productId: string) => void;
+
+  // Anti-Fraud & Terms & Stock Management
+  fraudIncidents: FraudIncidentRecord[];
+  recordFraudIncident: (data: Omit<FraudIncidentRecord, 'id' | 'timestamp' | 'status'>) => void;
+  adminResolveFraudIncident: (incidentId: string) => void;
+  termsModalOpen: boolean;
+  setTermsModalOpen: (open: boolean) => void;
+  acceptTermsAndConditions: () => void;
+  restockProduct: (productId: string, additionalStock: number) => boolean;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [users, setUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem('bradci_users');
+    return saved ? JSON.parse(saved) : INITIAL_USERS;
+  });
+
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const savedId = localStorage.getItem('bradci_current_user_id');
+    if (savedId) {
+      const found = INITIAL_USERS.find(u => u.id === savedId);
+      if (found) return found;
+    }
+    // Default to Kouassi Jean (Basic Seller with 2/3 products) for immediate rich interaction
+    return INITIAL_USERS[0];
+  });
+
+  const [products, setProducts] = useState<Product[]>(() => {
+    const saved = localStorage.getItem('bradci_products');
+    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+  });
+
+  const [freightJobs, setFreightJobs] = useState<DeliveryJob[]>(() => {
+    const saved = localStorage.getItem('bradci_freight');
+    return saved ? JSON.parse(saved) : INITIAL_FREIGHT_JOBS;
+  });
+
+  const [escrowRecords, setEscrowRecords] = useState<EscrowRecord[]>(() => {
+    const saved = localStorage.getItem('bradci_escrow');
+    return saved ? JSON.parse(saved) : INITIAL_ESCROW_RECORDS;
+  });
+
+  const [kycRecords, setKycRecords] = useState<KYCRecord[]>(() => {
+    const saved = localStorage.getItem('bradci_kyc');
+    return saved ? JSON.parse(saved) : INITIAL_KYC_RECORDS;
+  });
+
+  // GPS Location State
+  const [userLocation, setUserLocation] = useState<GPSLocation | null>(() => {
+    const saved = localStorage.getItem('bradci_user_gps');
+    if (saved) return JSON.parse(saved);
+    return currentUser?.gpsLocation || {
+      lat: 5.3599,
+      lng: -3.9875,
+      commune: 'Cocody',
+      address: 'Riviera 2, Abidjan',
+      accuracy: 10
+    };
+  });
+
+  const [gpsPermissionStatus, setGpsPermissionStatus] = useState<'prompt' | 'granted' | 'denied'>(() => {
+    const saved = localStorage.getItem('bradci_gps_permission');
+    return (saved as 'prompt' | 'granted' | 'denied') || 'granted';
+  });
+
+  const [gpsModalOpen, setGpsModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('explore');
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  const [targetPlanForPricing, setTargetPlanForPricing] = useState<SellerPlan | DriverPlan | 'boost' | null>(null);
+  const [productDetailModal, setProductDetailModal] = useState<Product | null>(null);
+  const [fiveBiddersModalProduct, setFiveBiddersModalProduct] = useState<Product | null>(null);
+  const [buyerDepositModalProduct, setBuyerDepositModalProduct] = useState<Product | null>(null);
+  const [newProductModalOpen, setNewProductModalOpen] = useState(false);
+  const [gpsTrackingJob, setGpsTrackingJob] = useState<DeliveryJob | null>(null);
+  const [selectedShopForView, setSelectedShopForView] = useState<ShopProfile | null>(null);
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
+  // ================= ADMIN SUITE & FINANCIAL STATES =================
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem('bradci_admin_auth') === 'true' || localStorage.getItem('bradci_admin_auth') === 'true';
+  });
+
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(() => {
+    return localStorage.getItem('bradci_maintenance_mode') === 'true';
+  });
+
+  const [maintenanceNotice, setMaintenanceNotice] = useState<string>(() => {
+    return localStorage.getItem('bradci_maintenance_notice') || 'Maintenance opérationnelle de routine pour optimisation des flux de séquestre Wave & Orange Money.';
+  });
+
+  const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>(() => {
+    const saved = localStorage.getItem('bradci_withdrawals');
+    return saved ? JSON.parse(saved) : INITIAL_WITHDRAWAL_REQUESTS;
+  });
+
+  const [financialTransactions, setFinancialTransactions] = useState<FinancialTransaction[]>(() => {
+    const saved = localStorage.getItem('bradci_fin_transactions');
+    return saved ? JSON.parse(saved) : INITIAL_FINANCIAL_TRANSACTIONS;
+  });
+
+  const [adminAlerts, setAdminAlerts] = useState<AdminAlert[]>(() => {
+    const saved = localStorage.getItem('bradci_admin_alerts');
+    return saved ? JSON.parse(saved) : INITIAL_ADMIN_ALERTS;
+  });
+
+  const [sentAdminMessages, setSentAdminMessages] = useState<SentAdminMessage[]>(() => {
+    const saved = localStorage.getItem('bradci_sent_admin_messages');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [activeLiveVisitorsCount, setActiveLiveVisitorsCount] = useState<number>(142);
+  const [newRegistrationsTodayCount, setNewRegistrationsTodayCount] = useState<number>(12);
+
+  // Admin Modals
+  const [adminExportModalOpen, setAdminExportModalOpen] = useState(false);
+  const [adminSelectedMemberForModal, setAdminSelectedMemberForModal] = useState<User | null>(null);
+  const [adminMessageModalRecipient, setAdminMessageModalRecipient] = useState<User | null>(null);
+
+  // App Notifications & Web Push State
+  const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
+
+  // Anti-Fraud Incidents & Legal Terms Modal
+  const [fraudIncidents, setFraudIncidents] = useState<FraudIncidentRecord[]>(() => {
+    const saved = localStorage.getItem('bradci_fraud_incidents');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // fallback
+      }
+    }
+    return [
+      {
+        id: 'fraud-inc-1',
+        userId: 'user-kouassi',
+        userName: 'Kouassi Jean',
+        userRole: 'client',
+        userPhone: '+225 07 48 92 11 34',
+        productTitle: 'Ancien Essai Vente Directe',
+        detectedType: 'phone_number',
+        rawOffendingContent: 'Appelez moi direct au 07 48 92 11 34 pour négocier hors application',
+        matchedSnippet: '07 48 92 11 34',
+        timestamp: '2026-08-19T14:30:00Z',
+        actionTaken: 'warning_issued',
+        status: 'warned'
+      }
+    ];
+  });
+
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_fraud_incidents', JSON.stringify(fraudIncidents));
+  }, [fraudIncidents]);
+
+  const recordFraudIncident = (data: Omit<FraudIncidentRecord, 'id' | 'timestamp' | 'status'>) => {
+    const newRecord: FraudIncidentRecord = {
+      ...data,
+      id: 'fraud-' + Date.now(),
+      timestamp: new Date().toISOString(),
+      status: data.actionTaken === 'account_suspended' ? 'banned' : 'acknowledged'
+    };
+    setFraudIncidents(prev => [newRecord, ...prev]);
+
+    // Also create admin alert
+    const newAlert: AdminAlert = {
+      id: 'alert-fraud-' + Date.now(),
+      type: 'fraud_incident',
+      title: data.actionTaken === 'account_suspended' 
+        ? '🚨 RÈGLE DES 3 STRIKES : Compte Suspendu pour Fraude' 
+        : '⚠️ Tentative de Fraude Détectée & Bloquée',
+      message: `L'utilisateur ${data.userName} (${data.userPhone || 'N/A'}) a tenté d'insérer des coordonnées directes (${data.detectedContent}). Action : ${data.actionTaken === 'account_suspended' ? 'Suspension Immédiate' : 'Avertissement n°' + data.strikeNumber}.`,
+      channel: 'system',
+      targetAdminPhone: '+225 07 00 00 00',
+      timestamp: 'À l\'instant',
+      isRead: false,
+      metadata: {
+        userId: data.userId,
+        phone: data.userPhone,
+        strikeNumber: data.strikeNumber,
+        productId: data.productId
+      }
+    };
+    setAdminAlerts(prev => [newAlert, ...prev]);
+  };
+
+  const adminResolveFraudIncident = (incidentId: string) => {
+    setFraudIncidents(prev => prev.map(inc => inc.id === incidentId ? { ...inc, status: 'resolved' } : inc));
+    addToast('Incident Résolu', 'L\'alerte de fraude a été marquée comme traitée.', 'success');
+  };
+
+  const acceptTermsAndConditions = () => {
+    if (!currentUser) return;
+    const updatedUser: User = {
+      ...currentUser,
+      termsAccepted: true,
+      termsAcceptedAt: new Date().toISOString()
+    };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    setTermsModalOpen(false);
+    addToast('Charte Acceptée', 'Vous avez accepté les Conditions Générales et la Charte Anti-Fraude Brad\'CI.', 'success');
+  };
+
+  const restockProduct = (productId: string, additionalStock: number): boolean => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return false;
+    if (additionalStock <= 0) {
+      addToast('Quantité Invalide', 'Veuillez saisir un nombre de pièces supérieur à 0.', 'warning');
+      return false;
+    }
+
+    const newStock = (prod.stockQuantity || 0) + additionalStock;
+    const updatedProd: Product = {
+      ...prod,
+      stockQuantity: newStock,
+      isOutOfStock: false,
+      outOfStockSince: undefined
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+    if (productDetailModal?.id === productId) {
+      setProductDetailModal(updatedProd);
+    }
+
+    addToast(
+      '✅ Stock Réapprovisionné !',
+      `Le stock de "${prod.title}" est maintenant de ${newStock} unités. L'annonce est réactivée et visible à l'achat.`,
+      'success'
+    );
+    return true;
+  };
+
+  // ================= LANGUAGE, THEME, VOICE & MAP PROVIDER =================
+  const [language, setLanguageState] = useState<AppLanguage>(() => {
+    const saved = localStorage.getItem('bradci_lang');
+    return (saved as AppLanguage) || 'fr';
+  });
+  const setLanguage = (lang: AppLanguage) => {
+    setLanguageState(lang);
+    localStorage.setItem('bradci_lang', lang);
+    addToast(
+      lang === 'fr' ? 'Langue Française Activée' : 'English Language Activated',
+      lang === 'fr' ? 'Interface et notifications configurées en Français.' : 'Interface and alerts switched to English.',
+      'info'
+    );
+  };
+  const t = (key: TranslationKey) => getTranslation(language, key);
+  const translate = (fr: string, en: string) => language === 'en' ? en : fr;
+
+  const [theme, setThemeState] = useState<AppTheme>(() => {
+    const saved = localStorage.getItem('bradci_theme');
+    return (saved as AppTheme) || 'dark';
+  });
+
+  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>('dark');
+
+  // Compute effective theme (Dark, Light, or Auto Day/Night)
+  useEffect(() => {
+    const computeTheme = (): 'dark' | 'light' => {
+      if (theme === 'dark') return 'dark';
+      if (theme === 'light') return 'light';
+      // Auto: Daytime (06h to 18h) is Light, Nighttime (18h to 06h) is Dark
+      const hour = new Date().getHours();
+      const isDay = hour >= 6 && hour < 18;
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        return isDay ? (prefersDark ? 'dark' : 'light') : 'dark';
+      }
+      return isDay ? 'light' : 'dark';
+    };
+
+    const resolved = computeTheme();
+    setEffectiveTheme(resolved);
+    localStorage.setItem('bradci_theme', theme);
+
+    const root = document.documentElement;
+    const body = document.body;
+
+    if (resolved === 'light') {
+      root.classList.add('light');
+      root.classList.remove('dark');
+      body.classList.add('light');
+      body.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+    } else {
+      root.classList.add('dark');
+      root.classList.remove('light');
+      body.classList.add('dark');
+      body.classList.remove('light');
+      root.setAttribute('data-theme', 'dark');
+    }
+  }, [theme]);
+
+  const setTheme = (newTheme: AppTheme) => {
+    setThemeState(newTheme);
+    const messages = {
+      dark: { title: 'Mode Sombre Activé', desc: 'Thème sombre optimisé pour la nuit et les écrans OLED.' },
+      light: { title: 'Mode Clair Lumineux Activé', desc: 'Thème blanc avec contrastes nets pour une lisibilité maximale en plein jour.' },
+      auto: { title: 'Thème Automatique (Jour / Nuit)', desc: 'Bascule automatique en mode clair le jour (06h-18h) et sombre la nuit.' }
+    };
+    addToast(messages[newTheme].title, messages[newTheme].desc, 'info');
+  };
+
+  const toggleTheme = () => {
+    setThemeState(prev => {
+      let next: AppTheme = 'dark';
+      if (prev === 'dark') next = 'light';
+      else if (prev === 'light') next = 'auto';
+      else next = 'dark';
+
+      const messages = {
+        dark: { title: 'Mode Sombre Activé 🌙', desc: 'Thème sombre haute précision.' },
+        light: { title: 'Mode Clair Blanc Activé ☀️', desc: 'Thème clair lumineux haute lisibilité.' },
+        auto: { title: 'Thème Automatique Activé ⚙️', desc: 'Alternance Jour (Clair) / Nuit (Sombre).' }
+      };
+      addToast(messages[next].title, messages[next].desc, 'info');
+      return next;
+    });
+  };
+
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('bradci_voice_enabled');
+    return saved !== 'false';
+  });
+  const toggleVoice = () => {
+    setVoiceEnabled(prev => {
+      const next = !prev;
+      localStorage.setItem('bradci_voice_enabled', String(next));
+      voiceNavigator.setMuted(!next);
+      if (next) {
+        voiceNavigator.testVoice(language);
+        addToast(
+          language === 'en' ? 'Voice Assistance Enabled 🔊' : 'Assistance Vocale Activée 🔊',
+          language === 'en' ? 'Live announcements for auctions, escrow, and deliveries active.' : 'Annonces en direct des enchères, du séquestre et de la bourse de fret.',
+          'success'
+        );
+      } else {
+        voiceNavigator.stop();
+        addToast(
+          language === 'en' ? 'Voice Assistance Muted 🔇' : 'Assistance Vocale Coupée 🔇',
+          language === 'en' ? 'Audio announcements are now muted.' : 'Les annonces audio sont en sourdine.',
+          'info'
+        );
+      }
+      return next;
+    });
+  };
+
+  const readCurrentScreenAloud = () => {
+    const isEn = language === 'en';
+    let screenTitle = isEn ? "Brad'CI Home" : "Accueil Brad'CI";
+    const keyPoints: string[] = [];
+
+    if (activeTab === 'explore' || activeTab === 'encheres') {
+      screenTitle = isEn ? 'Live Express Auctions' : 'Enchères en direct';
+      const activeAuctions = products.filter(p => p.listingType !== 'shop' && (p.status === 'active' || p.status === 'pending_choice' || p.status === 'pending_buyer_deposit'));
+      keyPoints.push(
+        isEn
+          ? `${activeAuctions.length} ongoing auctions with guaranteed mobile money escrow`
+          : `${activeAuctions.length} enchères en cours avec séquestre garanti`
+      );
+      const fiveBidsCount = products.filter(p => p.status === 'pending_choice').length;
+      if (fiveBidsCount > 0) {
+        keyPoints.push(
+          isEn
+            ? `${fiveBidsCount} auctions reached the 5-bid threshold and are awaiting seller buyer selection`
+            : `${fiveBidsCount} enchères ont atteint le palier des 5 offres et sont en arbitrage vendeur`
+        );
+      }
+      const myWinningPending = products.filter(p => p.status === 'pending_buyer_deposit');
+      if (myWinningPending.length > 0) {
+        keyPoints.push(
+          isEn
+            ? 'Action required: an auction offer is awaiting your escrow deposit for final validation'
+            : 'Attention, une offre d\'enchère attend votre dépôt sous séquestre pour validation'
+        );
+      }
+    } else if (activeTab === 'boutiques') {
+      screenTitle = isEn ? 'Official Stores and Direct Buys' : 'Boutiques officielles et achats directs';
+      const shopProds = products.filter(p => p.listingType === 'shop');
+      keyPoints.push(
+        isEn
+          ? `${shopProds.length} items available for direct purchase with express courier delivery`
+          : `${shopProds.length} articles disponibles à l'achat direct avec livraison express`
+      );
+    } else if (activeTab === 'dashboard_seller' || activeTab === 'dashboard_client') {
+      screenTitle = isEn ? 'Client and Seller Dashboard' : 'Tableau de bord Vendeur et Acheteur';
+      const availableBalance = currentUser?.walletBalance || 0;
+      const blockedBalance = getSellerBlockedBalance();
+      keyPoints.push(
+        isEn
+          ? `Available balance for withdrawal: ${availableBalance.toLocaleString('fr-FR')} FCFA`
+          : `Solde disponible pour retrait : ${availableBalance.toLocaleString('fr-FR')} FCFA`
+      );
+      keyPoints.push(
+        isEn
+          ? `Held in escrow pending delivery: ${blockedBalance.toLocaleString('fr-FR')} FCFA`
+          : `Solde sous séquestre en attente de livraison : ${blockedBalance.toLocaleString('fr-FR')} FCFA`
+      );
+    } else if (activeTab === 'dashboard_driver') {
+      screenTitle = isEn ? 'Freight Radar and Deliveries in Abidjan' : 'Bourse de fret et livraisons Abidjan';
+      const availableJobs = freightJobs.filter(j => j.status === 'available');
+      keyPoints.push(
+        isEn
+          ? `${availableJobs.length} delivery jobs available nearby`
+          : `${availableJobs.length} courses disponibles à proximité`
+      );
+      const activeMyJobs = freightJobs.filter(j => (j.assignedDriverId === currentUser?.id || currentUser?.role === 'driver') && j.status !== 'delivered' && j.status !== 'cancelled');
+      if (activeMyJobs.length > 0) {
+        keyPoints.push(
+          isEn
+            ? `You have ${activeMyJobs.length} active delivery in progress`
+            : `Vous avez ${activeMyJobs.length} livraison en cours`
+        );
+      }
+    } else {
+      screenTitle = isEn ? "Brad'CI Platform" : "Plateforme Brad'CI";
+      keyPoints.push(
+        isEn
+          ? 'Express live auctions under secured mobile money escrow with geolocation tracking across Abidjan'
+          : 'Ventes aux enchères sous séquestre sécurisé Wave, Orange Money et livraisons express géolocalisées à Abidjan'
+      );
+    }
+
+    voiceNavigator.readCurrentScreen(screenTitle, keyPoints, language);
+  };
+
+  const [mapProvider, setMapProviderState] = useState<MapProvider>(() => {
+    const saved = localStorage.getItem('bradci_map_provider');
+    return (saved as MapProvider) || 'google';
+  });
+  const setMapProvider = (p: MapProvider) => {
+    setMapProviderState(p);
+    localStorage.setItem('bradci_map_provider', p);
+  };
+
+  // KYC Modal State
+  const [kycModalOpen, setKycModalOpen] = useState<boolean>(false);
+  const [profileAvatarModalOpen, setProfileAvatarModalOpen] = useState<boolean>(false);
+
+  // 30s Driver Dispatch Engine State
+  const [pendingOrderOffer, setPendingOrderOffer] = useState<DeliveryJob | null>(null);
+  const [orderOfferCountdown, setOrderOfferCountdown] = useState<number>(30);
+
+  // Ratings and Reviews State
+  const [reviewModalJob, setReviewModalJob] = useState<DeliveryJob | null>(null);
+  const [reviews, setReviews] = useState<ReviewRecord[]>(() => {
+    const saved = localStorage.getItem('bradci_reviews');
+    return saved ? JSON.parse(saved) : [];
+  });
+  useEffect(() => {
+    localStorage.setItem('bradci_reviews', JSON.stringify(reviews));
+  }, [reviews]);
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    const saved = localStorage.getItem('bradci_app_notifications');
+    if (saved) return JSON.parse(saved);
+    return [
+      {
+        id: 'notif-welcome',
+        recipientRole: 'all',
+        title: '🎉 Bienvenue sur BRAD\'CI Fret & Enchères',
+        message: 'Séquestre Wave / MoMo garanti, traçabilité GPS en direct et inspection contradictoire lors de la remise en main propre.',
+        type: 'system',
+        timestamp: 'Il y a 5 min',
+        isRead: false,
+        urgency: 'normal'
+      },
+      {
+        id: 'notif-delivery-1',
+        recipientRole: 'client',
+        title: '🛵 Course en cours : iPhone 13 Pro 128Go',
+        message: 'Le coursier Bakary Traoré a pris en charge votre colis à Cocody. Suivez son déplacement en direct.',
+        type: 'delivery',
+        jobId: 'job-1',
+        timestamp: 'Il y a 2 min',
+        isRead: false,
+        urgency: 'high'
+      }
+    ];
+  });
+
+  const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('bradci_app_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
+  const pushBrowserNotification = useCallback((title: string, body: string, icon = '/favicon.ico') => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, {
+          body,
+          icon,
+          badge: icon,
+          tag: 'bradci-' + Date.now()
+        });
+      } catch (e) {
+        console.warn('Browser notification error:', e);
+      }
+    }
+  }, []);
+
+  const requestBrowserNotificationPermission = async (): Promise<boolean> => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      addToast('Notifications Non Supportées', 'Ce navigateur ne supporte pas les notifications push.', 'warning');
+      return false;
+    }
+
+    try {
+      const perm = await Notification.requestPermission();
+      const granted = perm === 'granted';
+      setBrowserNotificationsEnabled(granted);
+      if (granted) {
+        pushBrowserNotification('🔔 Notifications Brad\'CI Activées !', 'Vous recevrez les alertes de courses, arrivées livreurs et séquestre en direct sur votre téléphone.');
+        addToast('Notifications Activées', 'Vous recevrez les alertes de livraison et de courses en temps réel.', 'success');
+      } else {
+        addToast('Notifications Refusées', 'Vous pouvez les réactiver dans les paramètres de votre navigateur.', 'info');
+      }
+      return granted;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  };
+
+  const addNotification = useCallback((notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => {
+    const newNotif: AppNotification = {
+      ...notif,
+      id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
+      timestamp: 'À l\'instant',
+      isRead: false
+    };
+
+    setNotifications(prev => [newNotif, ...prev]);
+    pushBrowserNotification(newNotif.title, newNotif.message);
+  }, [pushBrowserNotification]);
+
+  const markNotificationAsRead = (notifId: string) => {
+    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, isRead: true } : n));
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    addToast('Notifications Lues', 'Toutes vos notifications ont été marquées comme lues.', 'info');
+  };
+
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    addToast('Historique Vidé', 'Toutes les notifications ont été supprimées.', 'info');
+  };
+
+  const unreadNotificationsCount = notifications.filter(n => {
+    if (!currentUser) return !n.isRead;
+    return !n.isRead && (n.recipientRole === 'all' || n.recipientRole === currentUser.role || n.recipientUserId === currentUser.id || n.recipientUserId === currentUser.name);
+  }).length;
+
+  // Live heart-beat simulation for active visitors
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveLiveVisitorsCount(prev => {
+        const delta = Math.floor(Math.random() * 7) - 3;
+        const next = prev + delta;
+        return next < 80 ? 95 : next > 260 ? 240 : next;
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Nettoyage automatique :
+  // 1. Annonces d'enchères vendues après expiration du bandeau de 1 heure
+  // 2. Articles boutiques en rupture de stock depuis plus de 14 jours (2 semaines) sans réapprovisionnement
+  useEffect(() => {
+    const cleanerInterval = setInterval(() => {
+      const now = new Date().getTime();
+      const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
+      setProducts(prev => {
+        const expiredAuctionIds: string[] = [];
+        const expiredOutOfStockIds: string[] = [];
+
+        const next = prev.filter(p => {
+          // Rule 1: Sold auction pinned for 1 hour
+          if (p.isPinnedSold && p.pinnedUntil) {
+            const until = new Date(p.pinnedUntil).getTime();
+            if (now >= until) {
+              expiredAuctionIds.push(p.id);
+              return false;
+            }
+          }
+
+          // Rule 2: Shop out of stock > 14 days
+          if ((p.listingType === 'shop' || p.shopId) && p.isOutOfStock && p.outOfStockSince) {
+            const outSince = new Date(p.outOfStockSince).getTime();
+            if (now - outSince >= FOURTEEN_DAYS_MS) {
+              expiredOutOfStockIds.push(p.id);
+              return false;
+            }
+          }
+
+          return true;
+        });
+
+        if (expiredAuctionIds.length > 0) {
+          console.log(`[BradCI] Purge automatique de ${expiredAuctionIds.length} annonce(s) d'enchère(s) vendue(s) après 1 heure.`);
+        }
+        if (expiredOutOfStockIds.length > 0) {
+          console.log(`[BradCI] Purge automatique de ${expiredOutOfStockIds.length} article(s) boutique en rupture de stock depuis > 14 jours.`);
+        }
+        return next;
+      });
+    }, 15000);
+
+    return () => clearInterval(cleanerInterval);
+  }, []);
+
+  // Sync admin states to localStorage
+  useEffect(() => {
+    localStorage.setItem('bradci_withdrawals', JSON.stringify(withdrawalRequests));
+  }, [withdrawalRequests]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_fin_transactions', JSON.stringify(financialTransactions));
+  }, [financialTransactions]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_admin_alerts', JSON.stringify(adminAlerts));
+  }, [adminAlerts]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_sent_admin_messages', JSON.stringify(sentAdminMessages));
+  }, [sentAdminMessages]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_maintenance_mode', String(isMaintenanceMode));
+  }, [isMaintenanceMode]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_maintenance_notice', maintenanceNotice);
+  }, [maintenanceNotice]);
+
+
+  // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem('bradci_users', JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_products', JSON.stringify(products));
+  }, [products]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_freight', JSON.stringify(freightJobs));
+  }, [freightJobs]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_escrow', JSON.stringify(escrowRecords));
+  }, [escrowRecords]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_kyc', JSON.stringify(kycRecords));
+  }, [kycRecords]);
+
+  useEffect(() => {
+    if (userLocation) {
+      localStorage.setItem('bradci_user_gps', JSON.stringify(userLocation));
+    }
+  }, [userLocation]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_gps_permission', gpsPermissionStatus);
+  }, [gpsPermissionStatus]);
+
+  const addToast = (title: string, desc: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
+    setToasts(prev => [...prev, { id, title, desc, type }]);
+    setTimeout(() => {
+      removeToast(id);
+    }, 5000);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Request GPS Location (Navigator Geolocation)
+  const requestGpsPermission = useCallback(async (forcePrompt = false): Promise<GPSLocation | null> => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      const fallbackLoc: GPSLocation = {
+        lat: 5.3599,
+        lng: -3.9875,
+        commune: 'Cocody',
+        address: 'Riviera 2, Abidjan (Position standard)',
+        accuracy: 15
+      };
+      setUserLocation(fallbackLoc);
+      setGpsPermissionStatus('granted');
+      return fallbackLoc;
+    }
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
+          const nearest = findNearestCommune(lat, lng);
+          const newLoc: GPSLocation = {
+            lat,
+            lng,
+            accuracy,
+            commune: nearest.name,
+            address: `${nearest.name} (${nearest.group}) - Position GPS Détectée`
+          };
+
+          setUserLocation(newLoc);
+          setGpsPermissionStatus('granted');
+          setGpsModalOpen(false);
+
+          // Update current user's GPS
+          if (currentUser) {
+            const updated = { ...currentUser, gpsLocation: newLoc };
+            setCurrentUser(updated);
+            setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+          }
+
+          addToast(
+            '📍 GPS Activé avec Succès',
+            `Position détectée : ${nearest.name} (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+            'success'
+          );
+          resolve(newLoc);
+        },
+        (error) => {
+          console.warn('Geolocation denied or unavailable:', error.message);
+          setGpsPermissionStatus('denied');
+          if (forcePrompt) {
+            setGpsModalOpen(true);
+          }
+          // Default to current user's profile commune coords
+          const defaultCoords = getCommuneCoords(currentUser?.gpsLocation?.commune || 'Cocody');
+          const fallbackLoc: GPSLocation = {
+            ...defaultCoords,
+            commune: currentUser?.gpsLocation?.commune || 'Cocody',
+            address: `${currentUser?.gpsLocation?.commune || 'Cocody'}, Abidjan`,
+            accuracy: 50
+          };
+          setUserLocation(fallbackLoc);
+          resolve(fallbackLoc);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+    });
+  }, [currentUser]);
+
+  // Set Manual Location if GPS hardware is unavailable
+  const setUserManualLocation = (communeName: string, customAddress?: string) => {
+    const coords = getCommuneCoords(communeName);
+    const loc: GPSLocation = {
+      ...coords,
+      commune: communeName,
+      address: customAddress || `${communeName}, Abidjan`,
+      accuracy: 10
+    };
+    setUserLocation(loc);
+    setGpsPermissionStatus('granted');
+    setGpsModalOpen(false);
+
+    if (currentUser) {
+      const updated = { ...currentUser, gpsLocation: loc };
+      setCurrentUser(updated);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+    }
+
+    addToast('Position Enregistrée', `Zone sélectionnée : ${communeName}`, 'success');
+  };
+
+  // Switch active user
+  const loginAsUser = (userId: string) => {
+    const target = users.find(u => u.id === userId);
+    if (target) {
+      setCurrentUser(target);
+      if (target.gpsLocation) {
+        setUserLocation(target.gpsLocation);
+      }
+      localStorage.setItem('bradci_current_user_id', target.id);
+      addToast('Profil Actif', `Connecté en tant que ${target.name} (${target.role.toUpperCase()})`, 'info');
+    }
+  };
+
+  const loginWithRole = (role: UserRole) => {
+    const found = users.find(u => u.role === role);
+    if (found) {
+      setCurrentUser(found);
+      if (found.gpsLocation) {
+        setUserLocation(found.gpsLocation);
+      }
+      localStorage.setItem('bradci_current_user_id', found.id);
+      addToast('Changement de Rôle', `Connecté en tant que ${found.name}`, 'info');
+    }
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('bradci_current_user_id');
+    addToast('Déconnexion', 'Vous êtes maintenant en mode visiteur public.', 'info');
+  };
+
+  // Rule 1: Free and Unlimited Product Publishing for All Accounts (Basic, Standard, Pro)
+  const canUserPublishProduct = (user?: User | null) => {
+    const u = user || currentUser;
+    if (!u) return { allowed: false, reason: 'Utilisateur non connecté', limit: 99999, current: 0 };
+
+    const plan = u.sellerPlan || 'basic';
+    const count = u.productsPublishedCount || 0;
+
+    // All accounts (including basic free accounts) have full freedom to publish unlimited boutique products & auctions!
+    return {
+      allowed: true,
+      reason: undefined,
+      limit: 99999,
+      current: count,
+      isUnlimited: true,
+      plan
+    };
+  };
+
+  const publishProduct = (productData: Partial<Product>): boolean => {
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return false;
+    }
+
+    // Account suspension check (Anti-Fraud Enforcement)
+    if (currentUser.isSuspended) {
+      addToast(
+        '🚨 Compte Suspendu',
+        currentUser.suspensionReason || 'Votre compte a été suspendu pour 3 infractions aux règles de sécurité Brad\'CI. Contactez le support via WhatsApp.',
+        'error'
+      );
+      return false;
+    }
+
+    // ================= STRICT ANTI-FRAUD FILTERING (TEXT + IMAGES) =================
+    // Rule: Strict prohibition of phone numbers, WhatsApp, or off-platform direct bypass
+    const textToScan = `${productData.title || ''} ${productData.description || ''} ${productData.pickupAddress || ''}`;
+    const fraudCheck = detectFraudulentContact(textToScan);
+    const imageFraudCheck = detectImageFraud(productData.images || []);
+
+    if (fraudCheck.hasFraud || imageFraudCheck.hasFraud) {
+      const reason = fraudCheck.hasFraud ? fraudCheck.message : imageFraudCheck.message;
+      const matchedKeyword = fraudCheck.hasFraud ? fraudCheck.detectedPatterns.join(', ') : imageFraudCheck.detectedPatterns.join(', ');
+      const currentStrikes = (currentUser.fraudStrikesCount || 0) + 1;
+      const isNowSuspended = currentStrikes >= 3;
+
+      // 1. Record incident in administrative log
+      const isWhatsapp = fraudCheck.hasFraud && fraudCheck.detectedPatterns.some(p => p.toLowerCase().includes('whatsapp'));
+      const isImg = imageFraudCheck.hasFraud;
+
+      recordFraudIncident({
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        userPhone: currentUser.phone,
+        productTitle: productData.title || 'Annonce sans titre',
+        type: isImg ? 'phone_in_image' : isWhatsapp ? 'whatsapp_keyword' : 'phone_in_desc',
+        detectedContent: matchedKeyword || 'Coordonnées directes / Numéro masqué',
+        strikeNumber: currentStrikes,
+        actionTaken: isNowSuspended ? 'account_suspended' : currentStrikes === 1 ? 'warning_sent' : 'strike_applied'
+      });
+
+      // 2. Increment user strikes and apply 3-strike rule
+      const updatedUser: User = {
+        ...currentUser,
+        fraudStrikesCount: currentStrikes,
+        isSuspended: isNowSuspended,
+        suspensionReason: isNowSuspended 
+          ? 'Compte et boutique suspendus suite à 3 infractions répétées au filtrage anti-fraude (tentatives d\'échange de coordonnées directes / contournement du séquestre).'
+          : currentUser.suspensionReason
+      };
+
+      setCurrentUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+      if (isNowSuspended) {
+        addToast(
+          '🚨 Compte / Boutique Suspendu (3/3 Infractions) !',
+          'Votre compte a été suspendu pour récidive de publication de coordonnées privées. Veuillez contacter le support officiel Brad\'CI.',
+          'error'
+        );
+        addNotification({
+          recipientRole: 'all',
+          recipientUserId: currentUser.id,
+          title: '🚨 Suspension Immédiate du Compte (Règle des 3 Avertissements)',
+          message: 'Votre compte et votre boutique ont été suspendus car 3 infractions de coordonnées directes (téléphone/WhatsApp) ont été constatées. Contactez le support via WhatsApp.',
+          type: 'system',
+          urgency: 'high'
+        });
+      } else {
+        addToast(
+          `⚠️ Avertissement Anti-Fraude (${currentStrikes}/3)`,
+          `Publication rejetée : ${reason}. Il est strictement interdit d'afficher des numéros ou contacts directs. Au 3ᵉ avertissement, votre compte sera suspendu.`,
+          'warning'
+        );
+      }
+
+      return false;
+    }
+
+    const check = canUserPublishProduct(currentUser);
+    if (!check.allowed) {
+      addToast('Quota Gratuit Atteint', check.reason || 'Passez au Pass supérieur pour continuer à publier', 'warning');
+      setTargetPlanForPricing('standard');
+      setPricingModalOpen(true);
+      return false;
+    }
+
+    const plan = currentUser.sellerPlan || 'basic';
+    const listingType = productData.listingType || (currentUser.shop ? 'shop' : 'auction');
+    // Commission rules:
+    // - All auctions are strictly 10% commission regardless of pass/plan
+    // - Basic accounts (no subscription) are strictly 10% for both shop and auctions
+    // - Certified Pro ('standard') shop items enjoy 5% commission
+    // - VIP Gold ('pro') shop items enjoy 2.5% commission
+    let commission = 0.10;
+    if (listingType === 'shop') {
+      if (plan === 'pro') {
+        commission = 0.025; // 2.5%
+      } else if (plan === 'standard') {
+        commission = 0.05; // 5%
+      } else {
+        commission = 0.10; // 10% basic
+      }
+    } else {
+      commission = 0.10; // 10% for all auctions
+    }
+    const sellerCommune = productData.commune || userLocation?.commune || 'Cocody';
+    const pickupCoords = productData.pickupCoords || getCommuneCoords(sellerCommune);
+    const fixedPrice = productData.buyNowPrice || productData.startingPrice || 10000;
+
+    // Stock for shop products
+    const initialStock = listingType === 'shop' 
+      ? Math.max(1, productData.stockQuantity !== undefined ? Number(productData.stockQuantity) : 5) 
+      : undefined;
+
+    const isDirectAdmin = currentUser.role === 'admin';
+    const productImages = productData.images && productData.images.length > 0 
+      ? productData.images.slice(0, 3) 
+      : ['https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&auto=format&fit=crop&q=80'];
+
+    const newProd: Product = {
+      id: 'prod-' + Date.now(),
+      title: productData.title || 'Nouvel Article',
+      description: productData.description || '',
+      category: productData.category || 'High-Tech',
+      listingType: listingType,
+      sellerId: currentUser.id,
+      sellerName: currentUser.shop?.name || currentUser.name,
+      shopId: currentUser.shop?.id,
+      shopName: currentUser.shop?.name,
+      sellerAvatar: currentUser.shop?.logo || currentUser.avatar,
+      sellerPlan: plan,
+      images: productImages,
+      videoUrl: productData.videoUrl,
+      videoDurationSeconds: productData.videoDurationSeconds,
+      startingPrice: fixedPrice,
+      currentPrice: fixedPrice,
+      buyNowPrice: fixedPrice,
+      reservePrice: productData.reservePrice || fixedPrice * 1.2,
+      commissionRate: commission,
+      stockQuantity: initialStock,
+      soldCount: listingType === 'shop' ? 0 : undefined,
+      isOutOfStock: false,
+      bids: [],
+      status: isDirectAdmin ? 'active' : 'pending_approval',
+      createdAt: new Date().toISOString(),
+      expiresAt: productData.expiresAt || new Date(Date.now() + 1000 * 60 * 60 * 48).toISOString(),
+      commune: sellerCommune,
+      pickupAddress: productData.pickupAddress || `${sellerCommune}, Abidjan`,
+      pickupCoords: pickupCoords,
+      requiredVehicle: productData.requiredVehicle || 'moto',
+      pickupCode: Math.floor(1000 + Math.random() * 9000).toString(),
+      deliveryOtpCode: Math.floor(1000 + Math.random() * 9000).toString(),
+      isBoosted: productData.isBoosted || false
+    };
+
+    // Update state
+    setProducts(prev => [newProd, ...prev]);
+
+    // Increment user's product count
+    const updatedCount = currentUser.productsPublishedCount + 1;
+    const updatedUser = { ...currentUser, productsPublishedCount: updatedCount };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+    if (isDirectAdmin) {
+      addToast(
+        listingType === 'shop' ? '🏪 Annonce Boutique Publiée !' : '🔨 Enchère Publiée !', 
+        `Votre article "${newProd.title}" (${initialStock ? `${initialStock} pièces en stock - ` : ''}Compte Admin)${productData.isBoosted ? ' ⚡ Option Boost Flash Activée !' : ''} est en ligne.`, 
+        'success'
+      );
+    } else {
+      addToast(
+        '⏳ Produit Soumis pour Approbation !',
+        `Votre annonce "${newProd.title}" (${productImages.length} photo${productImages.length > 1 ? 's' : ''}${initialStock ? ` - Stock initial : ${initialStock} pcs` : ''})${productData.isBoosted ? ' ⚡ avec Option Boost Flash (1 000 FCFA)' : ''} a été transmise à la modération.`,
+        'info'
+      );
+    }
+    return true;
+  };
+
+  // Direct Boutique Purchase with Escrow, Stock Decrement & Freight Dispatch
+  const buyShopProductDirect = (productId: string, paymentMethod: PaymentMethod = 'Wave'): boolean => {
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return false;
+    }
+
+    const prod = products.find(p => p.id === productId);
+    if (!prod || prod.status !== 'active') {
+      addToast('Article Indisponible', 'Cet article n\'est plus disponible à la vente.', 'error');
+      return false;
+    }
+
+    // Check Out of Stock
+    if (prod.isOutOfStock || (prod.stockQuantity !== undefined && prod.stockQuantity <= 0)) {
+      addToast(
+        'Stock Épuisé',
+        'Cet article boutique est en rupture de stock. Nouveau stock disponible bientôt !',
+        'warning'
+      );
+      return false;
+    }
+
+    const finalAmount = prod.buyNowPrice || prod.currentPrice;
+    const commission = Math.round(finalAmount * prod.commissionRate);
+    const sellerNet = finalAmount - commission;
+
+    const buyerCommune = userLocation?.commune || currentUser.gpsLocation?.commune || 'Marcory';
+    const buyerAddress = userLocation?.address || currentUser.gpsLocation?.address || `${buyerCommune}, Abidjan`;
+    const buyerCoords = userLocation || currentUser.gpsLocation || getCommuneCoords(buyerCommune);
+
+    const pickupCoords = prod.pickupCoords || getCommuneCoords(prod.commune);
+    const realDistanceKm = calculateHaversineDistance(pickupCoords.lat, pickupCoords.lng, buyerCoords.lat, buyerCoords.lng);
+    const distKm = Math.max(2, Math.round(realDistanceKm * 10) / 10);
+
+    const deliveryFee = calculateDeliveryFee(prod.commune, buyerCommune, prod.requiredVehicle);
+
+    // Create Delivery Job for Freight Exchange
+    const newJob: DeliveryJob = {
+      id: 'job-shop-' + Date.now(),
+      productId: prod.id,
+      productTitle: prod.title,
+      productImage: prod.images[0],
+      sellerName: prod.shopName || prod.sellerName,
+      sellerPhone: '+225 07 48 92 11 34', // Protected until in-person handover
+      pickupCommune: prod.commune,
+      pickupAddress: prod.pickupAddress,
+      pickupCoords: pickupCoords,
+      buyerName: currentUser.name,
+      buyerPhone: currentUser.phone,
+      dropoffCommune: buyerCommune,
+      dropoffAddress: buyerAddress,
+      dropoffCoords: buyerCoords,
+      requiredVehicle: prod.requiredVehicle,
+      deliveryFee,
+      itemValue: finalAmount,
+      status: 'available',
+      pickupCode: prod.pickupCode,
+      deliveryOtpCode: prod.deliveryOtpCode,
+      distanceKm: distKm,
+      etaMinutes: Math.round(distKm * 2.2 + 8),
+    };
+
+    const newEscrow: EscrowRecord = {
+      id: 'escrow-shop-' + Date.now(),
+      productId: prod.id,
+      productTitle: prod.title,
+      amount: finalAmount + deliveryFee,
+      sellerAmount: sellerNet,
+      commissionAmount: commission,
+      commissionRatePercent: prod.commissionRate * 100,
+      deliveryFee,
+      buyerName: currentUser.name,
+      sellerName: prod.shopName || prod.sellerName,
+      status: 'held',
+      paymentMethod,
+      createdAt: new Date().toISOString()
+    };
+
+    setFreightJobs(prev => [newJob, ...prev]);
+    setEscrowRecords(prev => [newEscrow, ...prev]);
+
+    // Stock Management Calculation
+    const currentStock = prod.stockQuantity !== undefined ? prod.stockQuantity : 1;
+    const nextStock = Math.max(0, currentStock - 1);
+    const nextSoldCount = (prod.soldCount || 0) + 1;
+    const isNowOutOfStock = nextStock === 0;
+    const outOfStockTimestamp = isNowOutOfStock ? new Date().toISOString() : undefined;
+
+    const updatedProd: Product = {
+      ...prod,
+      stockQuantity: nextStock,
+      soldCount: nextSoldCount,
+      isOutOfStock: isNowOutOfStock,
+      outOfStockSince: outOfStockTimestamp,
+      // The shop product remains active in the boutique catalog with updated stock/sold count
+      winnerId: currentUser.id,
+      winnerName: currentUser.name,
+      deliveryJobId: newJob.id
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+    setProductDetailModal(null);
+    setGpsTrackingJob(newJob);
+
+    // If out of stock, alert the seller with urgent restock notice
+    if (isNowOutOfStock) {
+      addNotification({
+        recipientRole: 'client',
+        recipientUserId: prod.sellerId,
+        title: '⚠️ Rupture de Stock Boutique !',
+        message: `Votre article "${prod.title}" a écoulé toutes ses pièces (${nextSoldCount} vendus au total). Il est désormais affiché "Stock épuisé - Nouveau stock bientôt". Cliquez sur Réapprovisionner pour renseigner le nouveau stock sous 14 jours avant suppression automatique.`,
+        type: 'system',
+        productId: prod.id,
+        urgency: 'high'
+      });
+    }
+
+    confetti({
+      particleCount: 100,
+      spread: 80,
+      origin: { y: 0.6 }
+    });
+
+    addToast(
+      '🛍️ Commande Boutique Confirmée !',
+      `Achat de "${prod.title}" validé pour ${finalAmount.toLocaleString('fr-FR')} FCFA. Fonds sous séquestre ${paymentMethod} sécurisé (${(finalAmount + deliveryFee).toLocaleString('fr-FR')} F). ${nextStock > 0 ? `Stock restant : ${nextStock} pcs.` : 'Stock désormais épuisé.'}`,
+      'success'
+    );
+    return true;
+  };
+
+  // Rule 3: 5 Bidders Rule
+  const placeBid = (productId: string, amount: number): boolean => {
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return false;
+    }
+
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return false;
+
+    if (amount <= prod.currentPrice) {
+      addToast('Offre Trop Basse', `L'enchère doit être supérieure à ${prod.currentPrice.toLocaleString('fr-FR')} FCFA`, 'error');
+      return false;
+    }
+
+    const bidderCommune = userLocation?.commune || currentUser.gpsLocation?.commune || 'Marcory';
+    const bidderCoords = userLocation || currentUser.gpsLocation || getCommuneCoords(bidderCommune);
+    const distanceKm = prod.pickupCoords 
+      ? calculateHaversineDistance(prod.pickupCoords.lat, prod.pickupCoords.lng, bidderCoords.lat, bidderCoords.lng)
+      : 5.4;
+
+    const newBid = {
+      id: 'bid-' + Date.now(),
+      bidderId: currentUser.id,
+      bidderName: currentUser.name,
+      bidderAvatar: currentUser.avatar,
+      bidderRating: currentUser.rating || 5.0,
+      bidderCommune: bidderCommune,
+      bidderDistrict: bidderCommune,
+      bidderDistanceKm: Math.round(distanceKm * 10) / 10,
+      bidderPhone: currentUser.phone,
+      bidderGps: { lat: bidderCoords.lat, lng: bidderCoords.lng },
+      amount,
+      timestamp: 'À l\'instant',
+      isLeading: true,
+    };
+
+    const updatedBids = [
+      ...prod.bids.map(b => ({ ...b, isLeading: false })),
+      newBid
+    ];
+
+    let newStatus = prod.status;
+    // RÈGLE DES 5 ENCHÉRISSEURS: Quand on atteint 5 enchères, bascule immédiatement en pending_choice
+    if (updatedBids.length >= 5 && prod.status === 'active') {
+      newStatus = 'pending_choice';
+      voiceNavigator.announceFiveBidsReached(prod.title, language);
+      addToast(
+        '🎯 Règle des 5 Enchérisseurs Déclenchée !', 
+        `5 enchères ont été posées sur "${prod.title}". L'enchère est bloquée. Le vendeur va maintenant choisir l'acheteur final.`,
+        'warning'
+      );
+    }
+
+    const updatedProduct = {
+      ...prod,
+      currentPrice: amount,
+      bids: updatedBids,
+      status: newStatus
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
+    if (productDetailModal?.id === productId) {
+      setProductDetailModal(updatedProduct);
+    }
+
+    addToast('Enchère Enregistrée !', `Vous menez l'enchère avec ${amount.toLocaleString('fr-FR')} FCFA`, 'success');
+    return true;
+  };
+
+  // NOUVEAU FLUX BRAD'CI: Le vendeur sélectionne 1 des 5 enchérisseurs -> Statut pending_buyer_deposit
+  const sellerSelectBidder = (productId: string, bidderId: string) => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+
+    const chosenBid = prod.bids.find(b => b.bidderId === bidderId) || prod.bids[0];
+    if (!chosenBid) return;
+
+    const deliveryFee = prod.requiredVehicle === 'cargo' ? 10000 : prod.requiredVehicle === 'voiture' ? 5000 : 2500;
+    const totalRequired = chosenBid.amount + deliveryFee;
+
+    const updatedProd: Product = {
+      ...prod,
+      status: 'pending_buyer_deposit',
+      selectedBidderId: chosenBid.bidderId,
+      selectedBidderName: chosenBid.bidderName
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+    setFiveBiddersModalProduct(null);
+    if (productDetailModal?.id === productId) {
+      setProductDetailModal(updatedProd);
+    }
+
+    // Add in-app notification to buyer
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: chosenBid.bidderName,
+      title: '🚨 Offre Retenue ! Dépôt Séquestre Requis',
+      message: `Félicitations ! Le vendeur a retenu votre offre de ${chosenBid.amount.toLocaleString('fr-FR')} FCFA pour "${prod.title}". Effectuez votre dépôt de ${(totalRequired).toLocaleString('fr-FR')} FCFA sous séquestre pour sécuriser l'achat.`,
+      type: 'bid',
+      productId: prod.id,
+      urgency: 'high'
+    });
+
+    // Vocal voice announcement
+    voiceNavigator.announceWinnerChosenAndDepositAlert(prod.title, totalRequired, language);
+
+    addToast(
+      '🎯 Acheteur Sélectionné & Alerte Envoyée !',
+      `Offre attribuée à ${chosenBid.bidderName}. Une alerte de dépôt sous séquestre lui a été transmise. S'il refuse, vous pourrez choisir parmi les autres offres.`,
+      'info'
+    );
+  };
+
+  // L'acheteur retenu effectue son dépôt sous séquestre (Wave / MoMo)
+  const buyerCompleteEscrowDeposit = (productId: string, paymentMethod: PaymentMethod = 'Wave'): boolean => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return false;
+
+    const winningBid = prod.bids.find(b => b.bidderId === prod.selectedBidderId) || prod.bids[0];
+    if (!winningBid) return false;
+
+    const finalAmount = winningBid.amount;
+    const commission = Math.round(finalAmount * prod.commissionRate);
+    const sellerNet = finalAmount - commission;
+
+    const pickupCoords = prod.pickupCoords || getCommuneCoords(prod.commune);
+    const dropoffCoords = winningBid.bidderGps || getCommuneCoords(winningBid.bidderCommune || 'Marcory');
+    const realDistanceKm = calculateHaversineDistance(pickupCoords.lat, pickupCoords.lng, dropoffCoords.lat, dropoffCoords.lng);
+    const distKm = Math.max(2, Math.round(realDistanceKm * 10) / 10);
+
+    let deliveryFee = 3500;
+    if (prod.requiredVehicle === 'cargo') {
+      deliveryFee = Math.max(10000, Math.round((8000 + distKm * 600) / 500) * 500);
+    } else if (prod.requiredVehicle === 'voiture') {
+      deliveryFee = Math.max(5000, Math.round((3500 + distKm * 400) / 500) * 500);
+    } else {
+      deliveryFee = Math.max(2000, Math.round((1500 + distKm * 250) / 500) * 500);
+    }
+
+    // Create Freight Job
+    const newJob: DeliveryJob = {
+      id: 'job-' + Date.now(),
+      productId: prod.id,
+      productTitle: prod.title,
+      productImage: prod.images[0],
+      sellerName: prod.sellerName,
+      sellerPhone: '+225 07 48 92 11 34',
+      pickupCommune: prod.commune,
+      pickupAddress: prod.pickupAddress,
+      pickupCoords: pickupCoords,
+      buyerName: winningBid.bidderName,
+      buyerPhone: winningBid.bidderPhone || '+225 07 66 11 22 33',
+      dropoffCommune: winningBid.bidderCommune || 'Marcory',
+      dropoffAddress: `${winningBid.bidderDistrict || winningBid.bidderCommune || 'Marcory'}, Abidjan`,
+      dropoffCoords: dropoffCoords,
+      requiredVehicle: prod.requiredVehicle,
+      deliveryFee,
+      itemValue: finalAmount,
+      status: 'available',
+      pickupCode: prod.pickupCode,
+      deliveryOtpCode: prod.deliveryOtpCode,
+      distanceKm: distKm,
+      etaMinutes: Math.round(distKm * 2.2 + 8),
+    };
+
+    // Create Escrow Record
+    const newEscrow: EscrowRecord = {
+      id: 'escrow-' + Date.now(),
+      productId: prod.id,
+      productTitle: prod.title,
+      amount: finalAmount + deliveryFee,
+      sellerAmount: sellerNet,
+      commissionAmount: commission,
+      commissionRatePercent: prod.commissionRate * 100,
+      deliveryFee,
+      buyerName: winningBid.bidderName,
+      sellerName: prod.sellerName,
+      status: 'held',
+      paymentMethod,
+      createdAt: new Date().toISOString()
+    };
+
+    setFreightJobs(prev => [newJob, ...prev]);
+    setEscrowRecords(prev => [newEscrow, ...prev]);
+
+    const updatedProd: Product = {
+      ...prod,
+      status: 'in_transit', // Bloqué au public avec mention "Achat Effectué - En cours de livraison"
+      winnerId: winningBid.bidderId,
+      winnerName: winningBid.bidderName,
+      deliveryJobId: newJob.id
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+    setBuyerDepositModalProduct(null);
+    if (productDetailModal?.id === productId) {
+      setProductDetailModal(updatedProd);
+    }
+
+    // Update buyer blocked balance in state
+    setUsers(prev => prev.map(u => {
+      if (u.name === winningBid.bidderName || (currentUser && u.id === currentUser.id)) {
+        return {
+          ...u,
+          buyerBlockedBalance: (u.buyerBlockedBalance || 0) + (finalAmount + deliveryFee)
+        };
+      }
+      return u;
+    }));
+
+    if (currentUser) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        buyerBlockedBalance: (prev.buyerBlockedBalance || 0) + (finalAmount + deliveryFee)
+      } : null);
+    }
+
+    // Voice announcement
+    voiceNavigator.speak(`Achat effectué et fonds bloqués sous séquestre ${paymentMethod}. Recherche de livreur en cours sur la bourse de fret.`, language);
+
+    // Toast + Confetti
+    confetti({
+      particleCount: 90,
+      spread: 75,
+      origin: { y: 0.6 }
+    });
+
+    addToast(
+      '🔒 Achat Validé & Fonds sous Séquestre !',
+      `Dépôt de ${(finalAmount + deliveryFee).toLocaleString('fr-FR')} FCFA validé via ${paymentMethod}. L'enchère est bloquée au public et la course est disponible pour les livreurs.`,
+      'success'
+    );
+
+    return true;
+  };
+
+  // L'acheteur refuse ou annule le dépôt -> Alerte le vendeur pour choisir parmi les autres
+  const buyerDeclineSelectedOffer = (productId: string, reason: string = 'Désistement de l\'acheteur') => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+
+    const declinedBidderId = prod.selectedBidderId;
+    const declinedBidderName = prod.selectedBidderName || 'L\'acheteur';
+    const existingDeclined = prod.declinedBidderIds || [];
+    const newDeclined = declinedBidderId ? [...existingDeclined, declinedBidderId] : existingDeclined;
+
+    const remainingEligibleBids = prod.bids.filter(b => !newDeclined.includes(b.bidderId));
+
+    const updatedProd: Product = {
+      ...prod,
+      status: 'pending_choice',
+      selectedBidderId: undefined,
+      selectedBidderName: undefined,
+      declinedBidderIds: newDeclined
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+    setBuyerDepositModalProduct(null);
+    if (productDetailModal?.id === productId) {
+      setProductDetailModal(updatedProd);
+    }
+
+    // Alert seller
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: prod.sellerName,
+      title: '⚠️ Désistement de l\'Acheteur Retenu',
+      message: `${declinedBidderName} s'est désisté (${reason}) pour "${prod.title}". Vous pouvez immédiatement choisir parmi les ${remainingEligibleBids.length} autres enchérisseurs restants !`,
+      type: 'bid',
+      productId: prod.id,
+      urgency: 'high'
+    });
+
+    // Voice announcement
+    voiceNavigator.announceBuyerDeclined(prod.title, declinedBidderName, remainingEligibleBids.length, language);
+
+    // If current user is the seller, open the selection modal to pick among remaining bidders
+    if (currentUser?.name === prod.sellerName || currentUser?.id === prod.sellerId) {
+      setFiveBiddersModalProduct(updatedProd);
+    }
+
+    addToast(
+      '⚠️ Désistement Enregistré',
+      `${declinedBidderName} a annulé. Le vendeur a été notifié pour choisir parmi les ${remainingEligibleBids.length} offres restantes.`,
+      'warning'
+    );
+  };
+
+  // Suppression / Purge automatique d'un post vendu après 1h
+  const purgeExpiredSoldProduct = (productId: string) => {
+    setProducts(prev => prev.filter(p => p.id !== productId));
+    if (productDetailModal?.id === productId) {
+      setProductDetailModal(null);
+    }
+    addToast('Annonce Archivée & Supprimée', 'L\'annonce d\'enchère vendue a expiré et a été définitivement supprimée.', 'info');
+  };
+
+  const sellerChooseWinner = (productId: string, winnerId: string) => {
+    sellerSelectBidder(productId, winnerId);
+  };
+
+  const sellerCancelAuction = (productId: string) => {
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, status: 'cancelled' } : p));
+    setFiveBiddersModalProduct(null);
+    addToast('Enchère Annulée', 'La vente a été annulée. Aucun frais n\'a été prélevé.', 'info');
+  };
+
+  // Simulation Instantanée de la Règle Métier des 5 Offres Brad'CI
+  const simulateFiveBids = (productId: string) => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+
+    const basePrice = prod.startingPrice || prod.currentPrice || 10000;
+    const step = Math.max(2000, Math.round((basePrice * 0.08) / 500) * 500);
+
+    const mockFiveBidders = [
+      {
+        bidderId: 'u_bid_1',
+        bidderName: 'Serge Koffi',
+        bidderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+        bidderPhone: '+225 07 55 12 34 56',
+        bidderCommune: 'Cocody',
+        bidderDistrict: 'Riviera Bonoumin',
+        bidderGps: { lat: 5.3599, lng: -3.9870 },
+        amount: basePrice + step * 1,
+        timestamp: 'Il y a 45 min',
+        isLeading: false
+      },
+      {
+        bidderId: 'u_bid_2',
+        bidderName: 'Awa Diomandé',
+        bidderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+        bidderPhone: '+225 05 44 89 22 10',
+        bidderCommune: 'Plateau',
+        bidderDistrict: 'Avenue Chardy',
+        bidderGps: { lat: 5.3261, lng: -4.0197 },
+        amount: basePrice + step * 2,
+        timestamp: 'Il y a 30 min',
+        isLeading: false
+      },
+      {
+        bidderId: 'u_bid_3',
+        bidderName: 'Yves Bakayoko',
+        bidderAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+        bidderPhone: '+225 01 02 03 04 05',
+        bidderCommune: 'Marcory',
+        bidderDistrict: 'Zone 4C Rue du Canal',
+        bidderGps: { lat: 5.3039, lng: -3.9809 },
+        amount: basePrice + step * 3,
+        timestamp: 'Il y a 18 min',
+        isLeading: false
+      },
+      {
+        bidderId: 'u_bid_4',
+        bidderName: 'Fatou Traoré',
+        bidderAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
+        bidderPhone: '+225 07 88 99 00 11',
+        bidderCommune: 'Yopougon',
+        bidderDistrict: 'Niangon Sud',
+        bidderGps: { lat: 5.3411, lng: -4.0728 },
+        amount: basePrice + step * 4,
+        timestamp: 'Il y a 7 min',
+        isLeading: false
+      },
+      {
+        bidderId: 'u_bid_5',
+        bidderName: 'Moussa Cissé',
+        bidderAvatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
+        bidderPhone: '+225 05 77 66 55 44',
+        bidderCommune: 'Koumassi',
+        bidderDistrict: 'Remblais Saint-Étienne',
+        bidderGps: { lat: 5.2930, lng: -3.9470 },
+        amount: basePrice + step * 5,
+        timestamp: 'À l\'instant',
+        isLeading: true
+      }
+    ];
+
+    const updatedProduct: Product = {
+      ...prod,
+      bids: mockFiveBidders,
+      currentPrice: mockFiveBidders[4].amount,
+      status: 'pending_choice'
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
+    if (productDetailModal?.id === productId) {
+      setProductDetailModal(updatedProduct);
+    }
+    
+    // Vocal announcement
+    voiceNavigator.announceFiveBidsReached(prod.title, language);
+
+    // Automatically open the 5 Bidders Modal for instant testing
+    setFiveBiddersModalProduct(updatedProduct);
+
+    addToast(
+      '🎯 Règle des 5 Offres Atteinte !',
+      `5 enchères réelles ont été enregistrées sur "${prod.title}". L'enchère est maintenant bloquée en arbitrage vendeur !`,
+      'warning'
+    );
+  };
+
+  // Rule 2: Delivery Driver Trial Rule (5 Free Deliveries)
+  const canDriverTakeDeliveries = (driver?: User | null) => {
+    const d = driver || currentUser;
+    if (!d || d.role !== 'driver') {
+      return { allowed: false, reason: 'Compte livreur requis', remaining: 0 };
+    }
+
+    if (d.driverPlan === 'vip_pass') {
+      return { allowed: true, remaining: 9999 };
+    }
+
+    const remaining = d.trialDeliveriesRemaining ?? 0;
+    if (remaining <= 0) {
+      return {
+        allowed: false,
+        reason: 'Période d\'essai terminée (5/5 courses gratuites utilisées). Vous devez obligatoirement souscrire au Pass Livreur VIP (6 000 FCFA / mois) pour continuer à accepter des livraisons.',
+        remaining: 0
+      };
+    }
+
+    return { allowed: true, remaining };
+  };
+
+  const toggleDriverAvailability = () => {
+    if (!currentUser || currentUser.role !== 'driver') return;
+    const currentStatus = currentUser.driverAvailability || 'available';
+    const nextStatus = currentStatus === 'available' ? 'offline' : 'available';
+    const isNowOnline = nextStatus === 'available';
+
+    const updatedUser: User = {
+      ...currentUser,
+      driverAvailability: nextStatus,
+      isOnline: isNowOnline
+    };
+
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+    addToast(
+      isNowOnline ? '🟢 Livreur En Service' : '🔴 Livreur En Pause',
+      isNowOnline 
+        ? 'Vous êtes maintenant visible sur la bourse de fret pour recevoir des commandes.' 
+        : 'Vous êtes temporairement indisponible pour de nouvelles courses.',
+      isNowOnline ? 'success' : 'info'
+    );
+  };
+
+  const switchDriverAccount = (driverId: string) => {
+    const targetDriver = users.find(u => u.id === driverId && u.role === 'driver');
+    if (!targetDriver) return;
+    setCurrentUser(targetDriver);
+    localStorage.setItem('bradci_current_user_id', targetDriver.id);
+    addToast(
+      'Compte Livreur Activé',
+      `Connecté en tant que ${targetDriver.name} (${targetDriver.driverPlan === 'vip_pass' ? 'Pass VIP 6 000 F' : 'Période Essai 5 Courses'})`,
+      'info'
+    );
+  };
+
+  const driverAcceptJob = (jobId: string): boolean => {
+    if (!currentUser || currentUser.role !== 'driver') {
+      addToast('Accès Restreint', 'Seul un livreur connecté peut accepter une course.', 'error');
+      return false;
+    }
+
+    const check = canDriverTakeDeliveries(currentUser);
+    if (!check.allowed) {
+      addToast('Pass Livreur Requis', check.reason || 'Abonnement obligatoire après 5 courses', 'warning');
+      setTargetPlanForPricing('vip_pass');
+      setPricingModalOpen(true);
+      return false;
+    }
+
+    const targetJob = freightJobs.find(j => j.id === jobId);
+    if (!targetJob) return false;
+
+    const driverCoords = userLocation || currentUser.gpsLocation || { lat: 5.3421, lng: -4.0150 };
+
+    const updatedJob: DeliveryJob = {
+      ...targetJob,
+      status: 'accepted',
+      assignedDriverId: currentUser.id,
+      assignedDriverName: currentUser.name,
+      assignedDriverPhone: currentUser.phone,
+      assignedDriverVehicle: currentUser.driverPlan === 'vip_pass' ? 'moto' : 'moto',
+      currentLat: driverCoords.lat,
+      currentLng: driverCoords.lng,
+      etaMinutes: targetJob.etaMinutes || 15,
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    
+    // Vocal announcement
+    voiceNavigator.announceOrderAccepted(targetJob.productTitle, currentUser.name, language);
+
+    addToast('Course Acceptée !', `Rendez-vous à ${updatedJob.pickupCommune} (${updatedJob.pickupAddress}) pour récupérer le colis.`, 'success');
+    return true;
+  };
+
+  const driverConfirmPickup = (jobId: string, enteredCode: string): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return false;
+
+    if (enteredCode.trim() !== job.pickupCode) {
+      addToast('Code Enlèvement Incorrect', 'Le code à 4 chiffres fourni par le vendeur ne correspond pas.', 'error');
+      return false;
+    }
+
+    const updatedJob: DeliveryJob = {
+      ...job,
+      status: 'in_transit',
+      etaMinutes: Math.max(5, Math.round((job.distanceKm || 8) * 1.8))
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'in_transit' } : p));
+    
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.buyerName,
+      title: '🛵 Colis Pris en Charge par le Livreur',
+      message: `Le coursier ${job.assignedDriverName || 'Bakary'} a récupéré votre article "${job.productTitle}" à ${job.pickupCommune}. En route vers votre adresse !`,
+      type: 'delivery',
+      jobId: job.id,
+      urgency: 'high'
+    });
+
+    // Vocal announcement
+    voiceNavigator.announceDriverEnRoute(job.assignedDriverName || currentUser?.name || 'Le livreur', job.pickupCommune, language);
+
+    addToast('Colis Enlevé !', 'En route vers le destinataire. Suivi GPS activé en temps réel.', 'success');
+    return true;
+  };
+
+  const driverDeclareArrival = (jobId: string): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return false;
+
+    const timeStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const updatedJob: DeliveryJob = {
+      ...job,
+      status: 'arrived',
+      driverArrivedAtDestination: true,
+      inspectionStatus: 'arrived_inspecting',
+      arrivalTimestamp: timeStr,
+      etaMinutes: 0
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'arrived' as any } : p));
+
+    // Vocal announcement
+    voiceNavigator.announceDriverArrived(job.assignedDriverName || 'Le livreur', job.dropoffCommune, language);
+
+    // Send high-priority notification to buyer
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.buyerName,
+      title: '📍 Votre livreur est arrivé à votre porte !',
+      message: `Le coursier (${job.assignedDriverName || 'Bakary'}) est arrivé à ${job.dropoffCommune}. Veuillez sortir inspecter le colis ensemble.`,
+      type: 'inspection',
+      jobId: job.id,
+      urgency: 'critical'
+    });
+
+    // Send notification to seller
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.sellerName,
+      title: '📍 Livreur Arrivé chez le Client',
+      message: `Le livreur est arrivé chez ${job.buyerName} à ${job.dropoffCommune}. Vérification contradictoire en cours.`,
+      type: 'delivery',
+      jobId: job.id,
+      urgency: 'normal'
+    });
+
+    addToast(
+      '📍 Arrivée chez le Client Confirmée',
+      `Vous êtes bien arrivé à ${job.dropoffCommune}. Présentez le colis au client (${job.buyerName}) pour vérification contradictoire.`,
+      'info'
+    );
+    return true;
+  };
+
+  const driverSetInspectionVerdict = (jobId: string, verdict: 'client_confirmed_good' | 'client_confirmed_bad'): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return false;
+
+    const updatedJob: DeliveryJob = {
+      ...job,
+      inspectionStatus: verdict
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+
+    if (verdict === 'client_confirmed_good') {
+      addNotification({
+        recipientRole: 'client',
+        recipientUserId: job.buyerName,
+        title: '✅ Colis Validé Conforme : Saisissez votre Code OTP',
+        message: `Le contrôle physique est bon ! Communiquez votre code secret OTP (${job.deliveryOtpCode}) au livreur pour clôturer la commande et débloquer les fonds du vendeur.`,
+        type: 'inspection',
+        jobId: job.id,
+        urgency: 'high'
+      });
+
+      addToast(
+        '✅ Colis Déclaré Conforme',
+        'Le client a validé l\'état du produit. Récupérez son Code OTP à 4 chiffres pour valider la livraison et encaisser vos frais de course.',
+        'success'
+      );
+    } else {
+      addNotification({
+        recipientRole: 'client',
+        recipientUserId: job.buyerName,
+        title: '⚠️ Non-Conformité Signalée : Déclenchez le Retour',
+        message: `Le colis a été déclaré non conforme. Le bouton "Refuser & Déclencher le Retour" est opérationnel dans votre espace. La valeur de l'article vous sera remboursée sur votre portefeuille.`,
+        type: 'inspection',
+        jobId: job.id,
+        urgency: 'critical'
+      });
+
+      addToast(
+        '⚠️ Non-Conformité Signalée par le Client',
+        'Le client a refusé le colis. L\'option d\'annulation/retour est débloquée chez le client. Demandez-lui son Code OTP Retour dès qu\'il valide.',
+        'warning'
+      );
+    }
+    return true;
+  };
+
+  const getSellerBlockedBalance = (sellerNameOrId?: string): number => {
+    const target = sellerNameOrId || currentUser?.name || currentUser?.id || '';
+    if (!target) return 0;
+    return escrowRecords
+      .filter(e => e.status === 'held' && (e.sellerName.toLowerCase().includes(target.toLowerCase()) || (currentUser?.name && e.sellerName.toLowerCase().includes(currentUser.name.toLowerCase()))))
+      .reduce((sum, e) => sum + e.sellerAmount, 0);
+  };
+
+  const getBuyerBlockedBalance = (buyerNameOrId?: string): number => {
+    const target = buyerNameOrId || currentUser?.name || currentUser?.id || '';
+    if (!target) return 0;
+    return escrowRecords
+      .filter(e => e.status === 'held' && (e.buyerName.toLowerCase() === target.toLowerCase() || (currentUser?.name && e.buyerName.toLowerCase() === currentUser.name.toLowerCase())))
+      .reduce((sum, e) => sum + e.amount, 0);
+  };
+
+  const driverConfirmDeliveryOTP = (jobId: string, enteredOtp: string): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return false;
+
+    if (enteredOtp.trim() !== job.deliveryOtpCode) {
+      addToast('Code Secret OTP Incorrect', 'Demandez le code secret à 4 chiffres à l\'acheteur après vérification physique du colis.', 'error');
+      return false;
+    }
+
+    // OTP Verified! Update Delivery Job
+    const updatedJob: DeliveryJob = {
+      ...job,
+      status: 'delivered',
+      etaMinutes: 0
+    };
+    const oneHourLater = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const nowIso = new Date().toISOString();
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    setProducts(prev => prev.map(p => p.id === job.productId ? {
+      ...p,
+      status: 'sold',
+      isPinnedSold: true,
+      soldAt: nowIso,
+      pinnedUntil: oneHourLater
+    } : p));
+
+    // Release Escrow
+    const escrow = escrowRecords.find(e => e.productId === job.productId);
+    const sellerPayout = escrow ? escrow.sellerAmount : Math.round((job.itemValue || 0) * 0.95);
+    const deliveryFee = job.deliveryFee || 2500;
+
+    setEscrowRecords(prev => prev.map(e => e.productId === job.productId ? {
+      ...e,
+      status: 'released',
+      releasedAt: new Date().toISOString()
+    } : e));
+
+    // Update all users involved:
+    // 1. Driver gets delivery fee
+    // 2. Seller gets sale proceeds transferred from blocked balance to withdrawal balance
+    // 3. Buyer's blocked balance is cleared
+    setUsers(prev => prev.map(u => {
+      let updated = { ...u };
+      // If Driver
+      if (u.id === job.assignedDriverId || (currentUser?.role === 'driver' && u.id === currentUser.id)) {
+        let updatedRemaining = u.trialDeliveriesRemaining ?? 0;
+        if (u.driverPlan === 'trial' && updatedRemaining > 0) {
+          updatedRemaining -= 1;
+        }
+        updated.walletBalance = u.walletBalance + deliveryFee;
+        updated.trialDeliveriesRemaining = updatedRemaining;
+      }
+      // If Seller
+      if (u.name === job.sellerName || (job.sellerName && job.sellerName.includes(u.name)) || (currentUser?.role === 'client' && u.id === currentUser.id && currentUser.sellerPlan)) {
+        updated.walletBalance = u.walletBalance + sellerPayout;
+        if (updated.blockedBalance) {
+          updated.blockedBalance = Math.max(0, updated.blockedBalance - sellerPayout);
+        }
+      }
+      // If Buyer
+      if (u.name === job.buyerName) {
+        if (updated.buyerBlockedBalance) {
+          updated.buyerBlockedBalance = Math.max(0, updated.buyerBlockedBalance - (escrow ? escrow.amount : (job.itemValue + deliveryFee)));
+        }
+      }
+      return updated;
+    }));
+
+    // Update currentUser in state
+    if (currentUser) {
+      if (currentUser.role === 'driver' || currentUser.id === job.assignedDriverId) {
+        let updatedRemaining = currentUser.trialDeliveriesRemaining ?? 0;
+        if (currentUser.driverPlan === 'trial' && updatedRemaining > 0) {
+          updatedRemaining -= 1;
+        }
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          walletBalance: prev.walletBalance + deliveryFee,
+          trialDeliveriesRemaining: updatedRemaining
+        } : null);
+      } else if (currentUser.name === job.sellerName || (job.sellerName && job.sellerName.includes(currentUser.name))) {
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          walletBalance: prev.walletBalance + sellerPayout,
+          blockedBalance: Math.max(0, (prev.blockedBalance || 0) - sellerPayout)
+        } : null);
+      } else if (currentUser.name === job.buyerName) {
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          buyerBlockedBalance: Math.max(0, (prev.buyerBlockedBalance || 0) - (escrow ? escrow.amount : (job.itemValue + deliveryFee)))
+        } : null);
+      }
+    }
+
+    // Record Financial Transaction
+    const newTrans: FinancialTransaction = {
+      id: 'ft-' + Date.now(),
+      type: 'delivery_fee',
+      description: `Course livrée & validée : "${job.productTitle}" (${job.pickupCommune} → ${job.dropoffCommune})`,
+      category: 'delivery',
+      grossAmount: deliveryFee,
+      netRevenueBradCi: 0,
+      userName: job.assignedDriverName || 'Bakary Traoré',
+      userRole: 'driver',
+      paymentMethod: escrow?.paymentMethod || 'Wave',
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      hour: new Date().getHours(),
+      status: 'completed'
+    };
+    setFinancialTransactions(prev => [newTrans, ...prev]);
+
+    confetti({
+      particleCount: 100,
+      spread: 90,
+      origin: { y: 0.5 }
+    });
+
+    // Vocal voice announcement
+    voiceNavigator.announceFundsAvailable(sellerPayout, language);
+    voiceNavigator.playSuccessChime();
+
+    addToast(
+      '🎉 Livraison Validée & Virement Effectué !', 
+      `OTP vérifié avec succès ! Virement de ${deliveryFee.toLocaleString('fr-FR')} FCFA crédité au livreur. Solde bloqué vendeur de ${sellerPayout.toLocaleString('fr-FR')} FCFA transféré vers son solde de retrait disponible.`,
+      'success'
+    );
+
+    return true;
+  };
+
+  const buyerConfirmDeliveryOTP = (jobId: string, enteredOtp: string): boolean => {
+    return driverConfirmDeliveryOTP(jobId, enteredOtp);
+  };
+
+  const buyerCancelAndReturnPackage = (jobId: string, reason: string): { success: boolean; returnOtpCode: string; message: string } => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return { success: false, returnOtpCode: '', message: 'Course introuvable' };
+
+    const escrow = escrowRecords.find(e => e.productId === job.productId);
+    const returnOtp = job.returnOtpCode || String(Math.floor(1000 + Math.random() * 9000));
+    const deliveryFee = job.deliveryFee || 2500;
+    const itemValue = job.itemValue || (escrow ? escrow.amount - escrow.deliveryFee : 0);
+
+    // Update Job to 'returning'
+    const updatedJob: DeliveryJob = {
+      ...job,
+      status: 'returning',
+      returnReason: reason || 'Colis non-conforme lors de la remise physique',
+      returnOtpCode: returnOtp,
+      isReturnConfirmedBySeller: false,
+      etaMinutes: Math.max(10, Math.round((job.distanceKm || 8) * 1.5))
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'returning', returnOtpCode: returnOtp } : p));
+
+    // Escrow handling:
+    // 1. Buyer gets the itemValue refunded back to walletBalance (refund for non-conforming item)
+    // 2. Driver receives deliveryFee for the transport
+    // 3. Escrow status updated to 'returned_delivery_paid'
+    setEscrowRecords(prev => prev.map(e => e.productId === job.productId ? {
+      ...e,
+      status: 'returned_delivery_paid',
+      releasedAt: new Date().toISOString()
+    } : e));
+
+    // Update Users balances:
+    setUsers(prev => prev.map(u => {
+      let updated = { ...u };
+      // Driver gets delivery fee
+      if (u.id === job.assignedDriverId || u.name === job.assignedDriverName) {
+        updated.walletBalance = u.walletBalance + deliveryFee;
+      }
+      // Buyer gets item value refunded to available wallet balance
+      if (u.name === job.buyerName || (currentUser && u.id === currentUser.id && currentUser.role === 'client')) {
+        updated.walletBalance = u.walletBalance + itemValue;
+        if (updated.buyerBlockedBalance) {
+          updated.buyerBlockedBalance = Math.max(0, updated.buyerBlockedBalance - (escrow ? escrow.amount : itemValue + deliveryFee));
+        }
+      }
+      // Seller's blocked balance is removed
+      if (u.name === job.sellerName || (job.sellerName && job.sellerName.includes(u.name))) {
+        if (updated.blockedBalance) {
+          updated.blockedBalance = Math.max(0, updated.blockedBalance - (escrow ? escrow.sellerAmount : itemValue * 0.95));
+        }
+      }
+      return updated;
+    }));
+
+    // Update currentUser if applicable
+    if (currentUser) {
+      if (currentUser.name === job.buyerName || currentUser.role === 'client') {
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          walletBalance: prev.walletBalance + itemValue,
+          buyerBlockedBalance: Math.max(0, (prev.buyerBlockedBalance || 0) - (escrow ? escrow.amount : itemValue + deliveryFee))
+        } : null);
+      } else if (currentUser.id === job.assignedDriverId) {
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          walletBalance: prev.walletBalance + deliveryFee
+        } : null);
+      }
+    }
+
+    // Create financial transaction
+    const cancelTx: FinancialTransaction = {
+      id: 'ft-' + Date.now(),
+      type: 'order_refund',
+      description: `Annulation non-conforme & Retour colis "${job.productTitle}" vers ${job.sellerName}. Frais livreur (${deliveryFee.toLocaleString('fr-FR')} F) payés.`,
+      category: 'refund',
+      grossAmount: itemValue,
+      netRevenueBradCi: 0,
+      userName: job.buyerName,
+      userRole: 'client',
+      paymentMethod: escrow?.paymentMethod || 'Wave',
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      hour: new Date().getHours(),
+      status: 'completed'
+    };
+    setFinancialTransactions(prev => [cancelTx, ...prev]);
+
+    addToast(
+      '⚠️ Colis Refusé & Retour Déclenché',
+      `Le montant de l'article (${itemValue.toLocaleString('fr-FR')} FCFA) vous a été recrédité sur votre portefeuille. Frais de course (${deliveryFee.toLocaleString('fr-FR')} FCFA) réglés au livreur. Code OTP Retour : ${returnOtp}.`,
+      'warning'
+    );
+
+    return {
+      success: true,
+      returnOtpCode: returnOtp,
+      message: `Retour enclenché avec succès. Code OTP Retour : ${returnOtp}`
+    };
+  };
+
+  const driverConfirmReturnOTP = (jobId: string, enteredOtp: string): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return false;
+
+    const expectedOtp = job.returnOtpCode || '9012';
+    if (enteredOtp.trim() !== expectedOtp) {
+      addToast('Code OTP Retour Incorrect', 'Demandez le code OTP Retour généré par l\'acheteur sur son application.', 'error');
+      return false;
+    }
+
+    // Driver on way back to seller
+    const updatedJob: DeliveryJob = {
+      ...job,
+      status: 'returning',
+      etaMinutes: Math.max(5, Math.round((job.distanceKm || 8) * 1.5))
+    };
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'returning' } : p));
+
+    addToast(
+      'Prise en charge du Retour Validée',
+      `OTP retour accepté. Veuillez acheminer le colis à la boutique / adresse du vendeur (${job.sellerName} à ${job.pickupCommune}).`,
+      'info'
+    );
+    return true;
+  };
+
+  const sellerConfirmReturnReceived = (jobId: string): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return false;
+
+    const updatedJob: DeliveryJob = {
+      ...job,
+      status: 'returned',
+      isReturnConfirmedBySeller: true,
+      returnedAt: new Date().toISOString()
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'returned' } : p));
+
+    addToast(
+      '✅ Colis Retour Approuvé & Reçu !',
+      `Vous avez confirmé la réception du colis retourné. L'article est réintégré à votre inventaire et la course est clôturée.`,
+      'success'
+    );
+
+    confetti({
+      particleCount: 80,
+      spread: 70,
+      origin: { y: 0.6 }
+    });
+
+    return true;
+  };
+
+  // ================= 30s DRIVER DISPATCH ENGINE =================
+  useEffect(() => {
+    if (!pendingOrderOffer) return;
+
+    const timer = setInterval(() => {
+      setOrderOfferCountdown(prev => {
+        if (prev <= 1) {
+          // Expired -> auto-decline and pass to next driver in commune
+          clearInterval(timer);
+          driverDeclineIncomingOffer();
+          return 30;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [pendingOrderOffer]);
+
+  const triggerOrderDispatchToDriver = (job: DeliveryJob) => {
+    setPendingOrderOffer(job);
+    setOrderOfferCountdown(30);
+    playOrderAlertSound();
+    announceDriverIncomingOrder(job.pickupCommune, job.dropoffCommune, job.deliveryFee);
+  };
+
+  const driverAcceptIncomingOffer = () => {
+    if (!pendingOrderOffer) return;
+    const jobId = pendingOrderOffer.id;
+    setPendingOrderOffer(null);
+    driverAcceptJob(jobId);
+    playSuccessChime();
+  };
+
+  const driverDeclineIncomingOffer = () => {
+    if (!pendingOrderOffer) return;
+    const declinedJob = pendingOrderOffer;
+    setPendingOrderOffer(null);
+    addToast(
+      'Course refusée ou expirée',
+      `La course #${declinedJob.id.substring(0, 6)} vers ${declinedJob.dropoffCommune} a été réassignée au réseau de livreurs disponibles.`,
+      'info'
+    );
+  };
+
+  // ================= AUTHENTICATION FLOWS =================
+  const registerUser = (data: {
+    firstName: string;
+    lastName: string;
+    city: string;
+    email: string;
+    phone: string;
+    role: UserRole;
+    password?: string;
+  }) => {
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`;
+    
+    const newUser: User = {
+      id: 'user-' + Date.now(),
+      name: fullName,
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      city: data.city,
+      email: data.email.trim().toLowerCase(),
+      phone: data.phone.startsWith('+225') ? data.phone : `+225 ${data.phone}`,
+      role: data.role,
+      avatar: `https://images.unsplash.com/photo-${data.role === 'driver' ? '1507003211169-0a1dd7228f2d' : '1534528741775-53994a69daeb'}?w=150`,
+      walletBalance: 0,
+      blockedBalance: 0,
+      buyerBlockedBalance: 0,
+      kycStatus: 'unverified',
+      emailVerified: false,
+      emailVerificationOtp: otpCode,
+      productsPublishedCount: 0,
+      rating: 5.0,
+      createdAt: new Date().toISOString(),
+      sellerPlan: 'basic',
+      driverPlan: data.role === 'driver' ? 'trial' : undefined,
+      trialDeliveriesRemaining: data.role === 'driver' ? 5 : undefined,
+      driverAvailability: data.role === 'driver' ? 'available' : undefined,
+      vehicleDetails: data.role === 'driver' ? { model: 'Moto Express', plate: 'CI-225-AB', type: 'moto' } : undefined
+    };
+
+    setUsers(prev => [newUser, ...prev]);
+    setCurrentUser(newUser);
+
+    return { success: true, otpCode };
+  };
+
+  const verifyEmailOtp = (email: string, enteredOtp: string) => {
+    const cleanEntered = enteredOtp.trim();
+    const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    
+    if (user && user.emailVerificationOtp && user.emailVerificationOtp !== cleanEntered) {
+      addToast('Code OTP Incorrect', 'Veuillez renseigner le code à 6 chiffres reçu par email.', 'error');
+      return { success: false };
+    }
+
+    const updated: User = {
+      ...(user || currentUser!),
+      emailVerified: true
+    };
+
+    setCurrentUser(updated);
+    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+    setKycModalOpen(true);
+    addToast('📧 Email Validé avec Succès !', 'Veuillez maintenant compléter votre vérification KYC pour activer vos privilèges.', 'success');
+    return { success: true };
+  };
+
+  const loginWithEmail = (email: string, password?: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const found = users.find(u => u.email?.toLowerCase() === cleanEmail || u.name.toLowerCase().includes(cleanEmail));
+    
+    if (found) {
+      setCurrentUser(found);
+      addToast('Connexion Réussie', `Bienvenue de retour, ${found.name} !`, 'success');
+      return { success: true };
+    }
+
+    if (currentUser) {
+      addToast('Connexion Réussie', `Connecté en tant que ${currentUser.name}`, 'success');
+      return { success: true };
+    }
+
+    return { success: false };
+  };
+
+  const loginWithGoogle = (role: UserRole = 'client') => {
+    const googleEmail = 'utilisateur.google@gmail.com';
+    const existing = users.find(u => u.email === googleEmail);
+    
+    if (existing) {
+      setCurrentUser(existing);
+      addToast('Connexion Google Réussie', `Bienvenue ${existing.name}`, 'success');
+      return { success: true, needsProfileCompletion: false, user: existing };
+    }
+
+    const tempUser: User = {
+      id: 'user-g-' + Date.now(),
+      name: 'Google User',
+      firstName: 'Utilisateur',
+      lastName: 'Google',
+      email: googleEmail,
+      phone: '+225 07 00 00 00 00',
+      city: 'Cocody',
+      role,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      walletBalance: 0,
+      blockedBalance: 0,
+      buyerBlockedBalance: 0,
+      kycStatus: 'unverified',
+      emailVerified: true,
+      productsPublishedCount: 0,
+      sellerPlan: 'basic',
+      driverPlan: role === 'driver' ? 'trial' : undefined,
+      trialDeliveriesRemaining: role === 'driver' ? 5 : undefined,
+      driverAvailability: role === 'driver' ? 'available' : undefined,
+      createdAt: new Date().toISOString()
+    };
+
+    return { success: true, needsProfileCompletion: true, user: tempUser };
+  };
+
+  const completeGoogleProfile = (data: {
+    firstName: string;
+    lastName: string;
+    phone: string;
+    city: string;
+    role: UserRole;
+  }) => {
+    const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`;
+    const newUser: User = {
+      id: 'user-g-' + Date.now(),
+      name: fullName,
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      email: 'utilisateur.google@gmail.com',
+      phone: data.phone.startsWith('+225') ? data.phone : `+225 ${data.phone}`,
+      city: data.city,
+      role: data.role,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      walletBalance: 0,
+      blockedBalance: 0,
+      buyerBlockedBalance: 0,
+      kycStatus: 'unverified',
+      emailVerified: true,
+      productsPublishedCount: 0,
+      sellerPlan: 'basic',
+      driverPlan: data.role === 'driver' ? 'trial' : undefined,
+      trialDeliveriesRemaining: data.role === 'driver' ? 5 : undefined,
+      driverAvailability: data.role === 'driver' ? 'available' : undefined,
+      createdAt: new Date().toISOString()
+    };
+
+    setUsers(prev => [newUser, ...prev]);
+    setCurrentUser(newUser);
+    setKycModalOpen(true);
+    addToast('Profil Complété', 'Compte configuré ! Soumettez vos documents KYC pour finaliser.', 'success');
+  };
+
+  // ================= RATING & REVIEW ENGINE =================
+  const submitReview = (data: {
+    jobId: string;
+    productId: string;
+    productTitle: string;
+    sellerRating: number;
+    sellerComment: string;
+    sellerQuickTags: string[];
+    driverRating: number;
+    driverComment: string;
+    driverQuickTags: string[];
+  }) => {
+    const job = freightJobs.find(j => j.id === data.jobId);
+    const newReview: ReviewRecord = {
+      id: 'rev-' + Date.now(),
+      jobId: data.jobId,
+      productId: data.productId,
+      productTitle: data.productTitle,
+      buyerId: currentUser?.id || 'buyer-1',
+      buyerName: currentUser?.name || 'Acheteur',
+      sellerId: job?.sellerName || 'Vendeur',
+      sellerName: job?.sellerName || 'Vendeur',
+      sellerRating: data.sellerRating,
+      sellerComment: data.sellerComment,
+      sellerQuickTags: data.sellerQuickTags,
+      driverId: job?.assignedDriverId || 'driver-1',
+      driverName: job?.assignedDriverName || 'Livreur',
+      driverRating: data.driverRating,
+      driverComment: data.driverComment,
+      driverQuickTags: data.driverQuickTags,
+      createdAt: new Date().toISOString()
+    };
+
+    setReviews(prev => [newReview, ...prev]);
+
+    // Synthetic reports sent automatically to both notification channels
+    addNotification({
+      userId: job?.sellerName || 'all',
+      type: 'review',
+      title: `⭐ Nouvelle Évaluation Vendeur (${data.sellerRating}/5)`,
+      message: `Rapport d'évaluation reçu pour "${data.productTitle}" : Note ${data.sellerRating}/5. Tags : [${data.sellerQuickTags.join(', ')}]. ${data.sellerComment ? `"${data.sellerComment}"` : ''}`,
+      linkTo: 'profile'
+    });
+
+    addNotification({
+      userId: job?.assignedDriverId || 'all',
+      type: 'review',
+      title: `🛵 Nouvelle Évaluation Livreur (${data.driverRating}/5)`,
+      message: `Rapport de course reçu pour la livraison "${data.productTitle}" : Note ${data.driverRating}/5. Tags : [${data.driverQuickTags.join(', ')}]. ${data.driverComment ? `"${data.driverComment}"` : ''}`,
+      linkTo: 'dashboard_driver'
+    });
+
+    playSuccessChime();
+    addToast(
+      '🎉 Évaluation Transmise !',
+      'Vos avis ont été pris en compte et les rapports synthétiques ont été générés.',
+      'success'
+    );
+  };
+
+  // ================= KYC & ANTI-FRAUD ENGINE =================
+  const submitKYC = (
+    dataOrDocType: {
+      docType: 'cni' | 'passeport' | 'attestation' | 'permis';
+      docNumber: string;
+      photoUrl: string;
+      selfieUrl: string;
+      driverLicenseUrl?: string;
+      driverLicenseSelfieUrl?: string;
+      vehicleRegistrationUrl?: string;
+    } | 'cni' | 'passeport' | 'attestation' | 'permis',
+    docNumParam?: string,
+    photoUrlParam?: string,
+    selfieUrlParam?: string
+  ) => {
+    if (!currentUser) {
+      return { success: false, isDuplicate: false, message: 'Utilisateur non connecté' };
+    }
+
+    let docType: 'cni' | 'passeport' | 'attestation' | 'permis' = 'cni';
+    let docNumber = '';
+    let photoUrl = '';
+    let selfieUrl = '';
+    let driverLicenseUrl: string | undefined;
+    let driverLicenseSelfieUrl: string | undefined;
+    let vehicleRegistrationUrl: string | undefined;
+
+    if (typeof dataOrDocType === 'object' && dataOrDocType !== null) {
+      docType = dataOrDocType.docType || 'cni';
+      docNumber = dataOrDocType.docNumber || '';
+      photoUrl = dataOrDocType.photoUrl || '';
+      selfieUrl = dataOrDocType.selfieUrl || '';
+      driverLicenseUrl = dataOrDocType.driverLicenseUrl;
+      driverLicenseSelfieUrl = dataOrDocType.driverLicenseSelfieUrl;
+      vehicleRegistrationUrl = dataOrDocType.vehicleRegistrationUrl;
+    } else {
+      docType = dataOrDocType || 'cni';
+      docNumber = docNumParam || '';
+      photoUrl = photoUrlParam || '';
+      selfieUrl = selfieUrlParam || '';
+    }
+
+    const cleanNum = docNumber.trim().toUpperCase();
+
+    // Check if document number already exists
+    const existingUser = users.find(u => u.id !== currentUser.id && u.kycDocumentNumber?.toUpperCase() === cleanNum);
+    const existingKYC = kycRecords.find(k => k.userId !== currentUser.id && k.documentNumber.toUpperCase() === cleanNum);
+
+    if (existingUser || existingKYC) {
+      const duplicateOwner = existingUser ? existingUser.name : existingKYC?.userName || 'Autre utilisateur';
+      
+      const fraudRecord: KYCRecord = {
+        id: 'kyc-' + Date.now(),
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userPhone: currentUser.phone,
+        userRole: currentUser.role,
+        documentType: docType as any,
+        documentNumber: cleanNum,
+        documentPhoto: photoUrl,
+        selfiePhoto: selfieUrl,
+        driverLicensePhoto: driverLicenseUrl,
+        driverLicenseSelfiePhoto: driverLicenseSelfieUrl,
+        vehicleRegistrationPhoto: vehicleRegistrationUrl,
+        submittedAt: new Date().toISOString(),
+        status: 'rejected',
+        isDuplicate: true,
+        duplicateUserIds: [existingUser?.id || existingKYC?.userId || 'unknown'],
+        reviewNotes: `🚨 SÉCURITÉ ANTI-FRAUDE : Détection automatique de doublon ! Le document ${cleanNum} est déjà enregistré sur le compte de "${duplicateOwner}". Rejet automatique.`
+      };
+
+      setKycRecords(prev => [fraudRecord, ...prev]);
+
+      const updatedUser: User = {
+        ...currentUser,
+        kycStatus: 'rejected',
+        kycDocumentType: docType as any,
+        kycDocumentNumber: cleanNum
+      };
+      setCurrentUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+      addToast(
+        '🚨 Fraude Détectée - Document Déjà Enregistré', 
+        `Le numéro de ${docType.toUpperCase()} ${cleanNum} est déjà associé à un autre compte existant. Un document ne peut être utilisé qu'une seule fois.`,
+        'error'
+      );
+
+      return {
+        success: false,
+        isDuplicate: true,
+        message: "Cette pièce d'identité est déjà associée à un compte vérifié sur BRAD'CI. La création de compte multiple est interdite."
+      };
+    }
+
+    // Normal submission (Pending Admin approval)
+    const newKycRecord: KYCRecord = {
+      id: 'kyc-' + Date.now(),
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userPhone: currentUser.phone,
+      userRole: currentUser.role,
+      documentType: docType as any,
+      documentNumber: cleanNum,
+      documentPhoto: photoUrl,
+      selfiePhoto: selfieUrl,
+      driverLicensePhoto: driverLicenseUrl,
+      driverLicenseSelfiePhoto: driverLicenseSelfieUrl,
+      vehicleRegistrationPhoto: vehicleRegistrationUrl,
+      submittedAt: new Date().toISOString(),
+      status: 'pending',
+      isDuplicate: false
+    };
+
+    setKycRecords(prev => [newKycRecord, ...prev]);
+
+    const updatedUser: User = {
+      ...currentUser,
+      kycStatus: 'pending',
+      kycDocumentType: docType as any,
+      kycDocumentNumber: cleanNum,
+      kycPhotoUrl: photoUrl,
+      kycSelfieUrl: selfieUrl,
+      kycDriverLicenseUrl: driverLicenseUrl,
+      kycDriverLicenseSelfieUrl: driverLicenseSelfieUrl,
+      kycVehicleRegistrationUrl: vehicleRegistrationUrl,
+      kycSubmittedAt: new Date().toISOString()
+    };
+
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+    addToast(
+      '🛡️ Dossier KYC Soumis avec Succès', 
+      'Votre dossier a été transmis à la sécurité. Validation sous 24h ouvrées.', 
+      'info'
+    );
+
+    return {
+      success: true,
+      isDuplicate: false,
+      message: 'Dossier transmis avec succès aux administrateurs.'
+    };
+  };
+
+  const adminInstantApproveMyKYC = () => {
+    if (!currentUser) return;
+    const updatedUser: User = {
+      ...currentUser,
+      kycStatus: 'verified'
+    };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    setKycRecords(prev => prev.map(k => k.userId === currentUser.id ? { ...k, status: 'verified', reviewedBy: 'Direction Sécurité Brad\'CI (Instantané)' } : k));
+  };
+
+  const adminApproveKYC = (kycId: string) => {
+    const rec = kycRecords.find(k => k.id === kycId);
+    if (!rec) return;
+
+    setKycRecords(prev => prev.map(k => k.id === kycId ? { ...k, status: 'verified', reviewedBy: 'Direction Sécurité Brad\'CI' } : k));
+    setUsers(prev => prev.map(u => u.id === rec.userId ? { ...u, kycStatus: 'verified' } : u));
+    
+    if (currentUser?.id === rec.userId) {
+      setCurrentUser(prev => prev ? { ...prev, kycStatus: 'verified' } : null);
+    }
+
+    addToast('KYC Validé', `Le dossier de ${rec.userName} a été certifié avec succès.`, 'success');
+  };
+
+  const adminRejectKYC = (kycId: string, reason: string) => {
+    const rec = kycRecords.find(k => k.id === kycId);
+    if (!rec) return;
+
+    setKycRecords(prev => prev.map(k => k.id === kycId ? { ...k, status: 'rejected', reviewNotes: reason, reviewedBy: 'Direction Sécurité Brad\'CI' } : k));
+    setUsers(prev => prev.map(u => u.id === rec.userId ? { ...u, kycStatus: 'rejected' } : u));
+
+    if (currentUser?.id === rec.userId) {
+      setCurrentUser(prev => prev ? { ...prev, kycStatus: 'rejected' } : null);
+    }
+
+    addToast('KYC Rejeté', `Le dossier de ${rec.userName} a été rejeté (${reason})`, 'warning');
+  };
+
+  // Admin Product Moderation & Fast/Flash Approvals
+  const adminApproveProduct = (productId: string, type: 'flash' | 'standard' = 'standard') => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+
+    const isFlash = type === 'flash';
+    const updatedProd: Product = {
+      ...prod,
+      status: 'active',
+      approvalType: type,
+      isBoosted: isFlash ? true : prod.isBoosted,
+      approvedAt: new Date().toISOString()
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+
+    addNotification({
+      recipientRole: 'all',
+      recipientUserId: prod.sellerId,
+      type: 'system',
+      title: isFlash ? '⚡ Approbation Flash Validée !' : '✅ Annonce Approuvée & En Ligne',
+      message: isFlash 
+        ? `Votre annonce "${prod.title}" a reçu l'Approbation Rapide Flash de la modération et est propulsée en tête de liste !` 
+        : `Votre annonce "${prod.title}" a été approuvée par l'administration et est maintenant visible par tous les acheteurs.`,
+      urgency: isFlash ? 'high' : 'normal'
+    });
+
+    if (isFlash) {
+      try {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } catch (e) {
+        // Safe fallback
+      }
+    }
+
+    addToast(
+      isFlash ? '⚡ Approbation Flash Réussie !' : '✅ Annonce Approuvée',
+      `Le produit "${prod.title}" est maintenant en ligne ${isFlash ? '(Mise en avant Flash active)' : ''}.`,
+      'success'
+    );
+  };
+
+  const adminRejectProduct = (productId: string, reason: string = 'Non conforme aux règles de vente et de sécurité') => {
+    const prod = products.find(p => p.id === productId);
+    if (!prod) return;
+
+    const updatedProd: Product = {
+      ...prod,
+      status: 'rejected',
+      rejectionReason: reason
+    };
+
+    setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
+
+    addNotification({
+      recipientRole: 'all',
+      recipientUserId: prod.sellerId,
+      type: 'system',
+      title: '❌ Annonce Non Conforme',
+      message: `Votre annonce "${prod.title}" a été refusée par la modération : ${reason}. Vous pouvez la modifier et la soumettre à nouveau.`,
+      urgency: 'high'
+    });
+
+    addToast('Annonce Refusée', `Le produit "${prod.title}" a été rejeté (${reason}).`, 'warning');
+  };
+
+  // Buy Pass or Boost
+  const purchaseSubscription = (plan: SellerPlan | DriverPlan | 'boost', paymentMethod: string, targetProductId?: string) => {
+    if (!currentUser) return;
+
+    if (plan === 'boost' && targetProductId) {
+      setProducts(prev => prev.map(p => p.id === targetProductId ? { ...p, isBoosted: true } : p));
+      addToast('Boost Flash Activé !', 'Votre annonce est maintenant propulsée en tête de liste pendant 48h.', 'success');
+    } else if (plan === 'standard' || plan === 'pro') {
+      const updatedUser: User = {
+        ...currentUser,
+        sellerPlan: plan,
+        isVIP: plan === 'pro'
+      };
+      setCurrentUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+      
+      confetti({
+        particleCount: 90,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+
+      addToast(
+        plan === 'pro' ? '👑 Pass Vendeur Or VIP Activé (10 000 FCFA) !' : '✨ Pass Vendeur Certifié Activé (5 000 FCFA) !',
+        plan === 'pro' 
+          ? 'Commission minimale à 2.5% + Badge Or VIP + Top Algorithme Abidjan + Support Dédié 7j/7.'
+          : 'Commission réduite à 5% + Badge Vendeur Certifié & Vérifié + Vitrine Boutique Pro.',
+        'success'
+      );
+    } else if (plan === 'vip_pass') {
+      const updatedUser: User = {
+        ...currentUser,
+        driverPlan: 'vip_pass',
+        trialDeliveriesRemaining: 0,
+        isVIP: true
+      };
+      setCurrentUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+      confetti({
+        particleCount: 100,
+        spread: 90,
+        origin: { y: 0.6 }
+      });
+
+      addToast(
+        '🚀 Pass Livreur VIP Activé (6 000 FCFA) !',
+        'Bourse de fret débloquée en illimité. Plus aucune limite de courses !',
+        'success'
+      );
+    }
+
+    setPricingModalOpen(false);
+  };
+
+  const boostProduct = (productId: string) => {
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, isBoosted: true } : p));
+    addToast('Boost Flash (1 000 FCFA)', 'Annonce propulsée en tête du feed !', 'success');
+  };
+
+  const getShopBySellerId = (sellerId: string): ShopProfile | undefined => {
+    const seller = users.find(u => u.id === sellerId);
+    if (seller?.shop) return seller.shop;
+    // If no shop profile exists, create a sensible fallback
+    if (seller) {
+      return {
+        id: 'shop-' + seller.id,
+        sellerId: seller.id,
+        name: `Boutique ${seller.name}`,
+        description: `Boutique officielle de ${seller.name} sur BRAD'CI. Enchères garanties avec séquestre Wave/MoMo et livraison express.`,
+        logo: seller.avatar,
+        banner: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop&q=80',
+        commune: seller.gpsLocation?.commune || 'Cocody',
+        address: seller.gpsLocation?.address || 'Abidjan',
+        phone: seller.phone,
+        whatsapp: seller.phone.replace(/[^0-9+]/g, ''),
+        category: 'Divers',
+        verifiedBadge: seller.sellerPlan === 'pro' || seller.isVIP || false,
+        tier: seller.sellerPlan === 'pro' ? 'pro' : 'standard',
+        viewsCount: 120,
+        salesCount: 4,
+        rating: seller.rating || 4.8
+      };
+    }
+    return undefined;
+  };
+
+  // ================= ADMIN & FINANCIAL ACTIONS =================
+  const adminLogin = (identifier: string, pass: string): boolean => {
+    const cleanId = identifier.trim().toLowerCase();
+    const cleanPass = pass.trim();
+
+    // Standard master check or admin email check
+    const isMaster = (cleanId === 'admin' || cleanId === 'admin@bradci.com' || cleanId === 'admin_root' || cleanId === 'securite.admin@bradci.com') && (cleanPass === 'admin123' || cleanPass === 'bradci2026' || cleanPass === 'admin' || cleanPass.length >= 4);
+
+    if (isMaster) {
+      let adminUser = users.find(u => u.role === 'admin');
+      if (!adminUser) {
+        adminUser = {
+          id: 'user-admin',
+          name: 'Direction Sécurité Brad\'CI',
+          email: 'securite.admin@bradci.com',
+          phone: '+225 27 22 44 88 00',
+          role: 'admin',
+          avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+          productsPublishedCount: 0,
+          kycStatus: 'verified',
+          walletBalance: 2450000,
+          isVIP: true,
+          rating: 5.0,
+          reviewCount: 999
+        };
+        setUsers(prev => [adminUser!, ...prev]);
+      }
+
+      setCurrentUser(adminUser);
+      setIsAdminAuthenticated(true);
+      sessionStorage.setItem('bradci_admin_auth', 'true');
+      localStorage.setItem('bradci_admin_auth', 'true');
+      setActiveTab('dashboard_admin');
+      addToast('Accès Administrateur Déverrouillé', 'Session Maître active. Bienvenue dans l\'Espace d\'Administration Brad\'CI.', 'success');
+      return true;
+    }
+
+    addToast('Échec de Connexion Admin', 'Identifiant maître ou mot de passe incorrect.', 'error');
+    return false;
+  };
+
+  const adminLogout = () => {
+    setIsAdminAuthenticated(false);
+    sessionStorage.removeItem('bradci_admin_auth');
+    localStorage.removeItem('bradci_admin_auth');
+    // Switch to first standard client or visitor
+    const fallbackUser = users.find(u => u.role === 'client') || users[0] || null;
+    setCurrentUser(fallbackUser);
+    setActiveTab('explore');
+    addToast('Session Admin Verrouillée', 'Vous êtes retourné à l\'espace public sécurisé.', 'info');
+  };
+
+  const toggleMaintenanceMode = (enabled?: boolean, notice?: string) => {
+    const nextState = enabled !== undefined ? enabled : !isMaintenanceMode;
+    setIsMaintenanceMode(nextState);
+    if (notice) setMaintenanceNotice(notice);
+    addToast(
+      nextState ? 'Mode Maintenance ACTIVÉ 🚧' : 'Mode Maintenance DÉSACTIVÉ ✅',
+      nextState 
+        ? 'Le site est maintenant inaccessible aux visiteurs publics (écran de maintenance actif).'
+        : 'La plateforme Brad\'CI est de nouveau accessible à tous les utilisateurs.',
+      nextState ? 'warning' : 'success'
+    );
+  };
+
+  const adminApproveWithdrawal = (requestId: string): boolean => {
+    const req = withdrawalRequests.find(r => r.id === requestId);
+    if (!req) return false;
+
+    setWithdrawalRequests(prev => prev.map(r => r.id === requestId ? {
+      ...r,
+      status: 'approved',
+      processedAt: new Date().toISOString()
+    } : r));
+
+    // Record payout in financial transactions
+    const newTrans: FinancialTransaction = {
+      id: 'ft-' + Date.now(),
+      type: 'withdrawal_payout',
+      description: `Virement sortant ${req.paymentMethod} vers ${req.userName} (${req.destinationPhone})`,
+      category: 'payout',
+      grossAmount: req.requestedAmount,
+      netRevenueBradCi: req.feeAmount,
+      userName: req.userName,
+      userRole: req.userRole,
+      paymentMethod: req.paymentMethod,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      hour: new Date().getHours(),
+      status: 'completed'
+    };
+
+    setFinancialTransactions(prev => [newTrans, ...prev]);
+
+    // Send user notification of payout approval
+    addNotification({
+      recipientRole: 'all',
+      recipientUserId: req.userId,
+      type: 'withdrawal',
+      title: language === 'en' ? `✅ Payout Approved (${req.netAmount.toLocaleString('fr-FR')} FCFA)` : `✅ Virement Approuvé & Transféré (${req.netAmount.toLocaleString('fr-FR')} FCFA)`,
+      message: language === 'en'
+        ? `Your payout of ${req.netAmount.toLocaleString('fr-FR')} FCFA via ${req.paymentMethod} has been transferred to ${req.destinationPhone}. Ref: ${req.referenceNumber}`
+        : `Votre virement de ${req.netAmount.toLocaleString('fr-FR')} FCFA via ${req.paymentMethod} a été validé et envoyé sur le ${req.destinationPhone}. Réf : ${req.referenceNumber}`,
+      urgency: 'high'
+    });
+
+    addToast(
+      language === 'en' ? 'Payout Approved & Sent!' : 'Virement Approuvé & Exécuté !',
+      language === 'en' 
+        ? `The amount of ${req.netAmount.toLocaleString('fr-FR')} FCFA was successfully transferred via ${req.paymentMethod} to ${req.destinationPhone}.`
+        : `Le montant de ${req.netAmount.toLocaleString('fr-FR')} FCFA a été viré avec succès par ${req.paymentMethod} vers ${req.destinationPhone}.`,
+      'success'
+    );
+
+    return true;
+  };
+
+  const adminRejectWithdrawal = (requestId: string, reason: string): boolean => {
+    const req = withdrawalRequests.find(r => r.id === requestId);
+    if (!req) return false;
+
+    setWithdrawalRequests(prev => prev.map(r => r.id === requestId ? {
+      ...r,
+      status: 'rejected',
+      rejectionReason: reason,
+      processedAt: new Date().toISOString()
+    } : r));
+
+    // Refund requested amount back to user's wallet
+    setUsers(prev => prev.map(u => u.id === req.userId ? {
+      ...u,
+      walletBalance: u.walletBalance + req.requestedAmount
+    } : u));
+
+    if (currentUser?.id === req.userId) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        walletBalance: prev.walletBalance + req.requestedAmount
+      } : null);
+    }
+
+    // Send user notification of payout rejection
+    addNotification({
+      recipientRole: 'all',
+      recipientUserId: req.userId,
+      type: 'withdrawal',
+      title: language === 'en' ? `❌ Payout Request Declined` : `❌ Demande de Retrait Rejetée`,
+      message: language === 'en'
+        ? `Your withdrawal request of ${req.requestedAmount.toLocaleString('fr-FR')} FCFA was declined. Funds refunded to wallet. Reason: ${reason}`
+        : `Votre demande de retrait de ${req.requestedAmount.toLocaleString('fr-FR')} FCFA a été rejetée. Solde recrédité. Motif : ${reason}`,
+      urgency: 'normal'
+    });
+
+    addToast(
+      language === 'en' ? 'Withdrawal Request Declined' : 'Demande de Retrait Rejetée',
+      language === 'en'
+        ? `Amount of ${req.requestedAmount.toLocaleString('fr-FR')} FCFA refunded to ${req.userName}'s wallet. Reason: ${reason}`
+        : `Montant de ${req.requestedAmount.toLocaleString('fr-FR')} FCFA recrédité sur le portefeuille de ${req.userName}. Motif : ${reason}`,
+      'warning'
+    );
+
+    return true;
+  };
+
+  const requestUserWithdrawal = (amount: number, method: PaymentMethod, phone: string): { success: boolean; message: string } => {
+    if (!currentUser) {
+      return { success: false, message: language === 'en' ? 'You must be logged in.' : 'Vous devez être connecté.' };
+    }
+    if (amount <= 0 || amount > currentUser.walletBalance) {
+      return { success: false, message: language === 'en' ? 'Insufficient balance in your wallet.' : 'Solde insuffisant dans votre portefeuille virtuel.' };
+    }
+    if (amount < 1000) {
+      return { success: false, message: language === 'en' ? 'Minimum withdrawal amount is 1,000 FCFA.' : 'Le montant minimum de retrait est de 1 000 FCFA.' };
+    }
+
+    const fee = Math.max(1, Math.round(amount * 0.01)); // 1% platform withdrawal fee applied to all payment methods
+    const net = amount - fee;
+
+    const newRequestId = 'wdr-' + Date.now();
+    const referenceNum = `WDR-${method.replace(/\s+/g, '').toUpperCase()}-${Date.now().toString().slice(-6)}`;
+    const newReq: WithdrawalRequest = {
+      id: newRequestId,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      userPhone: currentUser.phone,
+      userRole: currentUser.role,
+      requestedAmount: amount,
+      feeAmount: fee,
+      netAmount: net,
+      paymentMethod: method,
+      destinationPhone: phone || currentUser.phone,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      referenceNumber: referenceNum
+    };
+
+    // Deduct from wallet immediately
+    const updatedUser: User = {
+      ...currentUser,
+      walletBalance: currentUser.walletBalance - amount
+    };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+    setWithdrawalRequests(prev => [newReq, ...prev]);
+
+    // Send Alert to Admin Phone (+225 07 89 96 15 80) in background
+    const newAlert: AdminAlert = {
+      id: 'alert-' + Date.now(),
+      type: 'withdrawal_request',
+      title: `Demande de Retrait ${method} (${amount.toLocaleString('fr-FR')} FCFA)`,
+      message: `${currentUser.name} (${currentUser.role}) a demandé un virement ${method} de ${amount.toLocaleString('fr-FR')} FCFA vers le ${phone || currentUser.phone}.`,
+      channel: method === 'Wave' ? 'sms' : 'whatsapp',
+      targetAdminPhone: '+225 07 89 96 15 80',
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      metadata: {
+        withdrawalId: newRequestId,
+        userId: currentUser.id,
+        amount,
+        phone: phone || currentUser.phone
+      }
+    };
+    setAdminAlerts(prev => [newAlert, ...prev]);
+
+    // Send pending withdrawal notification to user
+    addNotification({
+      recipientRole: 'all',
+      recipientUserId: currentUser.id,
+      type: 'withdrawal',
+      title: language === 'en' ? `⏳ Withdrawal Request Pending (${net.toLocaleString('fr-FR')} FCFA)` : `⏳ Demande de Retrait en Cours (${net.toLocaleString('fr-FR')} FCFA)`,
+      message: language === 'en'
+        ? `Your payout request of ${net.toLocaleString('fr-FR')} FCFA via ${method} is being processed (Estimated time: 15-30 min). Ref: ${referenceNum}`
+        : `Votre demande de retrait de ${net.toLocaleString('fr-FR')} FCFA via ${method} est en cours de validation (Délai estimé : 15 à 30 min). Réf : ${referenceNum}`,
+      urgency: 'normal'
+    });
+
+    addToast(
+      language === 'en' ? 'Withdrawal Request Submitted' : 'Demande de Retrait Enregistrée',
+      language === 'en'
+        ? `Your request for ${net.toLocaleString('fr-FR')} FCFA via ${method} has been registered. Processing in 15 to 30 minutes.`
+        : `Votre demande de ${net.toLocaleString('fr-FR')} FCFA via ${method} a été enregistrée. Virement sous 15 à 30 minutes.`,
+      'success'
+    );
+
+    return { success: true, message: language === 'en' ? 'Request submitted successfully.' : 'Demande soumise avec succès.' };
+  };
+
+  const adminToggleUserSuspension = (userId: string, reason?: string) => {
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return;
+
+    const willSuspend = !targetUser.isSuspended;
+    setUsers(prev => prev.map(u => u.id === userId ? {
+      ...u,
+      isSuspended: willSuspend,
+      suspensionReason: willSuspend ? (reason || 'Non respect des règles de la communauté Brad\'CI') : undefined
+    } : u));
+
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        isSuspended: willSuspend,
+        suspensionReason: willSuspend ? (reason || 'Non respect des règles de la communauté Brad\'CI') : undefined
+      } : null);
+    }
+
+    addToast(
+      willSuspend ? 'Compte Utilisateur Suspendu' : 'Compte Utilisateur Débloqué',
+      `${targetUser.name} a été ${willSuspend ? 'suspendu de la plateforme' : 'réactivé avec succès'}.`,
+      willSuspend ? 'warning' : 'success'
+    );
+  };
+
+  const adminToggleShopClosure = (shopId: string, reason?: string) => {
+    setUsers(prev => prev.map(u => {
+      if (u.shop && u.shop.id === shopId) {
+        const isClosedNow = !u.shop.isClosed;
+        return {
+          ...u,
+          shop: {
+            ...u.shop,
+            isClosed: isClosedNow,
+            closedReason: isClosedNow ? (reason || 'Fermeture administrative temporaire') : undefined
+          }
+        };
+      }
+      return u;
+    }));
+
+    addToast('Statut Boutique Modifié', 'La visibilité publique de la boutique a été mise à jour.', 'info');
+  };
+
+  const adminSendMessageToUser = (recipientId: string, channel: 'in_app' | 'sms' | 'whatsapp', message: string, subject?: string): boolean => {
+    const recipient = users.find(u => u.id === recipientId);
+    if (!recipient) return false;
+
+    const newMsg: SentAdminMessage = {
+      id: 'msg-' + Date.now(),
+      recipientId,
+      recipientName: recipient.name,
+      recipientPhone: recipient.phone,
+      channel,
+      subject: subject || 'Message de la Direction Sécurité Brad\'CI',
+      message,
+      sentAt: new Date().toISOString(),
+      status: 'delivered'
+    };
+
+    setSentAdminMessages(prev => [newMsg, ...prev]);
+
+    addToast(
+      `Message Envoyé (${channel.toUpperCase()})`,
+      `Notification transmise à ${recipient.name} (${recipient.phone}).`,
+      'success'
+    );
+
+    return true;
+  };
+
+  const adminReassignDriver = (jobId: string, newDriverId: string) => {
+    const driver = users.find(u => u.id === newDriverId && u.role === 'driver');
+    if (!driver) {
+      addToast('Erreur', 'Livreur introuvable ou non disponible.', 'error');
+      return;
+    }
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? {
+      ...j,
+      assignedDriverId: driver.id,
+      assignedDriverName: driver.name,
+      assignedDriverPhone: driver.phone,
+      assignedDriverVehicle: driver.vehicleDetails?.type || 'moto',
+      status: 'accepted'
+    } : j));
+
+    addToast('Course Réassignée', `La mission a été réattribuée au livreur ${driver.name}.`, 'success');
+  };
+
+  const adminCancelDeliveryJob = (jobId: string, reason: string) => {
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? {
+      ...j,
+      status: 'cancelled'
+    } : j));
+
+    addToast('Livraison Annulée & Arbitrée', `La course a été annulée (${reason}). Les fonds restent sous séquestre sécurisé.`, 'warning');
+  };
+
+  const markAlertAsRead = (alertId: string) => {
+    setAdminAlerts(prev => prev.map(a => a.id === alertId ? { ...a, isRead: true } : a));
+  };
+
+  const dismissAlert = (alertId: string) => {
+    setAdminAlerts(prev => prev.filter(a => a.id !== alertId));
+  };
+
+  const exportFinancialsExcel = (timeFilter: TimeFilter) => {
+    const now = new Date().toISOString().split('T')[0];
+    let csvContent = '\uFEFF'; // UTF-8 BOM for Excel
+    csvContent += "ID;Date;Heure;Type;Description;Categorie;Montant Brut (FCFA);Revenu Net Brad'CI (FCFA);Utilisateur;Role;Moyen Paiement;Statut\n";
+
+    financialTransactions.forEach(t => {
+      csvContent += `"${t.id}";"${t.date}";"${t.time}";"${t.type}";"${t.description.replace(/"/g, '""')}";"${t.category}";${t.grossAmount};${t.netRevenueBradCi};"${t.userName.replace(/"/g, '""')}";"${t.userRole}";"${t.paymentMethod}";"${t.status}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bradci_comptabilite_${timeFilter}_${now}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    addToast('Export Excel Téléchargé', `Rapport financier exporté pour le filtre [${timeFilter.toUpperCase()}].`, 'success');
+  };
+
+  const updateShopProfile = (shopData: Partial<ShopProfile>) => {
+    if (!currentUser) return;
+
+    const existingShop = currentUser.shop || {
+      id: 'shop-' + currentUser.id,
+      sellerId: currentUser.id,
+      name: `Boutique ${currentUser.name}`,
+      slogan: 'Vente & Enchères Express à Abidjan',
+      description: 'Articles certifiés avec livraison sécurisée sous séquestre.',
+      logo: currentUser.avatar,
+      banner: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop&q=80',
+      commune: userLocation?.commune || currentUser.gpsLocation?.commune || 'Cocody',
+      district: 'Riviera',
+      address: userLocation?.address || currentUser.gpsLocation?.address || 'Abidjan, Côte d\'Ivoire',
+      phone: currentUser.phone,
+      whatsapp: currentUser.phone.replace(/[^0-9+]/g, ''),
+      category: 'Divers',
+      verifiedBadge: currentUser.sellerPlan === 'pro' || currentUser.isVIP || false,
+      tier: currentUser.sellerPlan === 'pro' ? 'pro' : 'standard',
+      viewsCount: 150,
+      salesCount: 6,
+      rating: currentUser.rating || 4.9,
+      openingHours: 'Lun - Sam : 08h00 - 19h00'
+    };
+
+    const updatedShop: ShopProfile = {
+      ...existingShop,
+      ...shopData,
+      tier: currentUser.sellerPlan === 'pro' ? 'pro' : 'standard',
+      verifiedBadge: currentUser.sellerPlan === 'pro' || currentUser.isVIP || false
+    };
+
+    const updatedUser: User = {
+      ...currentUser,
+      shop: updatedShop
+    };
+
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+    addToast('Boutique Mise à Jour !', 'Vos modifications ont été enregistrées avec succès sur votre vitrine publique.', 'success');
+  };
+
+  const updateUserAvatar = (avatarUrl: string) => {
+    if (!currentUser) return;
+    const updatedUser: User = {
+      ...currentUser,
+      avatar: avatarUrl,
+      shop: currentUser.shop ? { ...currentUser.shop, logo: avatarUrl } : currentUser.shop
+    };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    addToast('Photo de Profil Mise à Jour ✅', 'Votre nouvelle photo de profil est maintenant active et visible.', 'success');
+  };
+
+  const updateUserProfile = (data: Partial<User>) => {
+    if (!currentUser) return;
+    const updatedUser: User = {
+      ...currentUser,
+      ...data
+    };
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+    addToast('Profil Mis à Jour ✅', 'Vos informations ont été enregistrées.', 'success');
+  };
+
+  return (
+    <AppContext.Provider
+      value={{
+        currentUser,
+        users,
+        products,
+        freightJobs,
+        escrowRecords,
+        kycRecords,
+        userLocation,
+        gpsPermissionStatus,
+        gpsModalOpen,
+        setGpsModalOpen,
+        requestGpsPermission,
+        setUserManualLocation,
+        activeTab,
+        setActiveTab,
+        authModalOpen,
+        setAuthModalOpen,
+        pricingModalOpen,
+        setPricingModalOpen,
+        targetPlanForPricing,
+        setTargetPlanForPricing,
+        productDetailModal,
+        setProductDetailModal,
+        fiveBiddersModalProduct,
+        setFiveBiddersModalProduct,
+        buyerDepositModalProduct,
+        setBuyerDepositModalProduct,
+        newProductModalOpen,
+        setNewProductModalOpen,
+        gpsTrackingJob,
+        setGpsTrackingJob,
+        selectedShopForView,
+        setSelectedShopForView,
+        updateShopProfile,
+        getShopBySellerId,
+        profileAvatarModalOpen,
+        setProfileAvatarModalOpen,
+        updateUserAvatar,
+        updateUserProfile,
+        toasts,
+        addToast,
+        removeToast,
+
+        // ================= ADMIN SUITE & FINANCIALS =================
+        isAdminAuthenticated,
+        adminLogin,
+        adminLogout,
+        isMaintenanceMode,
+        maintenanceNotice,
+        toggleMaintenanceMode,
+        withdrawalRequests,
+        financialTransactions,
+        adminAlerts,
+        sentAdminMessages,
+        activeLiveVisitorsCount,
+        newRegistrationsTodayCount,
+        adminApproveWithdrawal,
+        adminRejectWithdrawal,
+        requestUserWithdrawal,
+        adminToggleUserSuspension,
+        adminToggleShopClosure,
+        adminSendMessageToUser,
+        adminReassignDriver,
+        adminCancelDeliveryJob,
+        markAlertAsRead,
+        dismissAlert,
+        adminExportModalOpen,
+        setAdminExportModalOpen,
+        adminSelectedMemberForModal,
+        setAdminSelectedMemberForModal,
+        adminMessageModalRecipient,
+        setAdminMessageModalRecipient,
+        exportFinancialsExcel,
+
+        // Notifications & Live Dispatch
+        notifications,
+        unreadNotificationsCount,
+        notificationsModalOpen,
+        setNotificationsModalOpen,
+        addNotification,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        clearAllNotifications,
+        browserNotificationsEnabled,
+        requestBrowserNotificationPermission,
+        pushBrowserNotification,
+
+        // Language, Theme, Voice, Map Provider
+        language,
+        setLanguage,
+        t,
+        translate,
+        theme,
+        effectiveTheme,
+        setTheme,
+        toggleTheme,
+        voiceEnabled,
+        toggleVoice,
+        readCurrentScreenAloud,
+        mapProvider,
+        setMapProvider,
+
+        // KYC Modal & Anti-Fraud
+        kycModalOpen,
+        setKycModalOpen,
+        adminInstantApproveMyKYC,
+
+        // Auth & Email OTP & Google Profile
+        registerUser,
+        verifyEmailOtp,
+        loginWithEmail,
+        loginWithGoogle,
+        completeGoogleProfile,
+
+        // 30s Driver Dispatch Engine
+        pendingOrderOffer,
+        orderOfferCountdown,
+        triggerOrderDispatchToDriver,
+        driverAcceptIncomingOffer,
+        driverDeclineIncomingOffer,
+
+        // Rating & Review Suite
+        reviewModalJob,
+        setReviewModalJob,
+        reviews,
+        submitReview,
+
+        // Actions
+        loginAsUser,
+        loginWithRole,
+        logout,
+        getSellerBlockedBalance,
+        getBuyerBlockedBalance,
+        canUserPublishProduct,
+        publishProduct,
+        placeBid,
+        sellerChooseWinner,
+        sellerSelectBidder,
+        buyerCompleteEscrowDeposit,
+        buyerDeclineSelectedOffer,
+        purgeExpiredSoldProduct,
+        sellerCancelAuction,
+        simulateFiveBids,
+        canDriverTakeDeliveries,
+        toggleDriverAvailability,
+        switchDriverAccount,
+        driverAcceptJob,
+        driverConfirmPickup,
+        driverDeclareArrival,
+        driverSetInspectionVerdict,
+        driverConfirmDeliveryOTP,
+        buyerConfirmDeliveryOTP,
+        buyerCancelAndReturnPackage,
+        driverConfirmReturnOTP,
+        sellerConfirmReturnReceived,
+        submitKYC,
+        adminApproveKYC,
+        adminRejectKYC,
+        adminApproveProduct,
+        adminRejectProduct,
+        purchaseSubscription,
+        boostProduct,
+        buyShopProductDirect,
+
+        // Anti-Fraud, Legal Terms & Stock Restocking
+        fraudIncidents,
+        recordFraudIncident,
+        adminResolveFraudIncident,
+        termsModalOpen,
+        setTermsModalOpen,
+        acceptTermsAndConditions,
+        restockProduct
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
+};

@@ -1,0 +1,6 @@
+{
+  "name": "Brad'CI - Enchères Express & Déstockage",
+  "description": "Plateforme d'enchères express de seconde main et déstockage sécurisé à Abidjan avec séquestre Wave/Mobile Money, RBAC strict, bourse de fret et forfaits vendeurs/livreurs.",
+  "requestFramePermissions": ["geolocation", "camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
