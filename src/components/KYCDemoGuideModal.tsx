@@ -64,12 +64,12 @@ export const KYCDemoGuideModal: React.FC<KYCDemoGuideModalProps> = ({
     {
       type: 'driverLicense' as const,
       title: translate("3. Permis de Conduire (Livreurs)", "3. Driving License (Couriers)"),
-      description: translate("Recto du permis de conduire ivoirien (Catégorie A moto ou B voiture).", "Front of Ivorian driver's license (Category A bike or B car)."),
+      description: translate("Recto du permis de conduire ivoirien (Catégorie A moto ou C fourgon).", "Front of Ivorian driver's license (Category A bike or C cargo)."),
       demoUrl: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=600&auto=format&fit=crop&q=80',
       docNum: 'PC-ABJ-99201',
       validRules: [
         translate("✓ Date de validité en cours", "✓ Active validity date"),
-        translate("✓ Catégorie A / B bien lisible", "✓ Category A / B readable")
+        translate("✓ Catégorie A / C bien lisible", "✓ Category A / C readable")
       ],
       invalidRules: [
         translate("✗ Permis expiré ou illisible", "✗ Expired or illegible license")

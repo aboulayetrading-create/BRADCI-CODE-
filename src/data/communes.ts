@@ -371,8 +371,8 @@ export function calculateDeliveryFee(
   const pickup = ALL_COMMUNES.find(c => c.name.toLowerCase() === pickupCommuneName.toLowerCase() || pickupCommuneName.toLowerCase().includes(c.name.toLowerCase()));
   const dropoff = ALL_COMMUNES.find(c => c.name.toLowerCase() === dropoffCommuneName.toLowerCase() || dropoffCommuneName.toLowerCase().includes(c.name.toLowerCase()));
 
-  // Vehicle multipliers
-  const vehicleMultiplier = vehicle === 'cargo' ? 2.5 : vehicle === 'voiture' ? 1.6 : 1.0;
+  // Vehicle multipliers (Moto Express vs Cargo / Fourgon)
+  const vehicleMultiplier = vehicle === 'cargo' ? 2.5 : 1.0;
 
   // If same commune: intra-commune discount (reduced to 1 000 - 1 200 F)
   if (pickup && dropoff && pickup.id === dropoff.id) {

@@ -4,7 +4,10 @@ import {
   User, 
   Product, 
   DeliveryJob, 
-  EscrowRecord, 
+  Bid,
+  EscrowRecord,
+  DirectPaymentRecord,
+  OrderStatus,
   KYCRecord, 
   UserRole, 
   SellerPlan, 
@@ -22,7 +25,9 @@ import {
   AppTheme,
   MapProvider,
   ReviewRecord,
-  FraudIncidentRecord
+  FraudIncidentRecord,
+  ReferralRecord,
+  VehicleType
 } from '../types';
 import { 
   INITIAL_USERS, 
@@ -32,7 +37,8 @@ import {
   INITIAL_KYC_RECORDS,
   INITIAL_WITHDRAWAL_REQUESTS,
   INITIAL_FINANCIAL_TRANSACTIONS,
-  INITIAL_ADMIN_ALERTS
+  INITIAL_ADMIN_ALERTS,
+  INITIAL_REFERRALS
 } from '../data/mockData';
 import { calculateHaversineDistance, findNearestCommune, getCommuneCoords, calculateDeliveryFee } from '../data/communes';
 import { getTranslation, TranslationKey } from '../utils/translations';
@@ -45,6 +51,12 @@ import {
   announcePurchaseSuccess,
   announceSaleSuccess
 } from '../utils/voiceNavigator';
+import { 
+  createPaymentAuditLog, 
+  TransactionAuditInput, 
+  PaymentAuditLog,
+  getStoredAuditLogs
+} from '../utils/paymentAuditReceiptService';
 
 interface ToastNotification {
   id: string;
@@ -59,6 +71,7 @@ interface AppContextType {
   products: Product[];
   freightJobs: DeliveryJob[];
   escrowRecords: EscrowRecord[];
+  directPaymentRecords: DirectPaymentRecord[];
   kycRecords: KYCRecord[];
   activeTab: string;
   setActiveTab: (tab: string) => void;
@@ -84,11 +97,11 @@ interface AppContextType {
   adminInstantApproveMyKYC: () => void;
 
   // Auth & Email OTP & Google Profile
-  registerUser: (data: { firstName: string; lastName: string; city: string; email: string; phone: string; role: UserRole; password?: string }) => { success: boolean; otpCode: string };
+  registerUser: (data: { firstName: string; lastName: string; city: string; email: string; phone: string; role: UserRole; password?: string; referralCode?: string }) => { success: boolean; otpCode: string };
   verifyEmailOtp: (email: string, enteredOtp: string) => { success: boolean };
   loginWithEmail: (email: string, password?: string) => { success: boolean };
   loginWithGoogle: (role?: UserRole) => { success: boolean; needsProfileCompletion: boolean; user?: User };
-  completeGoogleProfile: (data: { firstName: string; lastName: string; phone: string; city: string; role: UserRole }) => void;
+  completeGoogleProfile: (data: { firstName: string; lastName: string; phone: string; city: string; role: UserRole; referralCode?: string }) => void;
 
   // 30s Driver Dispatch Engine
   pendingOrderOffer: DeliveryJob | null;
@@ -102,6 +115,11 @@ interface AppContextType {
   setReviewModalJob: (job: DeliveryJob | null) => void;
   reviews: ReviewRecord[];
   submitReview: (data: { jobId: string; productId: string; productTitle: string; sellerRating: number; sellerComment: string; sellerQuickTags: string[]; driverRating: number; driverComment: string; driverQuickTags: string[] }) => void;
+  
+  // Official Receipt & Cryptographic Audit Suite
+  receiptModalData: { transactionData: any; auditLog: any } | null;
+  setReceiptModalData: (data: { transactionData: any; auditLog: any } | null) => void;
+  openOfficialReceipt: (jobIdOrJob: string | DeliveryJob) => Promise<boolean>;
   
   // GPS & Location States (Mandatory GPS)
   userLocation: GPSLocation | null;
@@ -192,6 +210,7 @@ interface AppContextType {
   loginAsUser: (userId: string) => void;
   loginWithRole: (role: UserRole) => void;
   logout: () => void;
+  logoutUser: () => void;
   getSellerBlockedBalance: (sellerNameOrId?: string) => number;
   getBuyerBlockedBalance: (buyerNameOrId?: string) => number;
   canUserPublishProduct: (user?: User | null) => { allowed: boolean; reason?: string; limit: number; current: number };
@@ -200,6 +219,7 @@ interface AppContextType {
   sellerChooseWinner: (productId: string, winnerId: string) => void;
   sellerSelectBidder: (productId: string, bidderId: string) => void;
   buyerCompleteEscrowDeposit: (productId: string, paymentMethod?: PaymentMethod) => boolean;
+  buyerInitiatePayOnDelivery: (jobId: string, operator?: PaymentMethod) => Promise<boolean>;
   buyerDeclineSelectedOffer: (productId: string, reason?: string) => void;
   purgeExpiredSoldProduct: (productId: string) => void;
   sellerCancelAuction: (productId: string) => void;
@@ -214,18 +234,24 @@ interface AppContextType {
   driverConfirmDeliveryOTP: (jobId: string, enteredOtp: string) => boolean;
   buyerConfirmDeliveryOTP: (jobId: string, enteredOtp: string) => boolean;
   buyerCancelAndReturnPackage: (jobId: string, reason: string) => { success: boolean; returnOtpCode: string; message: string };
+  driverStartAbsentTimer: (jobId: string) => boolean;
+  driverCancelDueToAbsentBuyer: (jobId: string) => boolean;
   driverConfirmReturnOTP: (jobId: string, enteredOtp: string) => boolean;
   sellerConfirmReturnReceived: (jobId: string) => boolean;
   submitKYC: (
     dataOrDocType: {
-      docType: 'cni' | 'passeport' | 'attestation' | 'permis';
+      docType: 'cni' | 'passeport' | 'attestation' | 'permis' | 'carte_consulaire';
       docNumber: string;
       photoUrl: string;
       selfieUrl: string;
       driverLicenseUrl?: string;
       driverLicenseSelfieUrl?: string;
       vehicleRegistrationUrl?: string;
-    } | 'cni' | 'passeport' | 'attestation' | 'permis',
+      vehiclePlate?: string;
+      vehicleColor?: string;
+      vehicleModel?: string;
+      vehicleType?: VehicleType;
+    } | 'cni' | 'passeport' | 'attestation' | 'permis' | 'carte_consulaire',
     docNumber?: string,
     photoUrl?: string,
     selfieUrl?: string
@@ -245,6 +271,17 @@ interface AppContextType {
   setTermsModalOpen: (open: boolean) => void;
   acceptTermsAndConditions: () => void;
   restockProduct: (productId: string, additionalStock: number) => boolean;
+
+  // Referral System (Système de Parrainage)
+  referrals: ReferralRecord[];
+  setReferrals: React.Dispatch<React.SetStateAction<ReferralRecord[]>>;
+  pendingReferralCode: string | null;
+  setPendingReferralCode: (code: string | null) => void;
+  openRegisterWithReferral: (code?: string) => void;
+  applyReferralBalanceToPurchase: (amount: number) => { success: boolean; deducted: number; remaining: number };
+  simulateNewRefereeRegistration: (sponsorCode?: string) => ReferralRecord | null;
+  simulateRefereeKycApproved: (refereeId: string) => boolean;
+  simulateRefereeFirstTransaction: (refereeId: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -265,6 +302,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return INITIAL_USERS[0];
   });
 
+  const [pendingReferralCode, setPendingReferralCode] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const refParam = params.get('ref') || params.get('referral') || params.get('sponsor') || params.get('code');
+        if (refParam) return refParam.trim().toUpperCase();
+        
+        if (window.location.hash) {
+          const hashMatch = window.location.hash.match(/[#&?](?:ref|referral|code|sponsor)=([A-Za-z0-9-_]+)/i);
+          if (hashMatch && hashMatch[1]) return hashMatch[1].trim().toUpperCase();
+        }
+
+        return localStorage.getItem('bradci_pending_sponsor_code');
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('bradci_products');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
@@ -280,9 +337,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_ESCROW_RECORDS;
   });
 
+  const [directPaymentRecords, setDirectPaymentRecords] = useState<DirectPaymentRecord[]>(() => {
+    const saved = localStorage.getItem('bradci_direct_payments');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('bradci_direct_payments', JSON.stringify(directPaymentRecords));
+  }, [directPaymentRecords]);
+
   const [kycRecords, setKycRecords] = useState<KYCRecord[]>(() => {
     const saved = localStorage.getItem('bradci_kyc');
     return saved ? JSON.parse(saved) : INITIAL_KYC_RECORDS;
+  });
+
+  const [referrals, setReferrals] = useState<ReferralRecord[]>(() => {
+    const saved = localStorage.getItem('bradci_referrals');
+    return saved ? JSON.parse(saved) : INITIAL_REFERRALS;
   });
 
   // GPS Location State
@@ -314,6 +385,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [newProductModalOpen, setNewProductModalOpen] = useState(false);
   const [gpsTrackingJob, setGpsTrackingJob] = useState<DeliveryJob | null>(null);
   const [selectedShopForView, setSelectedShopForView] = useState<ShopProfile | null>(null);
+  const [receiptModalData, setReceiptModalData] = useState<{ transactionData: TransactionAuditInput; auditLog: PaymentAuditLog } | null>(null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   // ================= ADMIN SUITE & FINANCIAL STATES =================
@@ -905,6 +977,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [kycRecords]);
 
   useEffect(() => {
+    localStorage.setItem('bradci_referrals', JSON.stringify(referrals));
+  }, [referrals]);
+
+  useEffect(() => {
     if (userLocation) {
       localStorage.setItem('bradci_user_gps', JSON.stringify(userLocation));
     }
@@ -913,6 +989,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('bradci_gps_permission', gpsPermissionStatus);
   }, [gpsPermissionStatus]);
+
+  // URL Referral Parameter & Invite Link Auto-Detection
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      let detectedRef = params.get('ref') || params.get('referral') || params.get('sponsor') || params.get('code');
+      
+      if (!detectedRef && window.location.hash) {
+        const hashMatch = window.location.hash.match(/[#&?](?:ref|referral|code|sponsor)=([A-Za-z0-9-_]+)/i);
+        if (hashMatch && hashMatch[1]) detectedRef = hashMatch[1];
+      }
+
+      if (detectedRef) {
+        const clean = detectedRef.trim().toUpperCase();
+        setPendingReferralCode(clean);
+        localStorage.setItem('bradci_pending_sponsor_code', clean);
+        
+        const sponsorUser = users.find(u => u.referralCode?.toUpperCase() === clean);
+        const sponsorLabel = sponsorUser ? sponsorUser.name : `Code ${clean}`;
+
+        addToast(
+          '🎁 Lien Parrain Détecté !',
+          `Code parrain [${clean}] activé (${sponsorLabel}). Créez votre compte pour réserver vos +1 000 FCFA de bienvenue !`,
+          'success'
+        );
+
+        // If not logged in, automatically open authentication modal in registration mode
+        if (!currentUser) {
+          setAuthModalOpen(true);
+        }
+      }
+    } catch (err) {
+      console.warn('Error reading URL params for referral:', err);
+    }
+  }, []);
 
   const addToast = (title: string, desc: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
@@ -1252,7 +1364,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  // Direct Boutique Purchase with Escrow, Stock Decrement & Freight Dispatch
+  // Direct Boutique Purchase with Pay on Delivery (POD) & Freight Dispatch
   const buyShopProductDirect = (productId: string, paymentMethod: PaymentMethod = 'Wave'): boolean => {
     if (!currentUser) {
       setAuthModalOpen(true);
@@ -1276,9 +1388,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const finalAmount = prod.buyNowPrice || prod.currentPrice;
-    const commission = Math.round(finalAmount * prod.commissionRate);
-    const sellerNet = finalAmount - commission;
-
     const buyerCommune = userLocation?.commune || currentUser.gpsLocation?.commune || 'Marcory';
     const buyerAddress = userLocation?.address || currentUser.gpsLocation?.address || `${buyerCommune}, Abidjan`;
     const buyerCoords = userLocation || currentUser.gpsLocation || getCommuneCoords(buyerCommune);
@@ -1289,7 +1398,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const deliveryFee = calculateDeliveryFee(prod.commune, buyerCommune, prod.requiredVehicle);
 
-    // Create Delivery Job for Freight Exchange
+    // Create Delivery Job for Freight Exchange (Pay on Delivery model)
     const newJob: DeliveryJob = {
       id: 'job-shop-' + Date.now(),
       productId: prod.id,
@@ -1309,30 +1418,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deliveryFee,
       itemValue: finalAmount,
       status: 'available',
+      orderStatus: 'PENDING',
+      paymentStatus: 'PENDING',
       pickupCode: prod.pickupCode,
-      deliveryOtpCode: prod.deliveryOtpCode,
+      deliveryOtpCode: '', // Generated ONLY after buyer pays at delivery!
       distanceKm: distKm,
       etaMinutes: Math.round(distKm * 2.2 + 8),
     };
 
-    const newEscrow: EscrowRecord = {
-      id: 'escrow-shop-' + Date.now(),
-      productId: prod.id,
-      productTitle: prod.title,
-      amount: finalAmount + deliveryFee,
-      sellerAmount: sellerNet,
-      commissionAmount: commission,
-      commissionRatePercent: prod.commissionRate * 100,
-      deliveryFee,
-      buyerName: currentUser.name,
-      sellerName: prod.shopName || prod.sellerName,
-      status: 'held',
-      paymentMethod,
-      createdAt: new Date().toISOString()
-    };
-
     setFreightJobs(prev => [newJob, ...prev]);
-    setEscrowRecords(prev => [newEscrow, ...prev]);
 
     // Stock Management Calculation
     const currentStock = prod.stockQuantity !== undefined ? prod.stockQuantity : 1;
@@ -1347,10 +1441,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       soldCount: nextSoldCount,
       isOutOfStock: isNowOutOfStock,
       outOfStockSince: outOfStockTimestamp,
-      // The shop product remains active in the boutique catalog with updated stock/sold count
       winnerId: currentUser.id,
       winnerName: currentUser.name,
-      deliveryJobId: newJob.id
+      deliveryJobId: newJob.id,
+      orderStatus: 'PENDING',
+      paymentStatus: 'PENDING'
     };
 
     setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
@@ -1377,8 +1472,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     addToast(
-      '🛍️ Commande Boutique Confirmée !',
-      `Achat de "${prod.title}" validé pour ${finalAmount.toLocaleString('fr-FR')} FCFA. Fonds sous séquestre ${paymentMethod} sécurisé (${(finalAmount + deliveryFee).toLocaleString('fr-FR')} F). ${nextStock > 0 ? `Stock restant : ${nextStock} pcs.` : 'Stock désormais épuisé.'}`,
+      '🛍️ Commande Boutique Enregistrée !',
+      `Achat de "${prod.title}" pour ${finalAmount.toLocaleString('fr-FR')} FCFA. Paiement Direct à la Livraison lors de la remise en main propre.`,
       'success'
     );
     return true;
@@ -1454,7 +1549,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  // NOUVEAU FLUX BRAD'CI: Le vendeur sélectionne 1 des 5 enchérisseurs -> Statut pending_buyer_deposit
+  // NOUVEAU FLUX BRAD'CI: Le vendeur sélectionne 1 des 5 enchérisseurs -> Paiement Direct à la Livraison
   const sellerSelectBidder = (productId: string, bidderId: string) => {
     const prod = products.find(p => p.id === productId);
     if (!prod) return;
@@ -1462,14 +1557,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const chosenBid = prod.bids.find(b => b.bidderId === bidderId) || prod.bids[0];
     if (!chosenBid) return;
 
-    const deliveryFee = prod.requiredVehicle === 'cargo' ? 10000 : prod.requiredVehicle === 'voiture' ? 5000 : 2500;
-    const totalRequired = chosenBid.amount + deliveryFee;
+    const finalAmount = chosenBid.amount;
+    const pickupCoords = prod.pickupCoords || getCommuneCoords(prod.commune);
+    const dropoffCoords = chosenBid.bidderGps || getCommuneCoords(chosenBid.bidderCommune || 'Marcory');
+    const realDistanceKm = calculateHaversineDistance(pickupCoords.lat, pickupCoords.lng, dropoffCoords.lat, dropoffCoords.lng);
+    const distKm = Math.max(2, Math.round(realDistanceKm * 10) / 10);
+
+    const deliveryFee = calculateDeliveryFee(prod.commune, chosenBid.bidderCommune || 'Marcory', prod.requiredVehicle);
+
+    // Create Freight Job for the winning buyer
+    const newJob: DeliveryJob = {
+      id: 'job-' + Date.now(),
+      productId: prod.id,
+      productTitle: prod.title,
+      productImage: prod.images[0],
+      sellerName: prod.sellerName,
+      sellerPhone: '+225 07 48 92 11 34',
+      pickupCommune: prod.commune,
+      pickupAddress: prod.pickupAddress,
+      pickupCoords: pickupCoords,
+      buyerName: chosenBid.bidderName,
+      buyerPhone: chosenBid.bidderPhone || '+225 07 66 11 22 33',
+      dropoffCommune: chosenBid.bidderCommune || 'Marcory',
+      dropoffAddress: `${chosenBid.bidderDistrict || chosenBid.bidderCommune || 'Marcory'}, Abidjan`,
+      dropoffCoords: dropoffCoords,
+      requiredVehicle: prod.requiredVehicle,
+      deliveryFee,
+      itemValue: finalAmount,
+      status: 'available',
+      orderStatus: 'PENDING',
+      paymentStatus: 'PENDING',
+      pickupCode: prod.pickupCode,
+      deliveryOtpCode: '', // Generated ONLY after buyer pays at delivery!
+      distanceKm: distKm,
+      etaMinutes: Math.round(distKm * 2.2 + 8),
+    };
+
+    setFreightJobs(prev => [newJob, ...prev]);
 
     const updatedProd: Product = {
       ...prod,
-      status: 'pending_buyer_deposit',
+      status: 'in_transit',
+      winnerId: chosenBid.bidderId,
+      winnerName: chosenBid.bidderName,
       selectedBidderId: chosenBid.bidderId,
-      selectedBidderName: chosenBid.bidderName
+      selectedBidderName: chosenBid.bidderName,
+      deliveryJobId: newJob.id,
+      orderStatus: 'PENDING',
+      paymentStatus: 'PENDING'
     };
 
     setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
@@ -1482,24 +1617,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification({
       recipientRole: 'client',
       recipientUserId: chosenBid.bidderName,
-      title: '🚨 Offre Retenue ! Dépôt Séquestre Requis',
-      message: `Félicitations ! Le vendeur a retenu votre offre de ${chosenBid.amount.toLocaleString('fr-FR')} FCFA pour "${prod.title}". Effectuez votre dépôt de ${(totalRequired).toLocaleString('fr-FR')} FCFA sous séquestre pour sécuriser l'achat.`,
+      title: '🏆 Offre Retenue ! Commande en Cours',
+      message: `Félicitations ! Le vendeur a retenu votre offre de ${chosenBid.amount.toLocaleString('fr-FR')} FCFA pour "${prod.title}". Un coursier prend en charge la livraison. Vous effectuerez le paiement direct à la livraison une fois le colis en main.`,
       type: 'bid',
       productId: prod.id,
       urgency: 'high'
     });
 
     // Vocal voice announcement
-    voiceNavigator.announceWinnerChosenAndDepositAlert(prod.title, totalRequired, language);
+    voiceNavigator.announceWinnerChosenAndDepositAlert(prod.title, finalAmount + deliveryFee, language);
 
     addToast(
-      '🎯 Acheteur Sélectionné & Alerte Envoyée !',
-      `Offre attribuée à ${chosenBid.bidderName}. Une alerte de dépôt sous séquestre lui a été transmise. S'il refuse, vous pourrez choisir parmi les autres offres.`,
-      'info'
+      '🎯 Acheteur Retenu & Course Lancée !',
+      `Offre attribuée à ${chosenBid.bidderName}. La livraison est lancée sur la bourse de fret. Paiement direct à la livraison.`,
+      'success'
     );
   };
 
-  // L'acheteur retenu effectue son dépôt sous séquestre (Wave / MoMo)
+  // Validation directe acheteur (Pay on Delivery)
   const buyerCompleteEscrowDeposit = (productId: string, paymentMethod: PaymentMethod = 'Wave'): boolean => {
     const prod = products.find(p => p.id === productId);
     if (!prod) return false;
@@ -1508,22 +1643,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!winningBid) return false;
 
     const finalAmount = winningBid.amount;
-    const commission = Math.round(finalAmount * prod.commissionRate);
-    const sellerNet = finalAmount - commission;
-
     const pickupCoords = prod.pickupCoords || getCommuneCoords(prod.commune);
     const dropoffCoords = winningBid.bidderGps || getCommuneCoords(winningBid.bidderCommune || 'Marcory');
     const realDistanceKm = calculateHaversineDistance(pickupCoords.lat, pickupCoords.lng, dropoffCoords.lat, dropoffCoords.lng);
     const distKm = Math.max(2, Math.round(realDistanceKm * 10) / 10);
 
-    let deliveryFee = 3500;
-    if (prod.requiredVehicle === 'cargo') {
-      deliveryFee = Math.max(10000, Math.round((8000 + distKm * 600) / 500) * 500);
-    } else if (prod.requiredVehicle === 'voiture') {
-      deliveryFee = Math.max(5000, Math.round((3500 + distKm * 400) / 500) * 500);
-    } else {
-      deliveryFee = Math.max(2000, Math.round((1500 + distKm * 250) / 500) * 500);
-    }
+    const deliveryFee = calculateDeliveryFee(prod.commune, winningBid.bidderCommune || 'Marcory', prod.requiredVehicle);
 
     // Create Freight Job
     const newJob: DeliveryJob = {
@@ -1545,38 +1670,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deliveryFee,
       itemValue: finalAmount,
       status: 'available',
+      orderStatus: 'PENDING',
+      paymentStatus: 'PENDING',
       pickupCode: prod.pickupCode,
-      deliveryOtpCode: prod.deliveryOtpCode,
+      deliveryOtpCode: '', // Locked until payment confirmed!
       distanceKm: distKm,
       etaMinutes: Math.round(distKm * 2.2 + 8),
     };
 
-    // Create Escrow Record
-    const newEscrow: EscrowRecord = {
-      id: 'escrow-' + Date.now(),
-      productId: prod.id,
-      productTitle: prod.title,
-      amount: finalAmount + deliveryFee,
-      sellerAmount: sellerNet,
-      commissionAmount: commission,
-      commissionRatePercent: prod.commissionRate * 100,
-      deliveryFee,
-      buyerName: winningBid.bidderName,
-      sellerName: prod.sellerName,
-      status: 'held',
-      paymentMethod,
-      createdAt: new Date().toISOString()
-    };
-
     setFreightJobs(prev => [newJob, ...prev]);
-    setEscrowRecords(prev => [newEscrow, ...prev]);
 
     const updatedProd: Product = {
       ...prod,
-      status: 'in_transit', // Bloqué au public avec mention "Achat Effectué - En cours de livraison"
+      status: 'in_transit',
       winnerId: winningBid.bidderId,
       winnerName: winningBid.bidderName,
-      deliveryJobId: newJob.id
+      deliveryJobId: newJob.id,
+      orderStatus: 'PENDING',
+      paymentStatus: 'PENDING'
     };
 
     setProducts(prev => prev.map(p => p.id === productId ? updatedProd : p));
@@ -1585,26 +1696,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setProductDetailModal(updatedProd);
     }
 
-    // Update buyer blocked balance in state
-    setUsers(prev => prev.map(u => {
-      if (u.name === winningBid.bidderName || (currentUser && u.id === currentUser.id)) {
-        return {
-          ...u,
-          buyerBlockedBalance: (u.buyerBlockedBalance || 0) + (finalAmount + deliveryFee)
-        };
-      }
-      return u;
-    }));
-
-    if (currentUser) {
-      setCurrentUser(prev => prev ? {
-        ...prev,
-        buyerBlockedBalance: (prev.buyerBlockedBalance || 0) + (finalAmount + deliveryFee)
-      } : null);
-    }
-
     // Voice announcement
-    voiceNavigator.speak(`Achat effectué et fonds bloqués sous séquestre ${paymentMethod}. Recherche de livreur en cours sur la bourse de fret.`, language);
+    voiceNavigator.speak(`Achat confirmé. Paiement direct à la livraison prévu lors de la remise en main propre.`, language);
 
     // Toast + Confetti
     confetti({
@@ -1614,8 +1707,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     addToast(
-      '🔒 Achat Validé & Fonds sous Séquestre !',
-      `Dépôt de ${(finalAmount + deliveryFee).toLocaleString('fr-FR')} FCFA validé via ${paymentMethod}. L'enchère est bloquée au public et la course est disponible pour les livreurs.`,
+      '🛵 Commande Confirmée !',
+      `Livraison enclenchée pour ${winningBid.bidderName}. Paiement direct prévu à la livraison (${(finalAmount + deliveryFee).toLocaleString('fr-FR')} FCFA).`,
       'success'
     );
 
@@ -1701,8 +1794,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const basePrice = prod.startingPrice || prod.currentPrice || 10000;
     const step = Math.max(2000, Math.round((basePrice * 0.08) / 500) * 500);
 
-    const mockFiveBidders = [
+    const mockFiveBidders: Bid[] = [
       {
+        id: 'bid-mock-1',
         bidderId: 'u_bid_1',
         bidderName: 'Serge Koffi',
         bidderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
@@ -1715,6 +1809,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLeading: false
       },
       {
+        id: 'bid-mock-2',
         bidderId: 'u_bid_2',
         bidderName: 'Awa Diomandé',
         bidderAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
@@ -1727,6 +1822,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLeading: false
       },
       {
+        id: 'bid-mock-3',
         bidderId: 'u_bid_3',
         bidderName: 'Yves Bakayoko',
         bidderAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
@@ -1739,6 +1835,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLeading: false
       },
       {
+        id: 'bid-mock-4',
         bidderId: 'u_bid_4',
         bidderName: 'Fatou Traoré',
         bidderAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
@@ -1751,6 +1848,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLeading: false
       },
       {
+        id: 'bid-mock-5',
         bidderId: 'u_bid_5',
         bidderName: 'Moussa Cissé',
         bidderAvatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150',
@@ -1789,27 +1887,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  // Rule 2: Delivery Driver Trial Rule (5 Free Deliveries)
+  // Rule 2: Delivery Driver Access - Free Unlimited Active Mode by Default (like basic accounts), Pass VIP Coming Soon (activates 5 free trial deliveries on launch)
   const canDriverTakeDeliveries = (driver?: User | null) => {
     const d = driver || currentUser;
     if (!d || d.role !== 'driver') {
-      return { allowed: false, reason: 'Compte livreur requis', remaining: 0 };
+      return { allowed: false, reason: 'Compte livreur requis', remaining: 0, isUnlimited: false };
     }
 
+    // VIP Pass has 100% unlimited runs
     if (d.driverPlan === 'vip_pass') {
-      return { allowed: true, remaining: 9999 };
+      return { allowed: true, remaining: 9999, isUnlimited: true };
     }
 
-    const remaining = d.trialDeliveriesRemaining ?? 0;
-    if (remaining <= 0) {
-      return {
-        allowed: false,
-        reason: 'Période d\'essai terminée (5/5 courses gratuites utilisées). Vous devez obligatoirement souscrire au Pass Livreur VIP (6 000 FCFA / mois) pour continuer à accepter des livraisons.',
-        remaining: 0
-      };
+    // If driver is currently on trial with active quota
+    if (d.driverPlan === 'trial') {
+      const remaining = d.trialDeliveriesRemaining ?? 5;
+      if (remaining <= 0) {
+        return {
+          allowed: false,
+          reason: 'Période d\'essai terminée (5/5 courses gratuites utilisées). Vous pouvez souscrire au Pass Livreur VIP (6 000 FCFA / mois) pour continuer à accepter des livraisons.',
+          remaining: 0,
+          isUnlimited: false
+        };
+      }
+      return { allowed: true, remaining, isUnlimited: false };
     }
 
-    return { allowed: true, remaining };
+    // Default current state: Free unlimited deliveries active for all couriers
+    return { allowed: true, remaining: 9999, isUnlimited: true };
   };
 
   const toggleDriverAvailability = () => {
@@ -1873,7 +1978,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       assignedDriverId: currentUser.id,
       assignedDriverName: currentUser.name,
       assignedDriverPhone: currentUser.phone,
-      assignedDriverVehicle: currentUser.driverPlan === 'vip_pass' ? 'moto' : 'moto',
+      assignedDriverVehicle: currentUser.kycVehicleType || currentUser.vehicleDetails?.type || 'moto',
+      assignedDriverVehiclePlate: currentUser.kycVehiclePlate || currentUser.vehicleDetails?.plate || '4523 JJ 01',
+      assignedDriverVehicleColor: currentUser.kycVehicleColor || currentUser.vehicleDetails?.color || 'Noir & Rouge',
+      assignedDriverVehicleModel: currentUser.kycVehicleModel || currentUser.vehicleDetails?.model || 'Yamaha Crypton 110',
       currentLat: driverCoords.lat,
       currentLng: driverCoords.lng,
       etaMinutes: targetJob.etaMinutes || 15,
@@ -1900,11 +2008,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedJob: DeliveryJob = {
       ...job,
       status: 'in_transit',
+      orderStatus: 'IN_TRANSIT',
       etaMinutes: Math.max(5, Math.round((job.distanceKm || 8) * 1.8))
     };
 
     setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
-    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'in_transit' } : p));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'in_transit', orderStatus: 'IN_TRANSIT' } : p));
     
     addNotification({
       recipientRole: 'client',
@@ -1931,6 +2040,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updatedJob: DeliveryJob = {
       ...job,
       status: 'arrived',
+      orderStatus: 'ARRIVED',
       driverArrivedAtDestination: true,
       inspectionStatus: 'arrived_inspecting',
       arrivalTimestamp: timeStr,
@@ -1938,17 +2048,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
-    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'arrived' as any } : p));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'arrived' as any, orderStatus: 'ARRIVED' } : p));
 
     // Vocal announcement
     voiceNavigator.announceDriverArrived(job.assignedDriverName || 'Le livreur', job.dropoffCommune, language);
 
-    // Send high-priority notification to buyer
+    // Send high-priority notification to buyer (triggers unlock of "Payer et Valider")
     addNotification({
       recipientRole: 'client',
       recipientUserId: job.buyerName,
-      title: '📍 Votre livreur est arrivé à votre porte !',
-      message: `Le coursier (${job.assignedDriverName || 'Bakary'}) est arrivé à ${job.dropoffCommune}. Veuillez sortir inspecter le colis ensemble.`,
+      title: '📍 Votre livreur est arrivé ! Étape "Payer et Valider" débloquée',
+      message: `Le coursier (${job.assignedDriverName || 'Bakary'}) est arrivé à votre porte à ${job.dropoffCommune}. Vous pouvez désormais initier votre paiement direct sécurisé par API sur l'application.`,
       type: 'inspection',
       jobId: job.id,
       urgency: 'critical'
@@ -1959,18 +2069,322 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       recipientRole: 'client',
       recipientUserId: job.sellerName,
       title: '📍 Livreur Arrivé chez le Client',
-      message: `Le livreur est arrivé chez ${job.buyerName} à ${job.dropoffCommune}. Vérification contradictoire en cours.`,
+      message: `Le livreur est arrivé chez ${job.buyerName} à ${job.dropoffCommune}. Vérification contradictoire et paiement direct en cours.`,
       type: 'delivery',
       jobId: job.id,
       urgency: 'normal'
     });
 
     addToast(
-      '📍 Arrivée chez le Client Confirmée',
-      `Vous êtes bien arrivé à ${job.dropoffCommune}. Présentez le colis au client (${job.buyerName}) pour vérification contradictoire.`,
+      '📍 Arrivée chez le Client Signalée (GPS)',
+      `Vous êtes bien arrivé à ${job.dropoffCommune}. L'acheteur (${job.buyerName}) a désormais le bouton "Payer et Valider" débloqué sur son application.`,
       'info'
     );
     return true;
+  };
+
+  // PAIEMENT DIRECT À LA LIVRAISON (Pay on Delivery via API)
+  // Initié exclusivement depuis l'interface de l'acheteur une fois le livreur ARRIVED
+  const buyerInitiatePayOnDelivery = async (jobId: string, operator: PaymentMethod = 'Wave'): Promise<boolean> => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) {
+      addToast('Erreur', 'Mission de livraison introuvable.', 'error');
+      return false;
+    }
+
+    if (job.orderStatus !== 'ARRIVED' && job.status !== 'arrived') {
+      addToast('Livreur non arrivé', 'Le paiement direct ne peut être initié que lorsque le livreur a signalé son arrivée sur place via GPS.', 'warning');
+      return false;
+    }
+
+    const prod = products.find(p => p.id === job.productId);
+    const sellerUser = users.find(u => u.name === job.sellerName || (job.sellerName && job.sellerName.includes(u.name)));
+    const sellerPlan = sellerUser?.sellerPlan || prod?.sellerPlan || 'basic';
+    
+    // Commission structure: Basic: 10%, Intermédiaire / Standard: 5%, Pro: 2.5%
+    let commissionPercent = 10;
+    if (sellerPlan === 'pro') {
+      commissionPercent = 2.5;
+    } else if (sellerPlan === 'standard' || (sellerPlan as string) === 'intermediaire') {
+      commissionPercent = 5.0;
+    }
+
+    const productPrice = Number(job.itemValue) || 0;
+    const deliveryFee = Number(job.deliveryFee) || 0;
+    const platformCommission = Math.round(productPrice * (commissionPercent / 100));
+    const platformFixedFee = 500; // Frais techniques fixes de plateforme
+    const platformTotal = platformCommission + platformFixedFee;
+    const sellerPayout = Math.max(0, productPrice - platformCommission);
+    const totalBuyerPaid = productPrice + deliveryFee + platformFixedFee;
+
+    // Transition: PAYMENT_PENDING
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? {
+      ...j,
+      orderStatus: 'PAYMENT_PENDING',
+      paymentStatus: 'PENDING',
+    } : j));
+
+    addToast('Paiement Direct Initié', `Connexion à l'API ${operator}... Traitement de ${totalBuyerPaid.toLocaleString('fr-FR')} FCFA.`, 'info');
+
+    // Simulate Merchant API Webhook confirmation
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Webhook PAYMENT_SUCCESS confirmation triggered!
+    const generatedOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    const paidAtIso = new Date().toISOString();
+
+    // 1. Record Direct Payment
+    const directRecord: DirectPaymentRecord = {
+      id: 'pay-' + Date.now(),
+      orderId: job.id,
+      productId: job.productId,
+      buyerName: job.buyerName,
+      sellerName: job.sellerName,
+      driverName: job.assignedDriverName || 'Coursier BRAD\'CI',
+      totalAmountPaid: totalBuyerPaid,
+      productPrice,
+      deliveryFee,
+      commissionAmount: platformCommission,
+      commissionPercent,
+      platformFee: platformFixedFee,
+      sellerPayout,
+      paymentMethod: operator,
+      paymentStatus: 'SUCCESS',
+      paidAt: paidAtIso
+    };
+
+    setDirectPaymentRecords(prev => [directRecord, ...prev]);
+
+    // 2. ATOMIC SPLIT PAYMENT:
+    // - Seller: Product Price - Commission (10% Basic, 5% Intermédiaire, 2.5% Pro)
+    // - Courier: Delivery Fee
+    // - Platform: Commission + Platform fees
+    setUsers(prev => prev.map(u => {
+      let updated = { ...u };
+      // Seller
+      if (u.name === job.sellerName || (job.sellerName && job.sellerName.includes(u.name))) {
+        updated.walletBalance = (updated.walletBalance || 0) + sellerPayout;
+      }
+      // Driver
+      if (u.id === job.assignedDriverId || u.name === job.assignedDriverName) {
+        updated.walletBalance = (updated.walletBalance || 0) + deliveryFee;
+      }
+      return updated;
+    }));
+
+    if (currentUser) {
+      if (currentUser.name === job.sellerName) {
+        setCurrentUser(prev => prev ? { ...prev, walletBalance: (prev.walletBalance || 0) + sellerPayout } : null);
+      } else if (currentUser.id === job.assignedDriverId) {
+        setCurrentUser(prev => prev ? { ...prev, walletBalance: (prev.walletBalance || 0) + deliveryFee } : null);
+      }
+    }
+
+    // 3. Update DeliveryJob: orderStatus = 'PAID', unlock deliveryOtpCode ONLY now!
+    const updatedJob: DeliveryJob = {
+      ...job,
+      orderStatus: 'PAID',
+      paymentStatus: 'PAID',
+      paidAt: paidAtIso,
+      deliveryOtpCode: generatedOtp,
+      otpGeneratedAt: paidAtIso,
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, orderStatus: 'PAID', paymentStatus: 'PAID' } : p));
+    setGpsTrackingJob(updatedJob);
+
+    // Record Split Payment Transactions
+    const newTxList: FinancialTransaction[] = [
+      {
+        id: 'tx-split-seller-' + Date.now(),
+        type: 'commission',
+        amount: sellerPayout,
+        fee: 0,
+        netAmount: sellerPayout,
+        fromUserName: job.buyerName,
+        toUserName: job.sellerName,
+        description: `Split Marchand : Vente ${job.productTitle} (${productPrice.toLocaleString('fr-FR')} F - ${commissionPercent}% comm)`,
+        timestamp: paidAtIso,
+        status: 'completed',
+        reference: `POD-${job.id.slice(-6)}-SELLER`
+      },
+      {
+        id: 'tx-split-driver-' + Date.now(),
+        type: 'commission',
+        amount: deliveryFee,
+        fee: 0,
+        netAmount: deliveryFee,
+        fromUserName: job.buyerName,
+        toUserName: job.assignedDriverName || 'Coursier',
+        description: `Split Coursier : Frais de livraison ${job.pickupCommune} -> ${job.dropoffCommune}`,
+        timestamp: paidAtIso,
+        status: 'completed',
+        reference: `POD-${job.id.slice(-6)}-DRIVER`
+      },
+      {
+        id: 'tx-split-platform-' + Date.now(),
+        type: 'commission',
+        amount: platformTotal,
+        fee: 0,
+        netAmount: platformTotal,
+        fromUserName: job.buyerName,
+        toUserName: 'BRAD\'CI Plateforme',
+        description: `Split Plateforme : Commission ${commissionPercent}% (${platformCommission.toLocaleString('fr-FR')} F) + Frais (${platformFixedFee} F)`,
+        timestamp: paidAtIso,
+        status: 'completed',
+        reference: `POD-${job.id.slice(-6)}-BRADCI`
+      }
+    ];
+
+    setFinancialTransactions(prev => [...newTxList, ...prev]);
+
+    // 4. Cryptographic Payment Audit Log & Receipt generation
+    const matchingKyc = kycRecords.find(k => k.userId === sellerUser?.id || k.userName === job.sellerName);
+    const maskedCni = matchingKyc?.documentNumber ? `CI-***${matchingKyc.documentNumber.slice(-4)}` : 'CI-***7842 (Vérifié KYC)';
+    
+    const transactionDataInput: TransactionAuditInput = {
+      transactionId: job.id,
+      orderId: job.id,
+      externalProviderId: `WAVE-CI-${Date.now().toString().slice(-8)}`,
+      transactionRef: `WAVE-CI-${Date.now().toString().slice(-8)}`,
+      provider: (operator as any) || 'Wave',
+      timestamp: paidAtIso,
+      buyerId: currentUser?.id || 'buyer-1',
+      buyerName: job.buyerName,
+      buyerPhone: job.buyerPhone,
+      sellerId: sellerUser?.id || 'seller-1',
+      sellerName: job.sellerName,
+      sellerPhone: job.sellerPhone,
+      sellerKycMaskedId: maskedCni,
+      itemId: job.productId,
+      itemTitle: job.productTitle,
+      itemCategory: prod?.category || 'Occasion Certifiée',
+      itemPriceFCFA: productPrice,
+      deliveryFeeFCFA: deliveryFee,
+      platformFeeFCFA: platformFixedFee,
+      amountTotalFCFA: totalBuyerPaid,
+      deliveryOtpCode: generatedOtp,
+      driverName: job.assignedDriverName || 'Coursier BRAD\'CI',
+      communeOrigin: job.pickupCommune,
+      communeDestination: job.dropoffCommune
+    };
+
+    try {
+      const auditResult = await createPaymentAuditLog(transactionDataInput);
+      console.log('Payment Audit Log Registered:', auditResult);
+    } catch (auditErr) {
+      console.error('Audit log registration error:', auditErr);
+    }
+
+    // Send notifications
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.buyerName,
+      title: '✅ Paiement Confirmé & Code OTP Débloqué !',
+      message: `Votre paiement API ${operator} de ${totalBuyerPaid.toLocaleString('fr-FR')} FCFA a été validé avec succès. Votre Code Secret OTP est : ${generatedOtp}. Transmettez-le au coursier pour récupérer votre colis.`,
+      type: 'payment',
+      jobId: job.id,
+      urgency: 'critical'
+    });
+
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.sellerName,
+      title: '💰 Paiement Direct Reçu !',
+      message: `L'acheteur a validé le paiement direct à la livraison pour "${job.productTitle}". +${sellerPayout.toLocaleString('fr-FR')} FCFA (après ${commissionPercent}% de commission) crédités sur votre solde.`,
+      type: 'payment',
+      jobId: job.id,
+      urgency: 'high'
+    });
+
+    if (job.assignedDriverName) {
+      addNotification({
+        recipientRole: 'driver',
+        recipientUserId: job.assignedDriverName,
+        title: '💵 Paiement Effectué par l\'Acheteur !',
+        message: `L'acheteur a payé via l'API ${operator}. Récupérez son Code Secret OTP pour finaliser la livraison et encaisser vos ${deliveryFee.toLocaleString('fr-FR')} FCFA.`,
+        type: 'delivery',
+        jobId: job.id,
+        urgency: 'critical'
+      });
+    }
+
+    confetti({
+      particleCount: 120,
+      spread: 85,
+      origin: { y: 0.6 }
+    });
+
+    addToast(
+      '✅ Paiement Validé par l\'API !',
+      `Paiement direct ${operator} confirmé (${totalBuyerPaid.toLocaleString('fr-FR')} FCFA). Votre Code Secret OTP est : ${generatedOtp}. Donnez-le au livreur.`,
+      'success'
+    );
+
+    return true;
+  };
+
+  const openOfficialReceipt = async (jobIdOrJob: string | DeliveryJob): Promise<boolean> => {
+    const targetJob: DeliveryJob | undefined = typeof jobIdOrJob === 'string'
+      ? (freightJobs.find(j => j.id === jobIdOrJob) || (gpsTrackingJob?.id === jobIdOrJob ? gpsTrackingJob : undefined))
+      : jobIdOrJob;
+
+    if (!targetJob) {
+      addToast('Erreur', 'Données de transaction introuvables.', 'error');
+      return false;
+    }
+
+    const prod = products.find(p => p.id === targetJob.productId);
+    const sellerUser = users.find(u => u.name === targetJob.sellerName || (targetJob.sellerName && targetJob.sellerName.includes(u.name)));
+    const matchingKyc = kycRecords.find(k => k.userId === sellerUser?.id || k.userName === targetJob.sellerName);
+    const maskedCni = matchingKyc?.documentNumber ? `CI-***${matchingKyc.documentNumber.slice(-4)}` : 'CI-***7842 (Vérifié KYC)';
+
+    const productPrice = Number(targetJob.itemValue) || 10000;
+    const deliveryFee = Number(targetJob.deliveryFee) || 1500;
+    const platformFixedFee = 500;
+    const totalBuyerPaid = productPrice + deliveryFee + platformFixedFee;
+
+    const txInput: TransactionAuditInput = {
+      transactionId: targetJob.id,
+      orderId: targetJob.id,
+      externalProviderId: `WAVE-CI-${(targetJob.paidAt || Date.now().toString()).slice(-8)}`,
+      transactionRef: `WAVE-CI-${(targetJob.paidAt || Date.now().toString()).slice(-8)}`,
+      provider: (targetJob.paymentOperator as any) || 'Wave',
+      timestamp: targetJob.paidAt || targetJob.completedAt || new Date().toISOString(),
+      buyerId: currentUser?.id || 'buyer-1',
+      buyerName: targetJob.buyerName,
+      buyerPhone: targetJob.buyerPhone || '+225 07 00 00 00',
+      sellerId: sellerUser?.id || 'seller-1',
+      sellerName: targetJob.sellerName,
+      sellerPhone: targetJob.sellerPhone || '+225 07 48 92 11 34',
+      sellerKycMaskedId: maskedCni,
+      itemId: targetJob.productId,
+      itemTitle: targetJob.productTitle,
+      itemCategory: prod?.category || 'Occasion Certifiée',
+      itemPriceFCFA: productPrice,
+      deliveryFeeFCFA: deliveryFee,
+      platformFeeFCFA: platformFixedFee,
+      amountTotalFCFA: totalBuyerPaid,
+      deliveryOtpCode: targetJob.deliveryOtpCode || '8814',
+      driverName: targetJob.assignedDriverName || 'Coursier BRAD\'CI',
+      communeOrigin: targetJob.pickupCommune,
+      communeDestination: targetJob.dropoffCommune
+    };
+
+    try {
+      const storedLogs = getStoredAuditLogs();
+      let auditLog = storedLogs.find(l => l.orderId === targetJob.id);
+      if (!auditLog) {
+        auditLog = await createPaymentAuditLog(txInput);
+      }
+      setReceiptModalData({ transactionData: txInput, auditLog });
+      return true;
+    } catch (err) {
+      console.error('Failed to open receipt:', err);
+      addToast('Erreur', 'Impossible de générer le reçu pour cette transaction.', 'error');
+      return false;
+    }
   };
 
   const driverSetInspectionVerdict = (jobId: string, verdict: 'client_confirmed_good' | 'client_confirmed_bad'): boolean => {
@@ -2036,28 +2450,336 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .reduce((sum, e) => sum + e.amount, 0);
   };
 
+  // ================= REFERRAL LIFECYCLE CONTROLLERS =================
+  const handleKycApprovedReferral = (approvedUserId: string) => {
+    const matchingRefs = referrals.filter(r => (r.refereeId === approvedUserId || (currentUser?.id === approvedUserId && r.refereeName === currentUser.name)) && r.status === 'PENDING_KYC');
+    if (matchingRefs.length === 0) return;
+
+    const nowIso = new Date().toISOString();
+
+    // 1. Update referrals state to PENDING_TRANSACTION
+    setReferrals(prev => prev.map(r => {
+      if ((r.refereeId === approvedUserId || (currentUser?.id === approvedUserId && r.refereeName === currentUser.name)) && r.status === 'PENDING_KYC') {
+        return {
+          ...r,
+          status: 'PENDING_TRANSACTION',
+          refereeKycStatus: 'verified',
+          kycValidatedAt: nowIso
+        };
+      }
+      return r;
+    }));
+
+    // 2. Update referee & sponsor users
+    setUsers(prev => prev.map(u => {
+      if (u.id === approvedUserId) {
+        return {
+          ...u,
+          kycStatus: 'verified',
+          isKycVerified: true,
+          pendingReferralBonus: (u.pendingReferralBonus || 0) + 1000
+        };
+      }
+      const sponsored = matchingRefs.find(r => r.sponsorId === u.id || r.sponsorReferralCode === u.referralCode);
+      if (sponsored) {
+        const currentCount = u.referralCount || 0;
+        if (currentCount < 10) {
+          return {
+            ...u,
+            pendingReferralBonus: (u.pendingReferralBonus || 0) + 1000
+          };
+        }
+      }
+      return u;
+    }));
+
+    if (currentUser?.id === approvedUserId) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        kycStatus: 'verified',
+        isKycVerified: true,
+        pendingReferralBonus: (prev.pendingReferralBonus || 0) + 1000
+      } : null);
+    }
+
+    // 3. Notify sponsors
+    matchingRefs.forEach(ref => {
+      addNotification({
+        recipientRole: 'all',
+        recipientUserId: ref.sponsorId,
+        title: '🛡️ Filleul KYC Certifié (+1 000 F En Attente)',
+        message: `Votre filleul ${ref.refereeName} a certifié son identité ! 1 000 FCFA ont été ajoutés à votre solde en attente. Ce bonus sera débloqué dès sa 1ère transaction validée par OTP.`,
+        type: 'referral',
+        urgency: 'normal'
+      });
+    });
+
+    addToast(
+      '🎁 1 000 FCFA de Parrainage en Attente !',
+      'Votre KYC est certifié ! Effectuez votre 1ère transaction sécurisée (achat ou vente) pour débloquer définitivement votre solde d\'achat.',
+      'success'
+    );
+  };
+
+  const handleDeliveryCompletedReferral = (buyerNameOrId: string, sellerNameOrId: string, jobId: string) => {
+    const pendingRefs = referrals.filter(r => 
+      r.status === 'PENDING_TRANSACTION' && 
+      (r.refereeId === buyerNameOrId || 
+       r.refereeName.toLowerCase() === buyerNameOrId.toLowerCase() || 
+       r.refereeId === sellerNameOrId || 
+       r.refereeName.toLowerCase() === sellerNameOrId.toLowerCase())
+    );
+
+    if (pendingRefs.length === 0) return;
+
+    const nowIso = new Date().toISOString();
+
+    pendingRefs.forEach(ref => {
+      const isBuyer = (ref.refereeId === buyerNameOrId || ref.refereeName.toLowerCase() === buyerNameOrId.toLowerCase());
+      
+      // 1. Mark referral completed
+      setReferrals(prev => prev.map(r => r.id === ref.id ? {
+        ...r,
+        status: 'COMPLETED',
+        completedAt: nowIso,
+        firstTxOrderId: jobId,
+        firstTxType: isBuyer ? 'purchase' : 'sale'
+      } : r));
+
+      // 2. Update users
+      setUsers(prev => prev.map(u => {
+        // Referee updates: transfer 1000 from pending to referralBalance
+        if (u.id === ref.refereeId || u.name.toLowerCase() === ref.refereeName.toLowerCase()) {
+          return {
+            ...u,
+            isFirstTxDone: true,
+            pendingReferralBonus: Math.max(0, (u.pendingReferralBonus || 0) - 1000),
+            referralBalance: (u.referralBalance || 0) + 1000
+          };
+        }
+        // Sponsor updates: increment count (max 10), transfer 1000 from pending to referralBalance
+        if (u.id === ref.sponsorId || (u.referralCode && u.referralCode === ref.sponsorReferralCode)) {
+          const currentCount = u.referralCount || 0;
+          if (currentCount < 10) {
+            return {
+              ...u,
+              referralCount: currentCount + 1,
+              pendingReferralBonus: Math.max(0, (u.pendingReferralBonus || 0) - 1000),
+              referralBalance: (u.referralBalance || 0) + 1000
+            };
+          }
+        }
+        return u;
+      }));
+
+      // Update currentUser if applicable
+      if (currentUser) {
+        if (currentUser.id === ref.refereeId || currentUser.name.toLowerCase() === ref.refereeName.toLowerCase()) {
+          setCurrentUser(prev => prev ? {
+            ...prev,
+            isFirstTxDone: true,
+            pendingReferralBonus: Math.max(0, (prev.pendingReferralBonus || 0) - 1000),
+            referralBalance: (prev.referralBalance || 0) + 1000
+          } : null);
+        } else if (currentUser.id === ref.sponsorId || currentUser.referralCode === ref.sponsorReferralCode) {
+          const currentCount = currentUser.referralCount || 0;
+          if (currentCount < 10) {
+            setCurrentUser(prev => prev ? {
+              ...prev,
+              referralCount: currentCount + 1,
+              pendingReferralBonus: Math.max(0, (prev.pendingReferralBonus || 0) - 1000),
+              referralBalance: (prev.referralBalance || 0) + 1000
+            } : null);
+          }
+        }
+      }
+
+      // 3. Notifications & Celebration
+      addNotification({
+        recipientRole: 'all',
+        recipientUserId: ref.sponsorId,
+        title: '🎉 +1 000 FCFA Débloqués (Parrainage Validé) !',
+        message: `Votre filleul ${ref.refereeName} a complété sa 1ère transaction livrée ! Votre bonus de 1 000 FCFA est maintenant disponible dans votre Solde Parrainage d'achat.`,
+        type: 'referral',
+        urgency: 'high'
+      });
+
+      addNotification({
+        recipientRole: 'all',
+        recipientUserId: ref.refereeId,
+        title: '🎉 +1 000 FCFA Débloqués (Bienvenue Brad\'CI) !',
+        message: `Félicitations pour votre 1ère transaction validée ! Votre bonus de bienvenue de 1 000 FCFA est maintenant disponible pour vos futurs achats.`,
+        type: 'referral',
+        urgency: 'high'
+      });
+
+      addToast(
+        '🎉 Bonus Parrainage Débloqué (+1 000 FCFA) !',
+        `Première transaction validée ! 1 000 FCFA ont été transférés sur votre Solde Parrainage d'achat.`,
+        'success'
+      );
+    });
+  };
+
+  const applyReferralBalanceToPurchase = (amount: number) => {
+    if (!currentUser) return { success: false, deducted: 0, remaining: amount };
+    const currentBal = currentUser.referralBalance || 0;
+    if (currentBal <= 0) return { success: false, deducted: 0, remaining: amount };
+
+    const toDeduct = Math.min(currentBal, amount);
+    const newBal = currentBal - toDeduct;
+    const remainingToPay = amount - toDeduct;
+
+    const updatedUser: User = {
+      ...currentUser,
+      referralBalance: newBal
+    };
+
+    setCurrentUser(updatedUser);
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+    addToast(
+      '🛒 Solde Parrainage Appliqué !',
+      `Une réduction de ${toDeduct.toLocaleString('fr-FR')} FCFA a été déduite de votre solde parrainage d'achat.`,
+      'success'
+    );
+
+    return { success: true, deducted: toDeduct, remaining: remainingToPay };
+  };
+
+  const simulateNewRefereeRegistration = (sponsorCode?: string): ReferralRecord | null => {
+    const code = (sponsorCode || currentUser?.referralCode || 'BRAD-89A2').toUpperCase();
+    const sponsor = users.find(u => u.referralCode?.toUpperCase() === code) || currentUser;
+    if (!sponsor) return null;
+
+    const demoNames = ['Koffi Sylvain', 'Binate Aïcha', 'Gbagbo Junior', 'N\'Dri Estelle', 'Konan Patrick', 'Yao Mireille'];
+    const randomName = demoNames[Math.floor(Math.random() * demoNames.length)] + ` (Filleul #${Math.floor(Math.random() * 900 + 100)})`;
+    const refereeId = 'user-ref-sim-' + Date.now();
+    const refereePhone = '+225 07 ' + Math.floor(10000000 + Math.random() * 90000000).toString().replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4');
+
+    const newRefereeUser: User = {
+      id: refereeId,
+      name: randomName,
+      firstName: randomName.split(' ')[0],
+      lastName: randomName.split(' ')[1] || 'Filleul',
+      email: `filleul.${Date.now()}@bradci-demo.ci`,
+      phone: refereePhone,
+      city: 'Cocody',
+      role: 'client',
+      avatar: `https://images.unsplash.com/photo-${1500000000000 + Math.floor(Math.random() * 1000000)}?w=150&auto=format&fit=crop&q=80`,
+      walletBalance: 0,
+      blockedBalance: 0,
+      buyerBlockedBalance: 0,
+      kycStatus: 'unverified',
+      emailVerified: true,
+      productsPublishedCount: 0,
+      referralCode: 'BRAD-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
+      referredBy: sponsor.referralCode,
+      referralCount: 0,
+      pendingReferralBonus: 0,
+      referralBalance: 0,
+      isFirstTxDone: false
+    };
+
+    const newRefRecord: ReferralRecord = {
+      id: 'ref-' + Date.now(),
+      sponsorId: sponsor.id,
+      sponsorName: sponsor.name,
+      sponsorReferralCode: sponsor.referralCode,
+      refereeId: refereeId,
+      refereeName: randomName,
+      refereePhone,
+      refereeAvatar: newRefereeUser.avatar,
+      refereeKycStatus: 'unverified',
+      status: 'PENDING_KYC',
+      sponsorBonusAmount: 1000,
+      refereeBonusAmount: 1000,
+      createdAt: new Date().toISOString()
+    };
+
+    setUsers(prev => [newRefereeUser, ...prev]);
+    setReferrals(prev => [newRefRecord, ...prev]);
+
+    addNotification({
+      recipientRole: 'all',
+      recipientUserId: sponsor.id,
+      title: '🤝 Nouveau Filleul Inscrit !',
+      message: `${randomName} a utilisé votre code de parrainage (${sponsor.referralCode}). Étape suivante : validation de son KYC.`,
+      type: 'referral',
+      urgency: 'normal'
+    });
+
+    addToast(
+      '🧪 [Sandbox] Filleul Enregistré',
+      `Filleul ${randomName} inscrit avec le code ${sponsor.referralCode}. Statut initial : PENDING_KYC.`,
+      'info'
+    );
+
+    return newRefRecord;
+  };
+
+  const simulateRefereeKycApproved = (refereeId: string): boolean => {
+    setUsers(prev => prev.map(u => u.id === refereeId ? { ...u, kycStatus: 'verified', isKycVerified: true } : u));
+    handleKycApprovedReferral(refereeId);
+    return true;
+  };
+
+  const simulateRefereeFirstTransaction = (refereeId: string): boolean => {
+    const ref = referrals.find(r => (r.refereeId === refereeId || r.id === refereeId) && r.status === 'PENDING_TRANSACTION');
+    if (!ref) {
+      addToast('Simulation Impossible', 'Ce filleul n\'est pas dans l\'état PENDING_TRANSACTION.', 'warning');
+      return false;
+    }
+    handleDeliveryCompletedReferral(ref.refereeId, 'Vendeur Demo BradCI', 'job-sim-' + Date.now());
+    return true;
+  };
+
+  const openRegisterWithReferral = (code?: string) => {
+    if (code) {
+      const clean = code.trim().toUpperCase();
+      setPendingReferralCode(clean);
+      localStorage.setItem('bradci_pending_sponsor_code', clean);
+      const sponsorUser = users.find(u => u.referralCode?.toUpperCase() === clean);
+      const sponsorName = sponsorUser ? sponsorUser.name : `Code ${clean}`;
+      addToast(
+        '🎁 Code Parrainage Activé',
+        `Parrain : ${sponsorName}. Inscrivez-vous pour sécuriser +1 000 FCFA sur vos achats.`,
+        'info'
+      );
+    }
+    setAuthModalOpen(true);
+  };
+
   const driverConfirmDeliveryOTP = (jobId: string, enteredOtp: string): boolean => {
     const job = freightJobs.find(j => j.id === jobId);
     if (!job) return false;
 
+    if (!job.deliveryOtpCode || (job.orderStatus !== 'PAID' && job.paymentStatus !== 'PAID')) {
+      addToast('Paiement Non Confirmé', 'L\'acheteur doit d\'abord effectuer le paiement direct sur son application (bouton "Payer et Valider") pour débloquer son Code Secret OTP.', 'warning');
+      return false;
+    }
+
     if (enteredOtp.trim() !== job.deliveryOtpCode) {
-      addToast('Code Secret OTP Incorrect', 'Demandez le code secret à 4 chiffres à l\'acheteur après vérification physique du colis.', 'error');
+      addToast('Code Secret OTP Incorrect', 'Demandez le code secret à 4 chiffres à l\'acheteur après vérification physique du colis et paiement direct.', 'error');
       return false;
     }
 
     // OTP Verified! Update Delivery Job
+    const nowIso = new Date().toISOString();
     const updatedJob: DeliveryJob = {
       ...job,
       status: 'delivered',
+      orderStatus: 'COMPLETED',
+      completedAt: nowIso,
       etaMinutes: 0
     };
     const oneHourLater = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-    const nowIso = new Date().toISOString();
 
     setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
     setProducts(prev => prev.map(p => p.id === job.productId ? {
       ...p,
       status: 'sold',
+      orderStatus: 'COMPLETED',
       isPinnedSold: true,
       soldAt: nowIso,
       pinnedUntil: oneHourLater
@@ -2159,6 +2881,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     voiceNavigator.announceFundsAvailable(sellerPayout, language);
     voiceNavigator.playSuccessChime();
 
+    // Trigger Referral bonus release if applicable
+    handleDeliveryCompletedReferral(job.buyerName, job.sellerName, job.id);
+
+    // If buyer was suspended from COD, increment their successful prepaid order count (unlocks COD after 5 orders)
+    setUsers(prev => prev.map(u => {
+      if (u.name === job.buyerName && u.isCodSuspended) {
+        const nextCount = (u.prepaidOrdersCompletedCount || 0) + 1;
+        const isRestored = nextCount >= (u.requiredPrepaidOrdersToUnlockCod || 5);
+        return {
+          ...u,
+          prepaidOrdersCompletedCount: nextCount,
+          isCodSuspended: !isRestored,
+          codSuspensionReason: isRestored ? undefined : u.codSuspensionReason
+        };
+      }
+      return u;
+    }));
+
+    if (currentUser?.name === job.buyerName && currentUser.isCodSuspended) {
+      const nextCount = (currentUser.prepaidOrdersCompletedCount || 0) + 1;
+      const isRestored = nextCount >= (currentUser.requiredPrepaidOrdersToUnlockCod || 5);
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        prepaidOrdersCompletedCount: nextCount,
+        isCodSuspended: !isRestored,
+        codSuspensionReason: isRestored ? undefined : prev.codSuspensionReason
+      } : null);
+
+      if (isRestored) {
+        addNotification({
+          recipientRole: 'client',
+          recipientUserId: currentUser.id,
+          title: '🎉 Mode Paiement à la Livraison Réactivé !',
+          message: `Félicitations ! Vous avez complété avec succès vos 5 commandes avec pré-paiement. L'option "Paiement à la Livraison" est de nouveau disponible sur votre compte.`,
+          type: 'payment',
+          urgency: 'high'
+        });
+        addToast(
+          '🎉 Paiement à la Livraison Réactivé !',
+          'Vous avez validé vos 5 commandes prépayées avec succès. Le paiement à la livraison est débloqué !',
+          'success'
+        );
+      }
+    }
+
     addToast(
       '🎉 Livraison Validée & Virement Effectué !', 
       `OTP vérifié avec succès ! Virement de ${deliveryFee.toLocaleString('fr-FR')} FCFA crédité au livreur. Solde bloqué vendeur de ${sellerPayout.toLocaleString('fr-FR')} FCFA transféré vers son solde de retrait disponible.`,
@@ -2194,31 +2961,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
     setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'returning', returnOtpCode: returnOtp } : p));
 
+    // Check if the order was PREPAID (Escrow) vs CASH ON DELIVERY (COD)
+    const isPrepaidOrder = !!escrow || job.paymentStatus === 'PAID';
+    const totalPrepaidPaid = escrow ? escrow.amount : (itemValue + deliveryFee);
+
     // Escrow handling:
-    // 1. Buyer gets the itemValue refunded back to walletBalance (refund for non-conforming item)
-    // 2. Driver receives deliveryFee for the transport
-    // 3. Escrow status updated to 'returned_delivery_paid'
-    setEscrowRecords(prev => prev.map(e => e.productId === job.productId ? {
-      ...e,
-      status: 'returned_delivery_paid',
-      releasedAt: new Date().toISOString()
-    } : e));
+    // 1. If PREPAID (Séquestre) : Buyer is refunded 100% (item + delivery fee) back to wallet, and system/seller pays driver
+    // 2. If PAY ON DELIVERY (COD) : No money was transferred yet, buyer pays 0, nobody loses funds, parcel returns to seller
+    if (isPrepaidOrder) {
+      setEscrowRecords(prev => prev.map(e => e.productId === job.productId ? {
+        ...e,
+        status: 'returned_delivery_paid',
+        releasedAt: new Date().toISOString()
+      } : e));
+    }
 
     // Update Users balances:
     setUsers(prev => prev.map(u => {
       let updated = { ...u };
-      // Driver gets delivery fee
+      // Driver receives delivery fee for the transport done
       if (u.id === job.assignedDriverId || u.name === job.assignedDriverName) {
         updated.walletBalance = u.walletBalance + deliveryFee;
       }
-      // Buyer gets item value refunded to available wallet balance
+      // Buyer gets refunded: if prepaid, receives back full paid amount (item + fees)
       if (u.name === job.buyerName || (currentUser && u.id === currentUser.id && currentUser.role === 'client')) {
-        updated.walletBalance = u.walletBalance + itemValue;
+        if (isPrepaidOrder) {
+          updated.walletBalance = u.walletBalance + totalPrepaidPaid;
+        }
         if (updated.buyerBlockedBalance) {
-          updated.buyerBlockedBalance = Math.max(0, updated.buyerBlockedBalance - (escrow ? escrow.amount : itemValue + deliveryFee));
+          updated.buyerBlockedBalance = Math.max(0, updated.buyerBlockedBalance - totalPrepaidPaid);
         }
       }
-      // Seller's blocked balance is removed
+      // Seller's blocked balance is cleared
       if (u.name === job.sellerName || (job.sellerName && job.sellerName.includes(u.name))) {
         if (updated.blockedBalance) {
           updated.blockedBalance = Math.max(0, updated.blockedBalance - (escrow ? escrow.sellerAmount : itemValue * 0.95));
@@ -2232,8 +3006,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (currentUser.name === job.buyerName || currentUser.role === 'client') {
         setCurrentUser(prev => prev ? {
           ...prev,
-          walletBalance: prev.walletBalance + itemValue,
-          buyerBlockedBalance: Math.max(0, (prev.buyerBlockedBalance || 0) - (escrow ? escrow.amount : itemValue + deliveryFee))
+          walletBalance: isPrepaidOrder ? prev.walletBalance + totalPrepaidPaid : prev.walletBalance,
+          buyerBlockedBalance: Math.max(0, (prev.buyerBlockedBalance || 0) - totalPrepaidPaid)
         } : null);
       } else if (currentUser.id === job.assignedDriverId) {
         setCurrentUser(prev => prev ? {
@@ -2247,9 +3021,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cancelTx: FinancialTransaction = {
       id: 'ft-' + Date.now(),
       type: 'order_refund',
-      description: `Annulation non-conforme & Retour colis "${job.productTitle}" vers ${job.sellerName}. Frais livreur (${deliveryFee.toLocaleString('fr-FR')} F) payés.`,
+      description: isPrepaidOrder 
+        ? `Remboursement intégral commande prépayée (${totalPrepaidPaid.toLocaleString('fr-FR')} F) pour colis non-conforme "${job.productTitle}". Frais coursier pris en charge.`
+        : `Annulation & Retour colis Pay on Delivery "${job.productTitle}" vers ${job.sellerName}. Aucun prélèvement client.`,
       category: 'refund',
-      grossAmount: itemValue,
+      grossAmount: isPrepaidOrder ? totalPrepaidPaid : 0,
       netRevenueBradCi: 0,
       userName: job.buyerName,
       userRole: 'client',
@@ -2262,16 +3038,201 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFinancialTransactions(prev => [cancelTx, ...prev]);
 
     addToast(
-      '⚠️ Colis Refusé & Retour Déclenché',
-      `Le montant de l'article (${itemValue.toLocaleString('fr-FR')} FCFA) vous a été recrédité sur votre portefeuille. Frais de course (${deliveryFee.toLocaleString('fr-FR')} FCFA) réglés au livreur. Code OTP Retour : ${returnOtp}.`,
-      'warning'
+      isPrepaidOrder ? '💰 Remboursement Intégral Prépayé Effectué' : '↩ Colis Refusé & Retour Déclenché',
+      isPrepaidOrder 
+        ? `Le montant total prépayé (${totalPrepaidPaid.toLocaleString('fr-FR')} FCFA) vous a été intégralement remboursé sur votre portefeuille. Code OTP Retour : ${returnOtp}.`
+        : `Commande à la livraison annulée : aucun frais prélevé sur votre compte. Le colis est retourné au vendeur. Code OTP : ${returnOtp}.`,
+      'info'
     );
+
+    // Buyer COD suspension check: if buyer intentionally cancels without good reason, suspend COD
+    setUsers(prev => prev.map(u => {
+      if (u.name === job.buyerName) {
+        return {
+          ...u,
+          isCodSuspended: true,
+          codSuspensionReason: `Annulation du colis à la livraison (${reason})`,
+          codSuspendedAt: new Date().toISOString(),
+          prepaidOrdersCompletedCount: 0,
+          requiredPrepaidOrdersToUnlockCod: 5
+        };
+      }
+      return u;
+    }));
+
+    if (currentUser?.name === job.buyerName) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        isCodSuspended: true,
+        codSuspensionReason: `Annulation du colis à la livraison (${reason})`,
+        codSuspendedAt: new Date().toISOString(),
+        prepaidOrdersCompletedCount: 0,
+        requiredPrepaidOrdersToUnlockCod: 5
+      } : null);
+    }
+
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.buyerName,
+      title: '⚠️ Mode Paiement à la Livraison Suspendu',
+      message: `Votre commande pour "${job.productTitle}" a été annulée à la livraison. Par mesure de sécurité et pour protéger les livreurs et vendeurs, l'option "Paiement à la Livraison" est suspendue sur votre compte. Vous devez réaliser 5 commandes payées directement avant livraison pour réactiver cette option.`,
+      type: 'payment',
+      urgency: 'critical'
+    });
 
     return {
       success: true,
       returnOtpCode: returnOtp,
       message: `Retour enclenché avec succès. Code OTP Retour : ${returnOtp}`
     };
+  };
+
+  // Démarrage du minuteur d'attente client absent (20 minutes)
+  const driverStartAbsentTimer = (jobId: string): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return false;
+
+    const nowIso = new Date().toISOString();
+    const updatedJob: DeliveryJob = {
+      ...job,
+      buyerAbsentWaitStartedAt: nowIso,
+      buyerAbsentElapsedSeconds: 0
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+
+    // Alert the buyer urgently
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.buyerName,
+      title: '🚨 LIVREUR SUR PLACE EN ATTENTE (Chrono 20 min)',
+      message: `Le coursier est arrivé à votre adresse à ${job.dropoffCommune}. Vous disposez de 20 minutes pour vous présenter. Passé ce délai, la commande sera annulée, le colis retourné au vendeur et votre mode de paiement à la livraison suspendu.`,
+      type: 'delivery',
+      jobId: job.id,
+      urgency: 'critical'
+    });
+
+    addToast(
+      '⏱️ Chrono d\'Attente 20 min Activé',
+      `Le décompte d'absence de l'acheteur a démarré. Une alerte urgente a été envoyée à ${job.buyerName}. Si l'acheteur ne se présente pas, vous pourrez annuler la course et percevoir vos 15% de bonus d'astreinte.`,
+      'warning'
+    );
+    return true;
+  };
+
+  // Annulation par le livreur si l'acheteur est absent après 20 min d'attente
+  const driverCancelDueToAbsentBuyer = (jobId: string): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job) return false;
+
+    const itemValue = job.itemValue || 0;
+    const deliveryFee = job.deliveryFee || 2500;
+    // 15% compensation bonus on item value
+    const bonus15Percent = Math.round(itemValue * 0.15);
+    const totalDriverPayout = deliveryFee + bonus15Percent;
+    const returnOtp = 'RET-' + Math.floor(1000 + Math.random() * 9000);
+
+    const updatedJob: DeliveryJob = {
+      ...job,
+      status: 'returning',
+      orderStatus: 'CANCELLED',
+      cancellationType: 'buyer_absent_timeout',
+      returnReason: 'Acheteur absent après plus de 20 minutes d\'attente sur place',
+      returnOtpCode: returnOtp,
+      driverCompensationBonusFCFA: bonus15Percent,
+      returnTripDirectionCommune: job.pickupCommune, // Track direction towards seller
+      etaMinutes: Math.max(10, Math.round((job.distanceKm || 8) * 1.5))
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    setProducts(prev => prev.map(p => p.id === job.productId ? { ...p, status: 'returning' } : p));
+
+    // 1. Credit driver: regular delivery fee + 15% compensation bonus
+    // 2. Suspend Buyer's Cash on Delivery (COD) mode until 5 prepaid orders are done
+    setUsers(prev => prev.map(u => {
+      let updated = { ...u };
+      // Driver gets delivery fee + 15% bonus
+      if (u.id === job.assignedDriverId || (currentUser?.role === 'driver' && u.id === currentUser.id)) {
+        updated.walletBalance = (u.walletBalance || 0) + totalDriverPayout;
+      }
+      // Buyer gets COD suspended
+      if (u.name === job.buyerName) {
+        updated.isCodSuspended = true;
+        updated.codSuspensionReason = "Absence injustifiée lors de la livraison (> 20 min d'attente livreur)";
+        updated.codSuspendedAt = new Date().toISOString();
+        updated.prepaidOrdersCompletedCount = 0;
+        updated.requiredPrepaidOrdersToUnlockCod = 5;
+      }
+      return updated;
+    }));
+
+    if (currentUser) {
+      if (currentUser.role === 'driver' || currentUser.id === job.assignedDriverId) {
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          walletBalance: (prev.walletBalance || 0) + totalDriverPayout
+        } : null);
+      } else if (currentUser.name === job.buyerName) {
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          isCodSuspended: true,
+          codSuspensionReason: "Absence injustifiée lors de la livraison (> 20 min d'attente livreur)",
+          codSuspendedAt: new Date().toISOString(),
+          prepaidOrdersCompletedCount: 0,
+          requiredPrepaidOrdersToUnlockCod: 5
+        } : null);
+      }
+    }
+
+    // Record Financial Transaction for Driver Compensation Bonus
+    const bonusTx: FinancialTransaction = {
+      id: 'ft-bonus-absent-' + Date.now(),
+      type: 'delivery_fee',
+      description: `Dédommagement absence client (+15% de l'article : ${bonus15Percent.toLocaleString('fr-FR')} F + Frais : ${deliveryFee.toLocaleString('fr-FR')} F) pour "${job.productTitle}"`,
+      category: 'delivery',
+      grossAmount: totalDriverPayout,
+      netRevenueBradCi: 0,
+      userName: job.assignedDriverName || 'Livreur BradCI',
+      userRole: 'driver',
+      paymentMethod: 'Wave',
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      hour: new Date().getHours(),
+      status: 'completed'
+    };
+    setFinancialTransactions(prev => [bonusTx, ...prev]);
+
+    // Send warning notification to Buyer
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.buyerName,
+      title: '🚫 Commande Annulée (Client Absent) & Suspension Paiement à la Livraison',
+      message: `Vous étiez absent lors de la livraison de "${job.productTitle}" après 20 minutes d'attente du coursier. Le colis est retourné au vendeur (${job.sellerName}). Votre compte est désormais suspendu du mode "Paiement à la Livraison". Vos 5 prochaines commandes devront obligatoirement être payées d'avance pour restaurer cette option.`,
+      type: 'payment',
+      urgency: 'critical'
+    });
+
+    // Send notification to Seller
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: job.sellerName,
+      title: '📦 Colis en Cours de Retour (Acheteur Absent)',
+      message: `L'acheteur ${job.buyerName} était absent à la livraison après 20 minutes d'attente. Le coursier ${job.assignedDriverName || 'Bakary'} vous rapporte votre colis à ${job.pickupCommune}. L'acheteur a été sanctionné.`,
+      type: 'delivery',
+      productId: job.productId,
+      urgency: 'high'
+    });
+
+    // Vocal voice notification
+    voiceNavigator.playWarningBeep();
+
+    addToast(
+      '📦 Course Annulée & Bonus 15% Encaissé !',
+      `Client absent après 20 min. Vous avez reçu vos frais de course (${deliveryFee.toLocaleString('fr-FR')} F) + un bonus de 15% (${bonus15Percent.toLocaleString('fr-FR')} F), soit ${totalDriverPayout.toLocaleString('fr-FR')} FCFA. Ramenez le colis à ${job.pickupCommune}. Le radar recherche les colis sur votre trajet retour !`,
+      'success'
+    );
+
+    return true;
   };
 
   const driverConfirmReturnOTP = (jobId: string, enteredOtp: string): boolean => {
@@ -2384,9 +3345,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     phone: string;
     role: UserRole;
     password?: string;
+    referralCode?: string;
   }) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`;
+    const generatedReferralCode = 'BRAD-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
+    // Check referral code
+    const cleanRefCode = data.referralCode?.trim().toUpperCase();
+    let sponsor = cleanRefCode ? users.find(u => u.referralCode?.toUpperCase() === cleanRefCode) : null;
     
     const newUser: User = {
       id: 'user-' + Date.now(),
@@ -2411,11 +3378,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverPlan: data.role === 'driver' ? 'trial' : undefined,
       trialDeliveriesRemaining: data.role === 'driver' ? 5 : undefined,
       driverAvailability: data.role === 'driver' ? 'available' : undefined,
-      vehicleDetails: data.role === 'driver' ? { model: 'Moto Express', plate: 'CI-225-AB', type: 'moto' } : undefined
+      vehicleDetails: data.role === 'driver' ? { model: 'Moto Express', plate: 'CI-225-AB', type: 'moto' } : undefined,
+      referralCode: generatedReferralCode,
+      referredBy: sponsor ? sponsor.referralCode : undefined,
+      referralCount: 0,
+      pendingReferralBonus: 0,
+      referralBalance: 0,
+      isFirstTxDone: false
     };
 
     setUsers(prev => [newUser, ...prev]);
     setCurrentUser(newUser);
+
+    // If registered via a sponsor code, create ReferralRecord in PENDING_KYC
+    if (sponsor) {
+      const newReferralRecord: ReferralRecord = {
+        id: 'ref-' + Date.now(),
+        sponsorId: sponsor.id,
+        sponsorName: sponsor.name,
+        sponsorReferralCode: sponsor.referralCode,
+        refereeId: newUser.id,
+        refereeName: newUser.name,
+        refereePhone: newUser.phone,
+        refereeAvatar: newUser.avatar,
+        refereeKycStatus: 'unverified',
+        status: 'PENDING_KYC',
+        sponsorBonusAmount: 1000,
+        refereeBonusAmount: 1000,
+        createdAt: new Date().toISOString()
+      };
+
+      setReferrals(prev => [newReferralRecord, ...prev]);
+
+      addNotification({
+        recipientRole: 'all',
+        recipientUserId: sponsor.id,
+        title: '🤝 Nouveau Filleul Inscrit !',
+        message: `${newUser.name} s'est inscrit avec votre code de parrainage (${sponsor.referralCode}). Dès qu'il certifie son KYC, votre bonus de 1 000 FCFA passera en attente !`,
+        type: 'referral',
+        urgency: 'normal'
+      });
+
+      addToast(
+        '🎁 Code Parrainage Appliqué !',
+        `Parrainé par ${sponsor.name} (${sponsor.referralCode}). Validez votre KYC pour activer vos 1 000 FCFA de bienvenue !`,
+        'success'
+      );
+    }
+
+    // Clean pending referral state
+    setPendingReferralCode(null);
+    localStorage.removeItem('bradci_pending_sponsor_code');
 
     return { success: true, otpCode };
   };
@@ -2501,8 +3514,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     phone: string;
     city: string;
     role: UserRole;
+    referralCode?: string;
   }) => {
     const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`;
+    const cleanRefCode = (data.referralCode || pendingReferralCode)?.trim().toUpperCase();
+    const sponsor = cleanRefCode ? users.find(u => u.referralCode?.toUpperCase() === cleanRefCode) : null;
+    const generatedReferralCode = 'BRAD-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+
     const newUser: User = {
       id: 'user-g-' + Date.now(),
       name: fullName,
@@ -2523,11 +3541,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverPlan: data.role === 'driver' ? 'trial' : undefined,
       trialDeliveriesRemaining: data.role === 'driver' ? 5 : undefined,
       driverAvailability: data.role === 'driver' ? 'available' : undefined,
+      referralCode: generatedReferralCode,
+      referredBy: sponsor ? sponsor.referralCode : undefined,
+      referralCount: 0,
+      pendingReferralBonus: 0,
+      referralBalance: 0,
+      isFirstTxDone: false,
       createdAt: new Date().toISOString()
     };
 
     setUsers(prev => [newUser, ...prev]);
     setCurrentUser(newUser);
+
+    if (sponsor) {
+      const newReferralRecord: ReferralRecord = {
+        id: 'ref-' + Date.now(),
+        sponsorId: sponsor.id,
+        sponsorName: sponsor.name,
+        sponsorReferralCode: sponsor.referralCode,
+        refereeId: newUser.id,
+        refereeName: newUser.name,
+        refereePhone: newUser.phone,
+        refereeAvatar: newUser.avatar,
+        refereeKycStatus: 'unverified',
+        status: 'PENDING_KYC',
+        sponsorBonusAmount: 1000,
+        refereeBonusAmount: 1000,
+        createdAt: new Date().toISOString()
+      };
+      setReferrals(prev => [newReferralRecord, ...prev]);
+
+      addNotification({
+        recipientRole: 'all',
+        recipientUserId: sponsor.id,
+        title: '🤝 Nouveau Filleul Google Inscrit !',
+        message: `${newUser.name} s'est inscrit avec votre code de parrainage (${sponsor.referralCode}). Validez vos transactions pour débloquer les 1 000 FCFA !`,
+        type: 'referral',
+        urgency: 'normal'
+      });
+
+      addToast(
+        '🎁 Code Parrainage Appliqué !',
+        `Parrainé par ${sponsor.name} (${sponsor.referralCode}). Validez votre KYC pour activer vos 1 000 FCFA de bienvenue !`,
+        'success'
+      );
+    }
+
+    setPendingReferralCode(null);
+    localStorage.removeItem('bradci_pending_sponsor_code');
+
     setKycModalOpen(true);
     addToast('Profil Complété', 'Compte configuré ! Soumettez vos documents KYC pour finaliser.', 'success');
   };
@@ -2595,14 +3657,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ================= KYC & ANTI-FRAUD ENGINE =================
   const submitKYC = (
     dataOrDocType: {
-      docType: 'cni' | 'passeport' | 'attestation' | 'permis';
+      docType: 'cni' | 'passeport' | 'attestation' | 'permis' | 'carte_consulaire';
       docNumber: string;
       photoUrl: string;
       selfieUrl: string;
       driverLicenseUrl?: string;
       driverLicenseSelfieUrl?: string;
       vehicleRegistrationUrl?: string;
-    } | 'cni' | 'passeport' | 'attestation' | 'permis',
+      vehiclePlate?: string;
+      vehicleColor?: string;
+      vehicleModel?: string;
+      vehicleType?: VehicleType;
+    } | 'cni' | 'passeport' | 'attestation' | 'permis' | 'carte_consulaire',
     docNumParam?: string,
     photoUrlParam?: string,
     selfieUrlParam?: string
@@ -2611,13 +3677,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, isDuplicate: false, message: 'Utilisateur non connecté' };
     }
 
-    let docType: 'cni' | 'passeport' | 'attestation' | 'permis' = 'cni';
+    let docType: 'cni' | 'passeport' | 'attestation' | 'permis' | 'carte_consulaire' = 'cni';
     let docNumber = '';
     let photoUrl = '';
     let selfieUrl = '';
     let driverLicenseUrl: string | undefined;
     let driverLicenseSelfieUrl: string | undefined;
     let vehicleRegistrationUrl: string | undefined;
+    let vehiclePlate: string | undefined;
+    let vehicleColor: string | undefined;
+    let vehicleModel: string | undefined;
+    let vehicleType: VehicleType | undefined;
 
     if (typeof dataOrDocType === 'object' && dataOrDocType !== null) {
       docType = dataOrDocType.docType || 'cni';
@@ -2627,8 +3697,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverLicenseUrl = dataOrDocType.driverLicenseUrl;
       driverLicenseSelfieUrl = dataOrDocType.driverLicenseSelfieUrl;
       vehicleRegistrationUrl = dataOrDocType.vehicleRegistrationUrl;
+      vehiclePlate = dataOrDocType.vehiclePlate;
+      vehicleColor = dataOrDocType.vehicleColor;
+      vehicleModel = dataOrDocType.vehicleModel;
+      vehicleType = dataOrDocType.vehicleType;
     } else {
-      docType = dataOrDocType || 'cni';
+      docType = (dataOrDocType as 'cni' | 'passeport' | 'attestation' | 'permis' | 'carte_consulaire') || 'cni';
       docNumber = docNumParam || '';
       photoUrl = photoUrlParam || '';
       selfieUrl = selfieUrlParam || '';
@@ -2656,6 +3730,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         driverLicensePhoto: driverLicenseUrl,
         driverLicenseSelfiePhoto: driverLicenseSelfieUrl,
         vehicleRegistrationPhoto: vehicleRegistrationUrl,
+        vehiclePlate: vehiclePlate,
+        vehicleColor: vehicleColor,
+        vehicleModel: vehicleModel,
+        vehicleType: vehicleType,
         submittedAt: new Date().toISOString(),
         status: 'rejected',
         isDuplicate: true,
@@ -2701,6 +3779,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverLicensePhoto: driverLicenseUrl,
       driverLicenseSelfiePhoto: driverLicenseSelfieUrl,
       vehicleRegistrationPhoto: vehicleRegistrationUrl,
+      vehiclePlate: vehiclePlate,
+      vehicleColor: vehicleColor,
+      vehicleModel: vehicleModel,
+      vehicleType: vehicleType,
       submittedAt: new Date().toISOString(),
       status: 'pending',
       isDuplicate: false
@@ -2718,6 +3800,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       kycDriverLicenseUrl: driverLicenseUrl,
       kycDriverLicenseSelfieUrl: driverLicenseSelfieUrl,
       kycVehicleRegistrationUrl: vehicleRegistrationUrl,
+      kycVehiclePlate: vehiclePlate || currentUser.kycVehiclePlate,
+      kycVehicleColor: vehicleColor || currentUser.kycVehicleColor,
+      kycVehicleModel: vehicleModel || currentUser.kycVehicleModel,
+      kycVehicleType: vehicleType || currentUser.kycVehicleType,
+      vehicleDetails: vehiclePlate ? {
+        plate: vehiclePlate,
+        color: vehicleColor || 'Noir',
+        model: vehicleModel || 'Engin Express',
+        type: vehicleType || 'moto'
+      } : currentUser.vehicleDetails,
       kycSubmittedAt: new Date().toISOString()
     };
 
@@ -2741,11 +3833,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) return;
     const updatedUser: User = {
       ...currentUser,
-      kycStatus: 'verified'
+      kycStatus: 'verified',
+      isKycVerified: true
     };
     setCurrentUser(updatedUser);
     setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
     setKycRecords(prev => prev.map(k => k.userId === currentUser.id ? { ...k, status: 'verified', reviewedBy: 'Direction Sécurité Brad\'CI (Instantané)' } : k));
+    handleKycApprovedReferral(currentUser.id);
   };
 
   const adminApproveKYC = (kycId: string) => {
@@ -2753,11 +3847,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!rec) return;
 
     setKycRecords(prev => prev.map(k => k.id === kycId ? { ...k, status: 'verified', reviewedBy: 'Direction Sécurité Brad\'CI' } : k));
-    setUsers(prev => prev.map(u => u.id === rec.userId ? { ...u, kycStatus: 'verified' } : u));
+    setUsers(prev => prev.map(u => u.id === rec.userId ? { ...u, kycStatus: 'verified', isKycVerified: true } : u));
     
     if (currentUser?.id === rec.userId) {
-      setCurrentUser(prev => prev ? { ...prev, kycStatus: 'verified' } : null);
+      setCurrentUser(prev => prev ? { ...prev, kycStatus: 'verified', isKycVerified: true } : null);
     }
+
+    handleKycApprovedReferral(rec.userId);
 
     addToast('KYC Validé', `Le dossier de ${rec.userName} a été certifié avec succès.`, 'success');
   };
@@ -3384,6 +4480,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         products,
         freightJobs,
         escrowRecords,
+        directPaymentRecords,
         kycRecords,
         userLocation,
         gpsPermissionStatus,
@@ -3505,10 +4602,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reviews,
         submitReview,
 
+        // Official Receipt & Cryptographic Audit Suite
+        receiptModalData,
+        setReceiptModalData,
+        openOfficialReceipt,
+
         // Actions
         loginAsUser,
         loginWithRole,
         logout,
+        logoutUser: logout,
         getSellerBlockedBalance,
         getBuyerBlockedBalance,
         canUserPublishProduct,
@@ -3531,6 +4634,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         driverConfirmDeliveryOTP,
         buyerConfirmDeliveryOTP,
         buyerCancelAndReturnPackage,
+        driverStartAbsentTimer,
+        driverCancelDueToAbsentBuyer,
         driverConfirmReturnOTP,
         sellerConfirmReturnReceived,
         submitKYC,
@@ -3541,6 +4646,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         purchaseSubscription,
         boostProduct,
         buyShopProductDirect,
+        buyerInitiatePayOnDelivery,
 
         // Anti-Fraud, Legal Terms & Stock Restocking
         fraudIncidents,
@@ -3549,7 +4655,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         termsModalOpen,
         setTermsModalOpen,
         acceptTermsAndConditions,
-        restockProduct
+        restockProduct,
+
+        // Referral System
+        referrals,
+        setReferrals,
+        pendingReferralCode,
+        setPendingReferralCode,
+        openRegisterWithReferral,
+        applyReferralBalanceToPurchase,
+        simulateNewRefereeRegistration,
+        simulateRefereeKycApproved,
+        simulateRefereeFirstTransaction
       }}
     >
       {children}

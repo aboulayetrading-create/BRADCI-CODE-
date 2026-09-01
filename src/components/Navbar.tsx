@@ -24,7 +24,8 @@ import {
   Moon,
   Volume2,
   VolumeX,
-  Laptop
+  Laptop,
+  Building2
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -91,7 +92,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header id="main-navbar" className="sticky top-0 z-40 bg-[#080C14]/95 backdrop-blur-md border-b border-slate-800/80 transition-colors">
+    <header id="main-navbar" className="sticky top-0 z-40 bg-[#0B1021]/95 backdrop-blur-md border-b border-[#222D4A] transition-colors">
       <div className="w-full max-w-[1800px] mx-auto px-1.5 sm:px-3 lg:px-6">
         <div className="flex items-center justify-between h-13 sm:h-15 lg:h-[68px] gap-1 sm:gap-2 md:gap-3">
           {/* Brand Logo & Tag */}
@@ -104,10 +105,10 @@ export const Navbar: React.FC = () => {
               <BradCiLogo size="md" />
             </button>
 
-            {/* Escrow Guarantee Pill */}
-            <div className="hidden 2xl:flex items-center gap-1.5 text-[11px] bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20 whitespace-nowrap">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="font-semibold">{translate("Séquestre 100% Garanti", "100% Escrow Guaranteed")}</span>
+            {/* Direct POD Guarantee Pill */}
+            <div className="hidden 2xl:flex items-center gap-1.5 text-[11px] bg-[#1E53E5]/10 text-[#467BFF] px-2.5 py-1 rounded-full border border-[#1E53E5]/30 whitespace-nowrap">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#1E53E5] shrink-0" />
+              <span className="font-semibold">{translate("Paiement Direct à la Livraison", "Direct Pay on Delivery")}</span>
             </div>
           </div>
 
@@ -124,6 +125,21 @@ export const Navbar: React.FC = () => {
               }`}
             >
               {translate("Enchères", "Auctions")}
+            </button>
+
+            {/* B2B Liquidation Hub */}
+            <button
+              id="nav-tab-b2b"
+              onClick={() => setActiveTab('b2b_liquidation')}
+              className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
+                activeTab === 'b2b_liquidation' 
+                  ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/40 font-bold shadow-sm' 
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+              }`}
+            >
+              <Building2 className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-blue-400 shrink-0" />
+              <span>{translate("Déstockage B2B", "B2B Liquidation")}</span>
+              <span className="hidden xl:inline-block text-[9px] bg-blue-500/30 text-cyan-300 font-extrabold px-1.5 py-0.2 rounded">LOTS</span>
             </button>
 
             {/* Client Dashboard (Only for Client role) */}
@@ -302,13 +318,13 @@ export const Navbar: React.FC = () => {
             <button
               id="btn-publish-product"
               onClick={handleSellClick}
-              className="relative group bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg font-bold text-[10px] sm:text-xs flex items-center gap-1 shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0"
+              className="relative group bg-[#FF5B00] hover:bg-[#E05000] text-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg font-black text-[10px] sm:text-xs flex items-center gap-1.5 shadow-md shadow-[#FF5B00]/30 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
               title={translate("Mettre un article en vente (Gratuit & Illimité)", "Post item for sale (Free & Unlimited)")}
             >
-              <PlusCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-950 shrink-0" />
+              <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
               <span>{translate("Vendre", "Sell")}</span>
-              <span className="bg-slate-950/20 text-slate-950 text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-mono-num font-black">
-                ∞
+              <span className="bg-black/25 text-white text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-mono-num font-black">
+                Gratuit
               </span>
             </button>
 
@@ -477,7 +493,7 @@ export const Navbar: React.FC = () => {
         {/* Mobile Dropdown Menu Drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-slate-800/80 py-3 space-y-2 bg-[#080C14]/98 backdrop-blur-xl animate-in slide-in-from-top duration-200">
-            <div className="grid grid-cols-2 gap-2 px-2 pb-2">
+            <div className="grid grid-cols-3 gap-2 px-2 pb-2">
               <button
                 onClick={() => { setActiveTab('explore'); setMobileMenuOpen(false); }}
                 className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
@@ -487,6 +503,17 @@ export const Navbar: React.FC = () => {
                 }`}
               >
                 {translate("Enchères", "Auctions")}
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('b2b_liquidation'); setMobileMenuOpen(false); }}
+                className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                  activeTab === 'b2b_liquidation' 
+                    ? 'bg-blue-600/30 text-cyan-300 border-blue-500/40' 
+                    : 'bg-slate-900 text-slate-300 border-slate-800'
+                }`}
+              >
+                {translate("Lots B2B", "B2B Lots")}
               </button>
 
               <button

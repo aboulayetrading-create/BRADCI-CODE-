@@ -1542,7 +1542,7 @@ export const AdminBackOffice: React.FC = () => {
                             <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
                               <span className="text-[10px] text-slate-400 block">Véhicule Requis :</span>
                               <strong className="text-xs text-slate-200 uppercase font-bold">
-                                {prod.requiredVehicle === 'cargo' ? '🚚 Fourgon / Cargo' : prod.requiredVehicle === 'voiture' ? '🚗 Voiture / Coffre' : '🏍️ Moto Express'}
+                                {prod.requiredVehicle === 'cargo' ? '🚚 Fourgon / Cargo' : '🏍️ Moto Express'}
                               </strong>
                             </div>
                           </div>
@@ -1800,7 +1800,7 @@ export const AdminBackOffice: React.FC = () => {
                               <span>→</span>
                               <span className="text-emerald-400">{job.dropoffCommune}</span>
                             </div>
-                            <span className="text-[10px] text-slate-400">{job.distanceKm} km • ETA : {job.estimatedDurationMin} min</span>
+                            <span className="text-[10px] text-slate-400">{job.distanceKm || 0} km • ETA : {job.etaMinutes || job.driverEstimatedDurationMinutes || 25} min</span>
                           </td>
                           <td className="p-3.5">
                             {job.assignedDriverName ? (

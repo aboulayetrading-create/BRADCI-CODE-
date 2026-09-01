@@ -2,7 +2,7 @@ import { AppLanguage } from '../types';
 
 export interface AIKnowledgeResponse {
   text: string;
-  category: 'onboarding' | 'auth' | 'order' | 'auction' | 'escrow' | 'delivery' | 'pricing' | 'kyc' | 'dispute' | 'support' | 'security_blocked' | 'general';
+  category: 'onboarding' | 'auth' | 'order' | 'auction' | 'pod_payment' | 'delivery' | 'pricing' | 'kyc' | 'dispute' | 'support' | 'security_blocked' | 'general';
   suggestedAction?: {
     labelFr: string;
     labelEn: string;
@@ -138,8 +138,8 @@ export function queryBradCiKnowledge(rawQuery: string, lang: AppLanguage = 'fr')
     return {
       category: 'order',
       text: isEn
-        ? "🛍️ **How to Place an Order or Buy an Item :**\n\n1. Browse the live feed or use search filters to find your desired item.\n2. Click on the product card to open details and tap **'Buy Now (Instant Order)'** or place a bid.\n3. **100% Guaranteed Wave Escrow**: Pay safely via Wave, Orange Money, or MTN MoMo. Your payment is held securely in BRAD'CI escrow.\n4. **Courier Assignment**: A certified courier nearby accepts the delivery run with real-time GPS tracking (Google Maps & Yango Maps).\n5. **Inspection & OTP Release**: Inspect the parcel physically upon arrival. Once satisfied, give your 4-digit secret OTP code to the courier to release the seller payout."
-        : "🛍️ **Comment passer une commande ou acheter un article :**\n\n1. Parcourez le fil d'annonces ou recherchez l'article souhaité.\n2. Cliquez sur l'article puis sur le bouton **'Acheter Maintenant'** ou formulez une offre.\n3. **Paiement Séquestre 100% Garanti** : Réglez en toute sécurité par Wave, Orange Money ou MTN MoMo. Vos fonds restent bloqués sous séquestre BRAD'CI.\n4. **Attribution du Livreur** : Un coursier certifié prend en charge le colis avec suivi GPS direct (Google Maps & Yango Maps).\n5. **Vérification & Code OTP** : Inspectez le produit à la livraison. Si conforme, donnez votre code secret OTP à 4 chiffres au livreur pour débloquer les fonds au vendeur.",
+        ? "🛍️ **How to Place an Order or Buy an Item (Direct Pay on Delivery) :**\n\n1. Browse the live feed or use search filters to find your desired item.\n2. Click on the product card to open details and tap **'Buy Now'** or place a bid.\n3. **Zero Upfront Fund Locking**: Your order starts in dispatch with no advance charge.\n4. **Courier Assignment & GPS**: A certified courier delivers the parcel with real-time GPS tracking (Google Maps & Yango Maps).\n5. **Direct API Payment & OTP Release**: Inspect the parcel physically upon driver arrival. Tap 'Pay & Validate' to execute direct payment via API (Wave, Orange Money, MTN MoMo, Moov, Card). Then share your 4-digit secret OTP code with the driver to finalize delivery with instant automatic split payout."
+        : "🛍️ **Comment passer une commande (Paiement Direct à la Livraison) :**\n\n1. Parcourez le fil d'annonces ou recherchez l'article souhaité.\n2. Cliquez sur l'article puis sur le bouton **'Acheter Maintenant'** ou formulez une offre.\n3. **Aucun Débit Préalable** : Votre commande est transmise en livraison sans aucun blocage de fonds en amont.\n4. **Attribution du Livreur & Suivi GPS** : Un coursier certifié achemine le colis avec suivi GPS en direct (Google Maps & Yango Maps).\n5. **Paiement Direct par API & Validation OTP** : Lorsque le livreur arrive et après examen du colis, cliquez sur 'Payer et Valider' pour régler par API (Wave, Orange Money, MTN MoMo, Moov, Carte). Transmettez ensuite le code secret OTP au livreur pour clôturer la commande et répartir instantanément les fonds.",
       suggestedAction: {
         labelFr: "Voir les Annonces Disponibles",
         labelEn: "Explore Available Listings",
@@ -161,8 +161,8 @@ export function queryBradCiKnowledge(rawQuery: string, lang: AppLanguage = 'fr')
     return {
       category: 'auction',
       text: isEn
-        ? "⚖️ **The 5-Bid Arbitration Rule (Foix Off) :**\n\n• **Automatic Trigger**: As soon as an auction receives **5 distinct buyer offers**, the sale automatically enters 'Arbitration Mode'.\n• **Seller's Choice**: The seller is not forced into endless waiting. They can review all 5 bidders, view their profiles & ratings, and **select their preferred winning buyer**.\n• **Zero Penalty Cancellation**: The seller also has the exclusive right to cancel the auction with 0 fees if reserve requirements are not met.\n• **Escrow Activation**: Once awarded, funds are locked in Wave escrow and the delivery order is dispatched instantly to couriers."
-        : "⚖️ **La Règle Métier des 5 Offres (Arbitrage Vendeur) :**\n\n• **Déclenchement Automatique** : Dès qu'une vente cumule **5 offres d'acheteurs distincts**, elle passe en statut 'Arbitrage 5 Offres'.\n• **Pouvoir du Vendeur** : Le vendeur n'est pas bloqué par le compte à rebours. Il peut examiner les 5 offres et **sélectionner l'acheteur final de son choix**.\n• **Annulation Sans Frais** : Le vendeur conserve le droit d'annuler la vente sans pénalité si les offres ne correspondent pas à ses attentes.\n• **Séquestre & Expédition** : Dès validation, l'argent de l'acheteur est sécurisé sous séquestre Wave et la course est envoyée aux livreurs certifiés.",
+        ? "⚖️ **The 5-Bid Arbitration Rule (Foix Off) :**\n\n• **Automatic Trigger**: As soon as an auction receives **5 distinct buyer offers**, the sale automatically enters 'Arbitration Mode'.\n• **Seller's Choice**: The seller can review all 5 bidders, view their profiles & ratings, and **select their preferred winning buyer**.\n• **Zero Penalty Cancellation**: The seller also has the exclusive right to cancel the auction with 0 fees if reserve requirements are not met.\n• **Delivery Dispatch**: Once awarded, the delivery order is dispatched instantly to certified couriers, with payment occurring on delivery."
+        : "⚖️ **La Règle Métier des 5 Offres (Arbitrage Vendeur) :**\n\n• **Déclenchement Automatique** : Dès qu'une vente cumule **5 offres d'acheteurs distincts**, elle passe en statut 'Arbitrage 5 Offres'.\n• **Pouvoir du Vendeur** : Le vendeur n'est pas bloqué par le compte à rebours. Il peut examiner les 5 offres et **sélectionner l'acheteur final de son choix**.\n• **Annulation Sans Frais** : Le vendeur conserve le droit d'annuler la vente sans pénalité si les offres ne correspondent pas à ses attentes.\n• **Expédition & Paiement Direct** : Dès attribution, la course est envoyée aux livreurs certifiés. Le paiement aura lieu directement à la livraison.",
       suggestedAction: {
         labelFr: "Filtrer les Enchères en Arbitrage",
         labelEn: "Filter 5-Bid Auctions",
@@ -193,23 +193,25 @@ export function queryBradCiKnowledge(rawQuery: string, lang: AppLanguage = 'fr')
     };
   }
 
-  // 7. WAVE ESCROW & OTP SECURITY (Séquestre Wave & OTP)
+  // 7. DIRECT PAY ON DELIVERY (POD) & OTP SECURITY (Paiement Direct & OTP)
   if (
     query.includes('sequestre') || 
     query.includes('wave') || 
+    query.includes('paiement') || 
     query.includes('otp') || 
     query.includes('arnaque') || 
     query.includes('securite') || 
     query.includes('remboursement') || 
     query.includes('argent') || 
     query.includes('escrow') ||
-    query.includes('fraude')
+    query.includes('fraude') ||
+    query.includes('pod')
   ) {
     return {
-      category: 'escrow',
+      category: 'pod_payment',
       text: isEn
-        ? "🛡️ **100% Guaranteed Wave Escrow & OTP Security :**\n\n1. **Protected Payment**: The buyer's money is deposited into the BRAD'CI Wave Escrow vault, not sent directly to the seller.\n2. **4-Digit Secret OTP**: Only the buyer possesses the secret delivery release code generated in their order ticket.\n3. **Physical Inspection Guarantee**: The buyer unpacks and tests the item in front of the courier.\n4. **Payout Release**: Only after the buyer confirms satisfaction and provides the OTP code are the seller and courier credited in their mobile wallet.\n5. **Anti-Scam Protection**: If an item is counterfeit or defective, the buyer simply withholds the OTP and is refunded 100%."
-        : "🛡️ **Séquestre Wave Garanti 100% & Déblocage par OTP :**\n\n1. **Paiement Sous Séquestre** : L'argent de l'acheteur est conservé sur le compte séquestre sécurisé Wave de BRAD'CI.\n2. **Code Secret OTP à 4 Chiffres** : Seul l'acheteur détient le code secret de validation transmis dans son reçu.\n3. **Vérification Physique** : L'acheteur déballe et examine l'article en présence du livreur.\n4. **Déblocage des Fonds** : Dès que l'acheteur communique le code OTP au livreur, le vendeur et le livreur sont crédités instantanément.\n5. **Zéro Arnaque** : Si le produit n'est pas conforme, l'acheteur refuse l'OTP et ses fonds lui sont intégralement restitués.",
+        ? "🛡️ **Direct Pay on Delivery (POD) & OTP Security :**\n\n1. **Zero Upfront Locking**: No funds are frozen or blocked in advance.\n2. **Courier Arrival**: The driver arrives and triggers the 'ARRIVED' status via GPS, unlocking the 'Pay & Validate' button exclusively on the buyer's interface.\n3. **Direct API Payment**: The buyer selects their provider (Wave, Orange Money, MTN MoMo, Moov Money, or Visa/Mastercard) and completes payment.\n4. **Webhook Confirmation & OTP**: Upon payment success confirmation via webhook, the buyer receives their 4-digit secret OTP code.\n5. **Driver OTP Verification**: The driver enters the OTP code handed by the buyer to complete the order with atomic fund split."
+        : "🛡️ **Paiement Direct à la Livraison (POD) & Sécurité OTP :**\n\n1. **Zéro Blocage de Fonds** : Aucun débit ni séquestre préalable n'est imposé.\n2. **Arrivée GPS du Livreur** : Le livreur signale son arrivée sur place, débloquant le bouton 'Payer et Valider' exclusivement sur l'interface de l'acheteur.\n3. **Paiement Direct par API** : L'acheteur choisit son opérateur (Wave, Orange Money, MTN MoMo, Moov Money, ou Carte Visa/Mastercard) et effectue le transfert.\n4. **Confirmation Webhook & Code OTP** : La validation du paiement génère le code secret OTP à 4 chiffres sur l'écran de l'acheteur.\n5. **Clôture par le Livreur** : Le livreur saisit le code OTP remis par l'acheteur pour valider la livraison et répartir instantanément les montants.",
       suggestedAction: {
         labelFr: "Consulter la Charte Sécurité",
         labelEn: "View Security Charter",
@@ -320,8 +322,8 @@ export function queryBradCiKnowledge(rawQuery: string, lang: AppLanguage = 'fr')
   return {
     category: 'general',
     text: isEn
-      ? "💡 **Welcome to BRAD'CI Assistance !**\n\nI can help you with all public platform services:\n• **Registration & Login**: Steps, email OTP verification, KYC identity check.\n• **Orders & Auctions**: How to bid, buy now, and the 5-bid seller arbitration rule.\n• **100% Wave Escrow**: How your payment remains locked until OTP confirmation.\n• **Couriers & Delivery**: GPS tracking via Google Maps and Yango Maps.\n• **Pricing Plans**: Seller Passes (5,000 F / 10,000 F) and Courier Pass (6,000 F).\n\nFeel free to type your question, use the microphone 🎙️, or connect with a human agent below."
-      : "💡 **Bienvenue sur l'Assistance BRAD'CI !**\n\nJe suis à votre service pour vous expliquer tous les aspects du site :\n• **Inscription & Connexion** : Validation par OTP email et certification KYC.\n• **Commandes & Enchères** : Offres express, achat direct et règle des 5 offres.\n• **Séquestre Wave Garanti** : Paiements protégés jusqu'à remise du code secret OTP.\n• **Livraison & GPS** : Suivi des coursiers avec Google Maps et Yango Maps.\n• **Pass & Tarifs** : Pass Vendeur (5 000 F / 10 000 F) et Pass Livreur (6 000 F).\n\nPosez votre question, utilisez le micro 🎙️ pour parler, ou demandez à échanger avec un agent humain ci-dessous.",
+      ? "💡 **Welcome to BRAD'CI Assistance !**\n\nI can help you with all public platform services:\n• **Registration & Login**: Steps, email OTP verification, KYC identity check.\n• **Orders & Auctions**: How to bid, buy now, and the 5-bid seller arbitration rule.\n• **Direct Pay on Delivery (POD)**: API payment upon courier arrival and OTP verification.\n• **Couriers & Delivery**: GPS tracking via Google Maps and Yango Maps.\n• **Pricing Plans**: Seller Passes (5,000 F / 10,000 F) and Courier Pass (6,000 F).\n\nFeel free to type your question, use the microphone 🎙️, or connect with a human agent below."
+      : "💡 **Bienvenue sur l'Assistance BRAD'CI !**\n\nJe suis à votre service pour vous expliquer tous les aspects du site :\n• **Inscription & Connexion** : Validation par OTP email et certification KYC.\n• **Commandes & Enchères** : Offres express, achat direct et règle des 5 offres.\n• **Paiement Direct à la Livraison (POD)** : Règlement par API à l'arrivée du livreur et validation OTP.\n• **Livraison & GPS** : Suivi des coursiers avec Google Maps et Yango Maps.\n• **Pass & Tarifs** : Pass Vendeur (5 000 F / 10 000 F) et Pass Livreur (6 000 F).\n\nPosez votre question, utilisez le micro 🎙️ pour parler, ou demandez à échanger avec un agent humain ci-dessous.",
     suggestedAction: {
       labelFr: "Parler à un Agent Humain",
       labelEn: "Talk to Human Agent",

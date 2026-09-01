@@ -29,7 +29,7 @@ import { generateAbidjanRoute, RouteStep, RoutePlan, voiceNavigator } from '../u
 interface GoogleMapsEmbedProps {
   pickupCommune: string;
   dropoffCommune: string;
-  vehicleType?: 'moto' | 'voiture' | 'cargo';
+  vehicleType?: 'moto' | 'cargo';
   isReturning?: boolean;
   courierName?: string;
   courierPhone?: string;
@@ -142,8 +142,6 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
     switch (vehicleType) {
       case 'cargo':
         return <Truck className="w-4 h-4 text-purple-400" />;
-      case 'voiture':
-        return <Car className="w-4 h-4 text-blue-400" />;
       default:
         return <Bike className="w-4 h-4 text-emerald-400" />;
     }

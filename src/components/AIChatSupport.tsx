@@ -43,8 +43,7 @@ export const AIChatSupport: React.FC = () => {
     setKycModalOpen, 
     language, 
     translate,
-    currentUser,
-    setRole
+    currentUser
   } = useApp();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -74,8 +73,8 @@ export const AIChatSupport: React.FC = () => {
       id: 'welcome-1',
       sender: 'bot',
       text: language === 'en'
-        ? "👋 **Hello! I am your BRAD'CI AI Assistant.**\n\nI am available 24/7 with voice explanations to answer all your questions about the site:\n• **Registration & Login**: Account steps, email OTP, and KYC identity verification.\n• **Orders & 5-Bid Auctions**: How bidding works and the seller arbitration rule.\n• **Wave Escrow**: 100% money protection until delivery secret OTP code.\n• **Courier Freight & GPS**: Real-time tracking via Google Maps & Yango Maps.\n• **Plans & Pricing**: Standard Pass (5,000 F), Pro Pass (10,000 F), Courier Pass (6,000 F).\n\n💡 *Note: Internal administration and owner-restricted data remain strictly private and confidential.*"
-        : "👋 **Bonjour ! Je suis votre Assistant IA BRAD'CI.**\n\nJe suis à votre service 24h/24 avec explication vocale pour répondre à toutes vos questions sur le fonctionnement du site :\n• **Inscription & Connexion** : Étapes, validation par OTP email et certification KYC.\n• **Commandes & Règle des 5 Offres** : Fonctionnement des enchères express et arbitrage vendeur.\n• **Séquestre Wave** : Sécurité financière totale jusqu'à remise du code secret OTP.\n• **Livraisons & Cartes GPS** : Suivi des coursiers via Google Maps et Yango Maps.\n• **Abonnements & Tarifs** : Pass Vendeur (5 000 F / 10 000 F), Pass Livreur (6 000 F).\n\n💡 *Note : Les accès d'administration interne et données réservées au propriétaire restent strictement confidentiels.*",
+        ? "👋 **Hello! I am your BRAD'CI AI Assistant.**\n\nI am available 24/7 with voice explanations to answer all your questions about the site:\n• **Registration & Login**: Account steps, email OTP, and KYC identity verification.\n• **Orders & 5-Bid Auctions**: How bidding works and the seller arbitration rule.\n• **Direct Pay on Delivery (POD)**: API payment upon arrival and OTP validation.\n• **Courier Freight & GPS**: Real-time tracking via Google Maps & Yango Maps.\n• **Plans & Pricing**: Standard Pass (5,000 F), Pro Pass (10,000 F), Courier Pass (6,000 F).\n\n💡 *Note: Internal administration and owner-restricted data remain strictly private and confidential.*"
+        : "👋 **Bonjour ! Je suis votre Assistant IA BRAD'CI.**\n\nJe suis à votre service 24h/24 avec explication vocale pour répondre à toutes vos questions sur le fonctionnement du site :\n• **Inscription & Connexion** : Étapes, validation par OTP email et certification KYC.\n• **Commandes & Règle des 5 Offres** : Fonctionnement des enchères express et arbitrage vendeur.\n• **Paiement Direct à la Livraison (POD)** : Règlement par API à l'arrivée du coursier et code OTP.\n• **Livraisons & Cartes GPS** : Suivi des coursiers via Google Maps et Yango Maps.\n• **Abonnements & Tarifs** : Pass Vendeur (5 000 F / 10 000 F), Pass Livreur (6 000 F).\n\n💡 *Note : Les accès d'administration interne et données réservées au propriétaire restent strictement confidentiels.*",
       timestamp: language === 'en' ? 'Now' : 'Maintenant',
       category: 'general',
       suggestedAction: {

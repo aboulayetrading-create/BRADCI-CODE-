@@ -202,7 +202,7 @@ export const PricingModal: React.FC = () => {
                 </li>
                 <li className="flex items-start gap-1.5">
                   <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                  <span>{translate("Déblocage & virement express des fonds", "Express escrow fund payout")}</span>
+                  <span>{translate("Paiements directs & virements instantanés", "Direct payments & instant payouts")}</span>
                 </li>
               </ul>
             </div>
@@ -272,7 +272,7 @@ export const PricingModal: React.FC = () => {
             </button>
           </div>
 
-          {/* Card 4: Pass Livreur VIP (6 000 FCFA) */}
+          {/* Card 4: Pass Livreur VIP (Coming Soon with Free Unlimited Active) */}
           <div 
             onClick={() => setSelectedPlan('vip_pass')}
             className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
@@ -281,46 +281,52 @@ export const PricingModal: React.FC = () => {
                 : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
             }`}
           >
-            <div className="absolute -top-2.5 right-3 bg-emerald-400 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full shadow">
-              {translate("LIVREUR", "COURIER")}
+            <div className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full shadow border border-amber-300 flex items-center gap-1">
+              <span>⏳</span>
+              <span>{translate("PASS BIENTÔT", "COMING SOON")}</span>
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
                   <Bike className="w-4 h-4" />
                 </div>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                  {translate("Courses Illimitées", "Unlimited Runs")}
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  {translate("Gratuit Actuel (Illimité)", "Currently Free (Unlimited)")}
                 </span>
               </div>
               <h3 className="font-bold text-sm text-white">{translate("Pass Livreur VIP", "VIP Courier Pass")}</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">{translate("Après 5 courses d'essai gratuites", "After 5 free trial deliveries")}</p>
-              <div className="mt-3 mb-4">
+              <p className="text-[11px] text-amber-300 font-medium mt-0.5">
+                {translate("Courses illimitées gratuites actives • Lancement bientôt", "Free unlimited runs active • Launching soon")}
+              </p>
+              <div className="mt-3 mb-4 flex items-baseline gap-2">
                 <span className="text-xl font-extrabold text-white font-mono-num">6 000 F</span>
                 <span className="text-[10px] text-slate-400"> {translate("/ mois", "/ mo")}</span>
+                <span className="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-500/30">
+                  {translate("5 Courses Offertes au Lancement", "5 Free Trial Deliveries at Launch")}
+                </span>
               </div>
               <ul className="space-y-2 text-xs text-slate-300">
                 <li className="flex items-start gap-1.5 text-emerald-300 font-semibold">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{translate("Accès illimité à la bourse de fret Abidjan", "Unlimited Abidjan freight radar access")}</span>
+                  <span>{translate("Accès illimité sans blocage à toutes les courses d'Abidjan", "Unlimited unblocked access to all deliveries across Abidjan")}</span>
                 </li>
                 <li className="flex items-start gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{translate("Virements instantanés Wave / MoMo / Orange", "Instant Wave / MoMo / Orange payouts")}</span>
+                  <span>{translate("0% de commission sur vos frais de livraison", "0% commission on your delivery earnings")}</span>
                 </li>
-                <li className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{translate("0% commission sur toutes vos courses", "0% commission on all deliveries")}</span>
+                <li className="flex items-start gap-1.5 text-amber-200">
+                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <span>{translate("Période d'essai : 5 courses offertes dès l'activation", "Trial period: 5 free deliveries upon official launch")}</span>
                 </li>
               </ul>
             </div>
             <button 
               type="button" 
               className={`mt-4 w-full py-2 rounded-xl text-xs font-bold transition-all ${
-                selectedPlan === 'vip_pass' ? 'bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                selectedPlan === 'vip_pass' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
               }`}
             >
-              {translate("Sélectionner", "Select")}
+              {translate("Offre Gratuite Active (Pass Bientôt)", "Free Active (Pass Soon)")}
             </button>
           </div>
         </div>

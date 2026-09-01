@@ -22,7 +22,8 @@ import {
   Package,
   Users,
   Navigation,
-  AlertCircle
+  AlertCircle,
+  Building2
 } from 'lucide-react';
 import { Product, VehicleType } from '../types';
 import { 
@@ -56,7 +57,7 @@ export const VisitorFeed: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
   const [selectedCommune, setSelectedCommune] = useState<string>('Toutes');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('Tous');
-  const [selectedFeedType, setSelectedFeedType] = useState<'all' | 'auction' | 'shop'>('all');
+  const [selectedFeedType, setSelectedFeedType] = useState<'all' | 'auction' | 'shop' | 'five_bids' | 'b2b'>('all');
   const [driverOnlyFilter, setDriverOnlyFilter] = useState<boolean>(false);
   const [isMapExpanded, setIsMapExpanded] = useState<boolean>(false);
 
@@ -69,6 +70,7 @@ export const VisitorFeed: React.FC = () => {
 
   const categories = [
     { key: 'Tous', label: translate('Tous', 'All') },
+    { key: 'Déstockage B2B', label: translate('🏢 Déstockage B2B (Lots)', '🏢 B2B Liquidation (Lots)') },
     { key: 'High-Tech', label: translate('High-Tech', 'High-Tech') },
     { key: 'Mode & Luxe', label: translate('Mode & Luxe', 'Fashion & Luxury') },
     { key: 'Maison & Électro', label: translate('Maison & Électro', 'Home & Appliances') },
@@ -79,7 +81,8 @@ export const VisitorFeed: React.FC = () => {
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          p.commune.toLowerCase().includes(searchQuery.toLowerCase());
+                          p.commune.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (p.b2bCompanyName && p.b2bCompanyName.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = selectedCategory === 'Tous' || p.category === selectedCategory;
     const matchesCommune = selectedCommune === 'Toutes' || 
                            p.commune.toLowerCase().includes(selectedCommune.toLowerCase()) ||
@@ -89,14 +92,14 @@ export const VisitorFeed: React.FC = () => {
     const matchesFeedType = selectedFeedType === 'all' || 
                             (selectedFeedType === 'shop' && (p.listingType === 'shop' || p.shopId)) ||
                             (selectedFeedType === 'auction' && (p.listingType === 'auction' || (!p.shopId && p.listingType !== 'shop'))) ||
-                            (selectedFeedType === 'five_bids' && (p.bids.length >= 5 || p.status === 'pending_choice'));
+                            (selectedFeedType === 'five_bids' && (p.bids.length >= 5 || p.status === 'pending_choice')) ||
+                            (selectedFeedType === 'b2b' && (p.isB2BLot || p.category === 'Déstockage B2B'));
     return matchesSearch && matchesCategory && matchesCommune && matchesVehicle && matchesDriverFilter && matchesFeedType;
   });
 
   const getVehicleIcon = (v: VehicleType) => {
     switch (v) {
       case 'cargo': return <Truck className="w-3.5 h-3.5 text-purple-400" />;
-      case 'voiture': return <Car className="w-3.5 h-3.5 text-blue-400" />;
       default: return <Bike className="w-3.5 h-3.5 text-emerald-400" />;
     }
   };
@@ -107,7 +110,6 @@ export const VisitorFeed: React.FC = () => {
       if (job) return job.deliveryFee;
     }
     if (p.requiredVehicle === 'cargo') return 12000;
-    if (p.requiredVehicle === 'voiture') return 6000;
     return 3000;
   };
 
@@ -205,23 +207,23 @@ export const VisitorFeed: React.FC = () => {
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="relative z-10 max-w-4xl">
-            <div className="inline-flex items-center gap-2 bg-amber-500/15 text-amber-400 px-3 py-1 rounded-full text-xs font-extrabold border border-amber-500/30 mb-3 shadow-sm">
-              <Flame className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span>{translate("Grand Abidjan & Villes Balnéaires • Séquestre Wave Garanti", "Greater Abidjan & Coastal Cities • Wave Escrow Guaranteed")}</span>
+            <div className="inline-flex items-center gap-2 bg-emerald-500/15 text-emerald-400 px-3 py-1 rounded-full text-xs font-extrabold border border-emerald-500/30 mb-3 shadow-sm">
+              <Flame className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>{translate("Grand Abidjan & Villes Balnéaires • Paiement Direct à la Livraison", "Greater Abidjan & Coastal Cities • Direct Pay on Delivery")}</span>
             </div>
 
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight font-display leading-[1.15]">
               {translate("Achetez & Vendez aux Enchères avec ", "Buy & Sell with ")}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-500">
-                {translate("Séquestre Wave", "Wave Escrow")}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-400">
+                {translate("Paiement Direct à la Livraison", "Direct Pay on Delivery")}
               </span>
               {translate(" Garanti.", " Guaranteed.")}
             </h1>
 
             <p className="text-slate-300 text-xs sm:text-sm mt-3 leading-relaxed max-w-2xl">
               {translate(
-                "La 1ère plateforme sécurisée de déstockage express couvrant les 13 communes d'Abidjan ainsi que Grand-Bassam, Assinie, Bingerville et Dabou.",
-                "The #1 secure express liquidation platform covering all 13 communes of Abidjan, as well as Grand-Bassam, Assinie, Bingerville, and Dabou."
+                "La 1ère plateforme sécurisée de déstockage express couvrant les 13 communes d'Abidjan ainsi que Grand-Bassam, Assinie, Bingerville et Dabou. Payez par API (Wave, Orange Money, MTN MoMo, Moov, Carte) après vérification du colis.",
+                "The #1 secure express liquidation platform covering all 13 communes of Abidjan, as well as Grand-Bassam, Assinie, Bingerville, and Dabou. Pay via API (Wave, Orange Money, MTN MoMo, Moov, Card) after parcel inspection."
               )}
             </p>
 
@@ -233,7 +235,7 @@ export const VisitorFeed: React.FC = () => {
               </div>
               <div className="bg-slate-900/70 border border-slate-800/80 p-2.5 sm:p-3 rounded-2xl">
                 <span className="text-blue-400 font-bold text-xs block">{translate("Pass Standard 5 000 F", "Standard Pass 5,000 F")}</span>
-                <span className="text-[11px] text-slate-400">{translate("Comm. réduite 7,5%", "Reduced 7.5% comm.")}</span>
+                <span className="text-[11px] text-slate-400">{translate("Comm. réduite 5%", "Reduced 5% comm.")}</span>
               </div>
               <div className="bg-slate-900/70 border border-slate-800/80 p-2.5 sm:p-3 rounded-2xl">
                 <span className="text-emerald-400 font-bold text-xs block">{translate("5 Courses Livreur", "5 Free Courier Runs")}</span>
@@ -241,7 +243,7 @@ export const VisitorFeed: React.FC = () => {
               </div>
               <div className="bg-slate-900/70 border border-slate-800/80 p-2.5 sm:p-3 rounded-2xl">
                 <span className="text-red-400 font-bold text-xs block">{translate("Unicité KYC", "KYC Identity Check")}</span>
-                <span className="text-[11px] text-slate-400">{translate("Sécurité 100% Anti-Fraude", "100% Anti-Fraud Escrow")}</span>
+                <span className="text-[11px] text-slate-400">{translate("Sécurité 100% Anti-Fraude", "100% Anti-Fraud POD")}</span>
               </div>
             </div>
 
@@ -402,6 +404,22 @@ export const VisitorFeed: React.FC = () => {
                   {products.filter(p => p.bids.length >= 5 || p.status === 'pending_choice').length}
                 </span>
               </button>
+
+              <button
+                id="feed-filter-b2b"
+                onClick={() => setSelectedFeedType('b2b')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  selectedFeedType === 'b2b'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                    : 'bg-slate-900 text-cyan-300 hover:bg-slate-800 border border-blue-500/30'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{translate("🏢 Déstockage B2B Lots", "🏢 B2B Liquidation Lots")}</span>
+                <span className="text-[10px] bg-blue-900/60 text-cyan-200 px-1.5 py-0.2 rounded-md font-mono-num font-extrabold">
+                  {products.filter(p => p.isB2BLot || p.category === 'Déstockage B2B').length}
+                </span>
+              </button>
             </div>
 
             {/* Vehicle requirement filter options */}
@@ -422,16 +440,7 @@ export const VisitorFeed: React.FC = () => {
                 }`}
               >
                 <Bike className="w-3 h-3" />
-                <span>{translate("Moto", "Bike")}</span>
-              </button>
-              <button
-                onClick={() => setSelectedVehicle('voiture')}
-                className={`px-2 py-0.5 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all ${
-                  selectedVehicle === 'voiture' ? 'bg-blue-500/20 text-blue-300' : 'hover:text-white'
-                }`}
-              >
-                <Car className="w-3 h-3" />
-                <span>{translate("Voiture", "Car")}</span>
+                <span>{translate("Moto Express", "Express Bike")}</span>
               </button>
               <button
                 onClick={() => setSelectedVehicle('cargo')}
@@ -440,7 +449,7 @@ export const VisitorFeed: React.FC = () => {
                 }`}
               >
                 <Truck className="w-3 h-3" />
-                <span>{translate("Camion", "Cargo")}</span>
+                <span>{translate("Cargo / Fourgon", "Cargo Van")}</span>
               </button>
             </div>
           </div>
@@ -561,6 +570,18 @@ export const VisitorFeed: React.FC = () => {
                           <AlertCircle className="w-3.5 h-3.5 text-white" />
                           <span>{translate("STOCK ÉPUISÉ", "OUT OF STOCK")}</span>
                         </div>
+                      ) : product.isB2BLot || product.category === 'Déstockage B2B' ? (
+                        product.b2bSaleKind === 'liquidation' ? (
+                          <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg shadow-lg border border-indigo-400/40 flex items-center gap-1.5 backdrop-blur-md">
+                            <Building2 className="w-3.5 h-3.5 text-indigo-200" />
+                            <span>{translate("LIQUIDATION", "LIQUIDATION")} ({product.b2bTotalUnitsCount || 1} {translate("U.", "U.")})</span>
+                          </div>
+                        ) : (
+                          <div className="bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-700 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg shadow-lg border border-cyan-400/40 flex items-center gap-1.5 backdrop-blur-md">
+                            <Building2 className="w-3.5 h-3.5 text-cyan-200" />
+                            <span>{translate("DÉSTOCKAGE", "CLEARANCE")} ({product.b2bTotalUnitsCount || 1} {translate("U.", "U.")})</span>
+                          </div>
+                        )
                       ) : isShop ? (
                         <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg shadow-lg border border-emerald-400/40 flex items-center gap-1.5 backdrop-blur-md">
                           <Store className="w-3.5 h-3.5 text-emerald-100" />
@@ -649,12 +670,14 @@ export const VisitorFeed: React.FC = () => {
                             {translate("Boutique", "Store")}
                           </span>
                         ) : product.sellerPlan === 'pro' ? (
-                          <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-bold shrink-0">
-                            PRO 5%
+                          <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold shrink-0 flex items-center gap-0.5">
+                            <Crown className="w-2.5 h-2.5 text-amber-400" />
+                            <span>OR VIP</span>
                           </span>
                         ) : product.sellerPlan === 'standard' ? (
-                          <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1 rounded font-bold shrink-0">
-                            STANDARD 7.5%
+                          <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1.5 py-0.2 rounded font-bold shrink-0 flex items-center gap-0.5">
+                            <ShieldCheck className="w-2.5 h-2.5 text-blue-400" />
+                            <span>CERTIFIÉ</span>
                           </span>
                         ) : null}
                       </div>

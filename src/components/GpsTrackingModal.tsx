@@ -6,29 +6,24 @@ import {
   Bike, 
   Phone, 
   ShieldCheck, 
-  Clock, 
-  Navigation, 
   KeyRound, 
   CheckCircle2, 
   Package, 
   MessageCircle, 
   AlertTriangle, 
   RotateCcw, 
-  Truck, 
-  ArrowRight, 
-  Info, 
-  DollarSign,
-  Volume2,
-  Radio,
-  Eye,
-  Headphones,
-  Users,
-  Timer,
-  AlertOctagon,
-  Sparkles
+  Radio, 
+  Eye, 
+  Headphones, 
+  Users, 
+  Timer, 
+  AlertOctagon, 
+  CreditCard, 
+  Zap,
+  FileText 
 } from 'lucide-react';
 import { GoogleMapsEmbed } from './GoogleMapsEmbed';
-import { DeliveryJob } from '../types';
+import { DeliveryJob, PaymentMethod } from '../types';
 
 export const GpsTrackingModal: React.FC = () => {
   const { 
@@ -38,27 +33,34 @@ export const GpsTrackingModal: React.FC = () => {
     buyerCancelAndReturnPackage, 
     buyerConfirmDeliveryOTP,
     sellerConfirmReturnReceived,
-    driverConfirmReturnOTP,
     driverConfirmPickup,
     driverDeclareArrival,
+    driverConfirmDeliveryOTP,
+    buyerInitiatePayOnDelivery,
+    openOfficialReceipt,
     freightJobs,
     addToast
   } = useApp();
 
-  const [courierProgress, setCourierProgress] = useState(25); // % along the route
+  const [courierProgress, setCourierProgress] = useState(25);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [pickupCodeInput, setPickupCodeInput] = useState('');
+  const [driverEnteredOtp, setDriverEnteredOtp] = useState('');
+  
+  // Payment on Delivery operator selection
+  const [selectedOperator, setSelectedOperator] = useState<PaymentMethod>('Wave');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   // Radar & Search state for 'available' jobs
-  const [activeConsultingDriversCount, setActiveConsultingDriversCount] = useState(3);
+  const [activeConsultingDriversCount] = useState(3);
   const [simulatedSearchSeconds, setSimulatedSearchSeconds] = useState(6);
   
   // Packaging Timer Simulation (10 min allowance)
-  const [packagingElapsedSeconds, setPackagingElapsedSeconds] = useState(180); // 3 mins into packaging
+  const [packagingElapsedSeconds] = useState(180);
 
   // Transit delay calculation
-  const [transitElapsedMinutes, setTransitElapsedMinutes] = useState(12);
+  const [transitElapsedMinutes] = useState(12);
 
   // Synchronize live job from freightJobs state
   const job: DeliveryJob | undefined = freightJobs.find(j => j.id === gpsTrackingJob?.id) || gpsTrackingJob || undefined;
@@ -67,7 +69,7 @@ export const GpsTrackingModal: React.FC = () => {
     if (!job) return;
     
     // Auto-advance courier progress if in transit
-    if (job.status === 'in_transit') {
+    if (job.status === 'in_transit' || job.orderStatus === 'IN_TRANSIT') {
       const interval = setInterval(() => {
         setCourierProgress(prev => (prev >= 95 ? 95 : prev + 1.5));
       }, 2500);
@@ -79,36 +81,40 @@ export const GpsTrackingModal: React.FC = () => {
   useEffect(() => {
     if (!job || job.status !== 'available') return;
 
-    const timer = setInterval(() => {
-      setSimulatedSearchSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          // Auto-assign first driver
-          if (gpsTrackingJob) {
-            const updated: DeliveryJob = {
-              ...gpsTrackingJob,
-              status: 'accepted',
-              assignedDriverId: 'driver-bakary',
-              assignedDriverName: 'Bakary Traoré',
-              assignedDriverPhone: '+225 01 44 77 89 22',
-              assignedDriverVehicle: 'moto',
-              sellerPackagingTimerStartedAt: new Date().toISOString()
-            };
-            setGpsTrackingJob(updated);
-            addToast(
-              '🛵 Livreur Assigné en Direct !',
-              'Bakary Traoré (Moto) a accepté votre course et se dirige vers le point de retrait.',
-              'success'
-            );
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1500);
+    setSimulatedSearchSeconds(6);
 
-    return () => clearInterval(timer);
-  }, [job, gpsTrackingJob]);
+    const interval = setInterval(() => {
+      setSimulatedSearchSeconds(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    const timeout = setTimeout(() => {
+      if (gpsTrackingJob && gpsTrackingJob.status === 'available') {
+        const updated: DeliveryJob = {
+          ...gpsTrackingJob,
+          status: 'accepted',
+          assignedDriverId: 'driver-bakary',
+          assignedDriverName: 'Bakary Traoré',
+          assignedDriverPhone: '+225 01 44 77 89 22',
+          assignedDriverVehicle: 'moto',
+          assignedDriverVehiclePlate: '4523 JJ 01',
+          assignedDriverVehicleColor: 'Noir & Rouge',
+          assignedDriverVehicleModel: 'Yamaha Crypton 110',
+          sellerPackagingTimerStartedAt: new Date().toISOString()
+        };
+        setGpsTrackingJob(updated);
+        addToast(
+          '🛵 Livreur Assigné en Direct !',
+          'Bakary Traoré (Moto • Matricule: 4523 JJ 01) a accepté votre course.',
+          'success'
+        );
+      }
+    }, 6000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [job?.id, job?.status]);
 
   if (!job) return null;
 
@@ -119,12 +125,20 @@ export const GpsTrackingModal: React.FC = () => {
   // Status checks
   const isAvailable = job.status === 'available';
   const isAccepted = job.status === 'accepted';
-  const isInTransit = job.status === 'in_transit';
-  const isArrived = job.status === 'arrived';
+  const isInTransit = job.status === 'in_transit' || job.orderStatus === 'IN_TRANSIT';
+  const isArrived = job.status === 'arrived' || job.orderStatus === 'ARRIVED' || job.orderStatus === 'PAYMENT_PENDING' || job.orderStatus === 'PAID';
+  const isPaymentPending = job.orderStatus === 'PAYMENT_PENDING';
+  const isPaid = job.orderStatus === 'PAID' || job.paymentStatus === 'PAID';
   const isReturning = job.status === 'returning';
   const isReturned = job.status === 'returned';
-  const isDelivered = job.status === 'delivered';
+  const isDelivered = job.status === 'delivered' || job.orderStatus === 'COMPLETED';
   const isPickedUp = isInTransit || isArrived || isDelivered || isReturning || isReturned;
+
+  // Pricing & Split calculation
+  const productPrice = Number(job.itemValue) || 0;
+  const deliveryFee = Number(job.deliveryFee) || 0;
+  const platformFee = 500;
+  const totalBuyerAmount = productPrice + deliveryFee + platformFee;
 
   // Seller Packaging Penalty Logic (10 min free, 100 F/min beyond)
   const packagingMinutes = Math.floor(packagingElapsedSeconds / 60);
@@ -161,30 +175,47 @@ export const GpsTrackingModal: React.FC = () => {
     driverDeclareArrival(job.id);
   };
 
+  const handleInitiatePayment = async () => {
+    setIsProcessingPayment(true);
+    await buyerInitiatePayOnDelivery(job.id, selectedOperator);
+    setIsProcessingPayment(false);
+  };
+
+  const handleDriverSubmitOtp = () => {
+    if (!driverEnteredOtp) {
+      addToast('Code OTP Manquant', 'Veuillez saisir le code OTP à 4 chiffres fourni par l\'acheteur.', 'warning');
+      return;
+    }
+    const ok = driverConfirmDeliveryOTP(job.id, driverEnteredOtp);
+    if (ok) {
+      setDriverEnteredOtp('');
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
       <div 
         id="gps-tracking-card" 
-        className="w-full max-w-3xl bg-[#0B111E] border border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl relative my-auto max-h-[94vh] overflow-y-auto text-white"
+        className="w-full max-w-3xl bg-[#0B1021] border border-[#222D4A] rounded-3xl p-4 sm:p-7 shadow-2xl relative my-auto max-h-[94vh] overflow-y-auto text-white"
       >
         {/* Top Control Bar with Close & Customer Service Buttons */}
-        <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#222D4A]">
           <div className="flex items-center gap-2">
             <button
               onClick={handleOpenCustomerService}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all shadow-sm cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1E53E5]/15 hover:bg-[#1E53E5]/25 border border-[#1E53E5]/40 text-[#467BFF] font-bold text-xs transition-all shadow-sm cursor-pointer"
             >
               <Headphones className="w-3.5 h-3.5" />
               <span>Assistance Client 24/7</span>
             </button>
             <span className="hidden sm:inline-block text-[11px] text-slate-400">
-              Résolution instantanée d'incidents
+              Paiement Direct à la Livraison (Pay on Delivery via API)
             </span>
           </div>
 
           <button
             onClick={() => setGpsTrackingJob(null)}
-            className="text-slate-400 hover:text-white p-1.5 rounded-xl bg-slate-900 border border-slate-800 transition-colors"
+            className="text-slate-400 hover:text-white p-1.5 rounded-xl bg-[#151C33] border border-[#222D4A] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -223,280 +254,151 @@ export const GpsTrackingModal: React.FC = () => {
                 <div>
                   <p className="text-xs font-black text-white flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{activeConsultingDriversCount} Livreurs Consultent l'Offre en ce moment</span>
+                    <span>Livreurs géolocalisés à proximité</span>
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    Secteur {job.pickupCommune} • Frais de course : <strong className="text-emerald-400 font-mono">{job.deliveryFee.toLocaleString('fr-FR')} FCFA</strong>
+                    Secteur {job.pickupCommune} • En attente d'acceptation immédiate
                   </p>
                 </div>
               </div>
 
               <div className="text-right shrink-0">
-                <span className="text-[10px] text-slate-400 block uppercase font-bold">Attribution auto</span>
+                <span className="text-[10px] text-slate-400 block uppercase font-bold">Attribution</span>
                 <span className="text-sm font-mono-num font-black text-amber-400">
                   ~ {simulatedSearchSeconds}s
                 </span>
               </div>
             </div>
 
-            {/* Live Drivers in Area list */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 max-w-lg mx-auto text-left">
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs flex items-center gap-2">
-                <Bike className="w-4 h-4 text-emerald-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="font-bold text-white truncate">Bakary T.</p>
-                  <p className="text-[10px] text-slate-400">Moto • 850m</p>
+            {/* Live Drivers in Area list with Photo and Distance Km only */}
+            <div className="grid grid-cols-3 gap-3 max-w-lg mx-auto">
+              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col items-center justify-center text-center relative group hover:border-emerald-500/50 transition-all">
+                <div className="relative mb-2">
+                  <img 
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" 
+                    alt="Livreur" 
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500 shadow-md"
+                  />
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse" />
+                </div>
+                <p className="font-bold text-xs text-white">Bakary T.</p>
+                <div className="mt-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-black font-mono">
+                  📍 0.8 km
                 </div>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs flex items-center gap-2">
-                <Bike className="w-4 h-4 text-emerald-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="font-bold text-white truncate">Moussa S.</p>
-                  <p className="text-[10px] text-slate-400">Moto • 1.2 km</p>
+
+              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col items-center justify-center text-center relative group hover:border-emerald-500/50 transition-all">
+                <div className="relative mb-2">
+                  <img 
+                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80" 
+                    alt="Livreur" 
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500/60 shadow-md"
+                  />
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse" />
+                </div>
+                <p className="font-bold text-xs text-white">Koffi J.</p>
+                <div className="mt-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-black font-mono">
+                  📍 1.4 km
                 </div>
               </div>
-              <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs flex items-center gap-2">
-                <Bike className="w-4 h-4 text-emerald-400 shrink-0" />
-                <div className="min-w-0">
-                  <p className="font-bold text-white truncate">Kouassi A.</p>
-                  <p className="text-[10px] text-slate-400">Moto • 1.8 km</p>
+
+              <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col items-center justify-center text-center relative group hover:border-emerald-500/50 transition-all">
+                <div className="relative mb-2">
+                  <img 
+                    src="https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80" 
+                    alt="Livreur" 
+                    referrerPolicy="no-referrer"
+                    className="w-14 h-14 rounded-full object-cover border-2 border-emerald-500/60 shadow-md"
+                  />
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900 animate-pulse" />
+                </div>
+                <p className="font-bold text-xs text-white">Moussa D.</p>
+                <div className="mt-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-black font-mono">
+                  📍 2.1 km
                 </div>
               </div>
             </div>
           </div>
         ) : (
-          /* ACTIVE / IN PROGRESS JOB DISPLAY */
           <>
-            {/* Header Title with Role context */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            {/* Header with Title & Route */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <div>
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border mb-2 bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
-                  <Navigation className="w-3.5 h-3.5 animate-pulse" />
-                  <span>
-                    {isReturning 
-                      ? '🔄 Trajet Retour vers Vendeur (Colis Non-Conforme)' 
-                      : isReturned 
-                      ? '✅ Colis Restitué au Vendeur' 
-                      : isAccepted 
-                      ? '🛵 Livreur en Route vers la Boutique'
-                      : isInTransit 
-                      ? '📍 Colis en Acheminement vers Destinataire'
-                      : isArrived 
-                      ? '🚪 Livreur Arrivé à Destination'
-                      : 'Suivi Télémétrie GPS en Direct'}
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-white font-display">
-                  {job.productTitle}
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Course assignée • De <strong>{job.pickupCommune}</strong> ({job.pickupAddress}) vers <strong>{job.dropoffCommune}</strong>
-                </p>
-              </div>
-
-              <div className="sm:text-right bg-slate-900/90 border border-slate-800 p-3 rounded-2xl shrink-0">
-                <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                  {isReturning ? 'Retour estimé :' : isReturned ? 'Statut course :' : 'Arrivée estimée (ETA) :'}
-                </span>
-                <span className="text-xl font-mono-num font-black text-amber-400 flex items-center sm:justify-end gap-1 mt-0.5">
-                  <Clock className="w-4 h-4 text-amber-400 animate-spin" />
-                  <span>
-                    {isReturned 
-                      ? 'Restitué' 
+                <div className="flex items-center gap-2">
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase tracking-wider ${
+                    isDelivered 
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                      : isPaid
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : isArrived
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30 animate-pulse'
                       : isReturning 
-                      ? `${Math.max(4, (job.etaMinutes || 12))} min` 
-                      : isDelivered 
-                      ? 'Livré' 
-                      : isArrived 
-                      ? 'Sur place'
-                      : `${Math.max(3, (job.etaMinutes || 15) - Math.floor(courierProgress / 10))} min`}
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      : isInTransit 
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  }`}>
+                    {isDelivered
+                      ? '✓ Commande Clôturée (OTP Validé)'
+                      : isPaid
+                      ? '✅ Paiement API Confirmé • OTP Débloqué'
+                      : isArrived
+                      ? '📍 Livreur Arrivé sur Place • Paiement Débloqué'
+                      : isReturning
+                      ? '↩ Trajet Retour Vendeur'
+                      : isInTransit
+                      ? '🛵 En Route (Suivi GPS Actif)'
+                      : '📦 Enlèvement en cours'}
                   </span>
+                  <span className="text-xs text-slate-400">Mission #{job.id.slice(-6)}</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-bold text-white mt-1 flex items-center gap-2">
+                  <span>{job.productTitle}</span>
+                </h2>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[11px] text-slate-400 block uppercase font-medium">Prix & Frais</span>
+                <span className="text-base font-extrabold text-amber-400 font-mono-num">
+                  {totalBuyerAmount.toLocaleString('fr-FR')} FCFA
                 </span>
               </div>
             </div>
 
-            {/* MANDATORY CONTRADICTORY INSPECTION & PACKAGING PROTOCOL BANNER */}
-            <div className="mb-4 p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/30 text-xs">
-              <div className="flex items-start gap-2.5">
-                <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="font-bold text-white text-xs">
-                    Protocole de Sécurité & Emballage Contradictoire Brad'CI :
-                  </p>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">
-                    <strong>1. Vendeur :</strong> Vous devez impérativement <strong>déballer l'article et montrer le produit réel</strong> au livreur pour vérification de conformité visuelle avec l'annonce.<br />
-                    <strong>2. Livreur :</strong> Contrôlez que le produit correspond fidèlement à la photo avant d'assister à l'emballage sécurisé.<br />
-                    <strong>3. Vendeur :</strong> Remballez soigneusement le colis devant le coursier puis communiquez-lui votre code d'enlèvement.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* PENALTY WARNING & COUNTER BANNER (100 FCFA / min) */}
-            <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              {/* Seller Packaging Delay Tracker */}
-              <div className={`p-3 rounded-2xl border flex items-start gap-2.5 ${
-                sellerPenaltyFCFA > 0 
-                  ? 'bg-red-500/15 border-red-500/40 text-red-200' 
-                  : 'bg-slate-900/80 border-slate-800 text-slate-300'
-              }`}>
-                <Timer className={`w-4 h-4 shrink-0 mt-0.5 ${sellerPenaltyFCFA > 0 ? 'text-red-400 animate-spin' : 'text-amber-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-[11px]">Délai Emballage Vendeur</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950 text-amber-400 font-bold">
-                      {packagingMinutes} min écoulées
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    10 min gratuites autorisées. Au-delà (11e min+), <strong>100 FCFA / min</strong> de pénalité sont déduits du paiement vendeur au profit de Brad'CI.
-                  </p>
-                  {sellerPenaltyFCFA > 0 && (
-                    <p className="text-[11px] font-black text-red-400 font-mono mt-1">
-                      ⚠️ Pénalité appliquée : -{sellerPenaltyFCFA.toLocaleString('fr-FR')} FCFA ({sellerPenaltyMinutes} min de retard)
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Driver Transit & Non-Cancellation Lock */}
-              <div className={`p-3 rounded-2xl border flex items-start gap-2.5 ${
-                driverPenaltyFCFA > 0 
-                  ? 'bg-red-500/15 border-red-500/40 text-red-200' 
-                  : 'bg-slate-900/80 border-slate-800 text-slate-300'
-              }`}>
-                <AlertOctagon className={`w-4 h-4 shrink-0 mt-0.5 ${driverPenaltyFCFA > 0 ? 'text-red-400 animate-spin' : 'text-emerald-400'}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-[11px]">Règle Course Livreur</span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-950 text-emerald-400 font-bold">
-                      Course Verrouillée
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    <strong>Interdiction d'annuler</strong> une course acceptée. Retard &gt; 20 min au-delà de l'ETA GPS = <strong>100 FCFA / min</strong> facturés au livreur.
-                  </p>
-                  {driverPenaltyFCFA > 0 && (
-                    <p className="text-[11px] font-black text-red-400 font-mono mt-1">
-                      ⚠️ Pénalité retard coursier : -{driverPenaltyFCFA.toLocaleString('fr-FR')} FCFA
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Financial Escrow Banner */}
-            <div className="mb-4 p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-                  <DollarSign className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-slate-400 font-medium">
-                    {isSeller 
-                      ? 'Solde Séquestre Vendeur Bloqué :' 
-                      : isBuyer 
-                      ? 'Montant Séquestre Acheteur Envoyé :' 
-                      : 'Valeur Article sous Séquestre :'}
-                  </span>
-                  <p className="text-sm font-extrabold text-amber-400 font-mono-num">
-                    {Number(job.itemValue || 185000).toLocaleString('fr-FR')} FCFA + {job.deliveryFee.toLocaleString('fr-FR')} F livraison
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-[11px] text-slate-400 sm:text-right">
-                {isReturning ? (
-                  <span className="text-amber-400 font-bold">
-                    ⚠️ Colis refusé • Frais livreur ({job.deliveryFee.toLocaleString('fr-FR')} F) versés • Remboursement acheteur validé
-                  </span>
-                ) : isReturned ? (
-                  <span className="text-emerald-400 font-bold">
-                    ✓ Marchandise réintégrée chez le vendeur • Course clôturée
-                  </span>
-                ) : isDelivered ? (
-                  <span className="text-emerald-400 font-bold">
-                    ✓ Fonds transférés sur le solde de retrait du vendeur
-                  </span>
-                ) : (
-                  <span>
-                    🛡️ Séquestre sécurisé. Validation définitive par code OTP acheteur après inspection.
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* 3-Step Timeline Progression Banner */}
+            {/* 5-Step Order Status Timeline */}
             <div className="mb-4 p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {/* Step 1 */}
-                <div className={`p-2.5 rounded-xl border flex items-center gap-2.5 ${
-                  isAccepted
-                    ? 'bg-blue-500/15 border-blue-400 text-blue-300'
-                    : isPickedUp
-                    ? 'bg-slate-900 border-slate-800 text-slate-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-400'
-                }`}>
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${
-                    isPickedUp ? 'bg-emerald-500 text-slate-950' : 'bg-blue-500 text-white'
-                  }`}>
-                    {isPickedUp ? '✓' : '1'}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">1. Enlèvement boutique</p>
-                    <p className="text-[10px] text-slate-400 truncate">{job.pickupCommune}</p>
-                  </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
+                {/* 1. PENDING */}
+                <div className={`p-2 rounded-xl border ${isPickedUp || isAccepted ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
+                  <p className="font-bold text-[11px]">1. PENDING</p>
+                  <p className="text-[9px] text-slate-400">Commande créée</p>
                 </div>
-
-                {/* Step 2 */}
-                <div className={`p-2.5 rounded-xl border flex items-center gap-2.5 ${
-                  isReturning || isReturned
-                    ? 'bg-amber-500/15 border-amber-400 text-amber-300'
-                    : isInTransit
-                    ? 'bg-emerald-500/15 border-emerald-400 text-emerald-300'
-                    : isDelivered || isArrived
-                    ? 'bg-slate-900 border-slate-800 text-slate-400'
-                    : 'bg-slate-900/40 border-slate-800 text-slate-500'
-                }`}>
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${
-                    isDelivered || isReturned ? 'bg-emerald-500 text-slate-950' : isReturning ? 'bg-amber-500 text-slate-950' : isInTransit ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    {isDelivered || isReturned ? '✓' : isReturning ? '↩' : '2'}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">
-                      {isReturning ? '2. Refus & Trajet Retour' : '2. Colis en transit GPS'}
-                    </p>
-                    <p className="text-[10px] text-slate-400 truncate">
-                      {isReturning ? 'Vers vendeur' : 'Vers destinataire'}
-                    </p>
-                  </div>
+                {/* 2. IN_TRANSIT */}
+                <div className={`p-2 rounded-xl border ${isInTransit || isArrived || isDelivered ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                  <p className="font-bold text-[11px]">2. IN_TRANSIT</p>
+                  <p className="text-[9px] text-slate-400">Livreur en route</p>
                 </div>
-
-                {/* Step 3 */}
-                <div className={`p-2.5 rounded-xl border flex items-center gap-2.5 ${
-                  isReturned || isDelivered || isArrived
-                    ? 'bg-emerald-500/15 border-emerald-400 text-emerald-300'
-                    : 'bg-slate-900/40 border-slate-800 text-slate-500'
-                }`}>
-                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${
-                    isDelivered || isReturned ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    {isDelivered || isReturned ? '✓' : '3'}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">
-                      {isReturning ? '3. Restitution Vendeur' : isReturned ? '3. Colis Restitué' : '3. Remise Conforme OTP'}
-                    </p>
-                    <p className="text-[10px] text-slate-400 truncate">
-                      {isReturning ? job.pickupCommune : job.dropoffCommune}
-                    </p>
-                  </div>
+                {/* 3. ARRIVED */}
+                <div className={`p-2 rounded-xl border ${isArrived || isDelivered ? 'bg-blue-500/20 border-blue-500/40 text-blue-300 font-bold' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                  <p className="font-bold text-[11px]">3. ARRIVED</p>
+                  <p className="text-[9px] text-slate-400">GPS sur place</p>
+                </div>
+                {/* 4. PAID */}
+                <div className={`p-2 rounded-xl border ${isPaid || isDelivered ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 font-bold' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                  <p className="font-bold text-[11px]">4. PAID</p>
+                  <p className="text-[9px] text-slate-400">Paiement direct</p>
+                </div>
+                {/* 5. COMPLETED */}
+                <div className={`p-2 rounded-xl border ${isDelivered ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200 font-black' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                  <p className="font-bold text-[11px]">5. COMPLETED</p>
+                  <p className="text-[9px] text-slate-400">Code OTP validé</p>
                 </div>
               </div>
             </div>
 
-            {/* Real-time Google Maps & Interactive GPS Telemetry Navigation with Voice Guidance */}
+            {/* Google Maps & GPS View */}
             <div className="mb-4">
               <GoogleMapsEmbed
                 pickupCommune={job.pickupCommune}
@@ -510,17 +412,16 @@ export const GpsTrackingModal: React.FC = () => {
               />
             </div>
 
-            {/* Courier Info + Persona Code Cards */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Driver Card with Contacts */}
-              <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+            {/* Courier Info Card */}
+            <div className="mb-4 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
                     <Bike className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
                     <p className="font-bold text-sm text-white truncate">{job.assignedDriverName || 'Bakary Traoré'}</p>
-                    <p className="text-xs text-emerald-400 font-medium">Livreur Certifié Brad'CI</p>
+                    <p className="text-xs text-emerald-400 font-medium">Livreur Certifié Brad'CI • Paiement Direct à la Livraison</p>
                     <p className="text-[11px] text-slate-400 font-mono mt-0.5">{job.assignedDriverPhone || '+225 01 44 77 89 22'}</p>
                   </div>
                 </div>
@@ -528,7 +429,7 @@ export const GpsTrackingModal: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <a
                     href={`tel:${job.assignedDriverPhone || '+2250144778922'}`}
-                    className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow"
+                    className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow cursor-pointer"
                     title="Appeler le coursier"
                   >
                     <Phone className="w-4 h-4" />
@@ -537,7 +438,7 @@ export const GpsTrackingModal: React.FC = () => {
                     href={`https://wa.me/2250144778922`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-colors shadow"
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 transition-colors shadow cursor-pointer"
                     title="WhatsApp direct"
                   >
                     <MessageCircle className="w-4 h-4" />
@@ -545,176 +446,347 @@ export const GpsTrackingModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Persona Specific Code Card */}
-              {isReturning ? (
-                /* Return In Progress Card */
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Code OTP Retour Généré :</span>
-                    </span>
-                    <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">
-                      Retour Vendeur
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-2xl font-black font-mono-num tracking-[0.25em] text-white bg-slate-950 px-3 py-1 rounded-xl border border-amber-500/40">
-                      {job.returnOtpCode || '9012'}
-                    </span>
-                    <p className="text-[10px] text-slate-300 leading-tight">
-                      Certifie le refus et la restitution du colis au vendeur.
-                    </p>
-                  </div>
+              <div className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Plaque :</span>
+                  <span className="font-mono font-black text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 uppercase text-xs">
+                    {job.assignedDriverVehiclePlate || '4523 JJ 01'}
+                  </span>
                 </div>
-              ) : isSeller ? (
-                /* Vendeur: Code d'Enlèvement */
-                <div className="p-3.5 rounded-2xl bg-gradient-to-br from-blue-500/15 to-transparent border border-blue-500/30 flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Package className="w-3.5 h-3.5" />
-                      <span>Code d'Enlèvement Vendeur :</span>
-                    </span>
-                    <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-bold">
-                      À donner au livreur
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-2xl font-black font-mono-num tracking-[0.25em] text-white bg-slate-950 px-3 py-1 rounded-xl border border-blue-500/40">
-                      {job.pickupCode || '4291'}
-                    </span>
-                    <p className="text-[10px] text-slate-300 leading-tight">
-                      Donnez ce code au livreur après déballage, vérification et emballage pour valider la prise en charge.
-                    </p>
-                  </div>
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="text-slate-400">Couleur :</span>
+                  <span className="text-white font-bold">{job.assignedDriverVehicleColor || 'Noir & Rouge'}</span>
                 </div>
-              ) : (
-                /* Acheteur: Code Secret OTP */
-                <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/15 to-transparent border border-amber-500/30 flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <KeyRound className="w-3.5 h-3.5" />
-                      <span>Votre Code Secret OTP :</span>
-                    </span>
-                    <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">
-                      À donner à la remise
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <span className="text-2xl font-black font-mono-num tracking-[0.25em] text-white bg-slate-950 px-3 py-1 rounded-xl border border-amber-500/40">
-                      {job.deliveryOtpCode || '8814'}
-                    </span>
-                    <p className="text-[10px] text-slate-300 leading-tight">
-                      Ne donnez ce code qu'<strong>après déballage et inspection physique</strong> de l'article !
-                    </p>
-                  </div>
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="text-slate-400">Engin :</span>
+                  <span className="text-emerald-400 font-medium">{job.assignedDriverVehicleModel || 'Yamaha Crypton 110'}</span>
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* DRIVER DIRECT WORKFLOW CONTROLS (IF LOGGED IN AS DRIVER OR SIMULATED) */}
+            {/* ========================================================================= */}
+            {/* EXCLUSIVE BUYER ACTIONS & PAY ON DELIVERY INTERFACE                        */}
+            {/* ========================================================================= */}
+            {isBuyer && (
+              <div className="space-y-4 mb-4">
+                {/* 1. If Driver ARRIVED and Payment not yet done -> Show "Payer et Valider" */}
+                {isArrived && !isPaid && !isDelivered && (
+                  <div className="p-5 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border-2 border-emerald-500/50 shadow-xl space-y-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
+                          <Zap className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-sm text-white">Le Livreur est à votre porte !</h3>
+                          <p className="text-xs text-slate-300">Inspectez votre colis, puis initiez le paiement direct sécurisé par API.</p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-black text-xs border border-emerald-500/30">
+                        Étape 4 / 5
+                      </span>
+                    </div>
+
+                    {/* Operator Selection */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-300 block mb-2">
+                        Choisissez votre moyen de paiement direct (API) :
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-2">
+                        {[
+                          { id: 'Wave', name: 'Wave (0%)', badge: 'Recommandé', color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' },
+                          { id: 'Orange Money', name: 'Orange Money', badge: 'Instantané', color: 'bg-orange-500/20 text-orange-300 border-orange-500/40' },
+                          { id: 'MTN MoMo', name: 'MTN MoMo', badge: 'Instantané', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40' },
+                          { id: 'Moov Money', name: 'Moov Money', badge: 'Instantané', color: 'bg-blue-500/20 text-blue-300 border-blue-500/40' },
+                          { id: 'Carte Visa', name: 'Carte Visa', badge: 'Sécurisé', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' }
+                        ].map((op) => (
+                          <button
+                            key={op.id}
+                            type="button"
+                            onClick={() => setSelectedOperator(op.id as PaymentMethod)}
+                            className={`p-2.5 rounded-xl border text-xs font-black transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                              selectedOperator === op.id
+                                ? `bg-[#1E53E5]/20 border-[#1E53E5] ring-2 ring-[#FF5B00] text-white shadow-lg`
+                                : 'bg-[#151C33] border-[#222D4A] text-slate-400 hover:text-white hover:border-slate-600'
+                            }`}
+                          >
+                            <CreditCard className={`w-4 h-4 ${selectedOperator === op.id ? 'text-[#FF5B00]' : 'text-slate-400'}`} />
+                            <span className="truncate text-[11px]">{op.name}</span>
+                            <span className="text-[8px] uppercase tracking-wider text-slate-400 font-normal">{op.badge}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Breakdown & Split distribution details */}
+                    <div className="p-3.5 rounded-2xl bg-[#0B1021] border border-[#222D4A] text-xs space-y-1.5">
+                      <div className="flex justify-between text-slate-300">
+                        <span>Prix de l'article :</span>
+                        <span className="font-mono font-bold text-white">{productPrice.toLocaleString('fr-FR')} FCFA</span>
+                      </div>
+                      <div className="flex justify-between text-slate-300">
+                        <span>Frais de transport livreur :</span>
+                        <span className="font-mono font-bold text-white">{deliveryFee.toLocaleString('fr-FR')} FCFA</span>
+                      </div>
+                      <div className="flex justify-between text-slate-300">
+                        <span>Frais techniques de plateforme :</span>
+                        <span className="font-mono font-bold text-white">{platformFee.toLocaleString('fr-FR')} FCFA</span>
+                      </div>
+                      <div className="pt-2 border-t border-[#222D4A] flex justify-between items-center text-sm font-black">
+                        <span className="text-[#FF5B00]">Total à Payer à la Livraison :</span>
+                        <span className="font-mono text-[#FF5B00] text-base font-black">{totalBuyerAmount.toLocaleString('fr-FR')} FCFA</span>
+                      </div>
+                    </div>
+
+                    {/* Pay Button - Official Vibrant Orange (#FF5B00) */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleInitiatePayment}
+                        disabled={isProcessingPayment || isPaymentPending}
+                        className="flex-1 py-4 px-4 rounded-2xl bg-[#FF5B00] hover:bg-[#E05000] active:scale-98 text-white font-black text-sm sm:text-base shadow-xl shadow-[#FF5B00]/30 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
+                      >
+                        {isProcessingPayment || isPaymentPending ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Traitement API {selectedOperator}...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-5 h-5 text-yellow-300" />
+                            <span>PAYER ET VALIDER LA LIVRAISON ({totalBuyerAmount.toLocaleString('fr-FR')} F via {selectedOperator})</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => setCancelModalOpen(true)}
+                        className="px-4 py-4 rounded-2xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold transition-colors cursor-pointer shrink-0"
+                      >
+                        Refuser
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. If PAID -> Show dynamic delivery OTP code in HUGE GREEN (#00C853) with Royal Blue Shield badge (#1E53E5) */}
+                {isPaid && !isDelivered && (
+                  <div className="p-5 rounded-3xl bg-gradient-to-br from-[#151C33] via-[#0B1021] to-[#0B1021] border-2 border-[#00C853] shadow-2xl space-y-4 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {/* Royal Blue Shield Badge (#1E53E5) */}
+                        <div className="w-8 h-8 rounded-xl bg-[#1E53E5] flex items-center justify-center shadow-md">
+                          <ShieldCheck className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                          <span className="font-black text-sm uppercase tracking-wide text-[#00C853] block">
+                            Paiement Direct Validé (PAID)
+                          </span>
+                          <span className="text-[10px] text-slate-400">Transaction Webhook Marchand Confirmée</span>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full bg-[#00C853]/20 text-[#00C853] border border-[#00C853]/40 font-mono text-xs font-black">
+                        API VALIDÉE
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-300">
+                      Votre transfert de <strong>{totalBuyerAmount.toLocaleString('fr-FR')} FCFA</strong> a été sécurisé. <strong>Communiquez ce Code Secret OTP au livreur</strong> après réception de votre article :
+                    </p>
+
+                    {/* Big OTP Display in #00C853 with Blue Shield Branding */}
+                    <div className="py-5 px-4 bg-[#0B1021] rounded-2xl border border-[#00C853]/50 text-center space-y-2 shadow-inner">
+                      <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#1E53E5] font-black uppercase tracking-wider">
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>Code Secret OTP de Déblocage</span>
+                      </div>
+                      <div className="text-4xl sm:text-5xl font-black font-mono-num tracking-[0.35em] text-[#00C853] drop-shadow-md">
+                        {job.deliveryOtpCode || '8814'}
+                      </div>
+                      <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                        Ne transmettez ce code au livreur qu'une fois le colis physiquement contrôlé.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. If COMPLETED -> Order Finished */}
+                {isDelivered && (
+                  <div className="p-4 rounded-2xl bg-[#00C853]/15 border border-[#00C853]/40 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-[#00C853] font-black">
+                      <CheckCircle2 className="w-5 h-5 shrink-0" />
+                      <span>Commande Clôturée avec Succès • Colis Réceptionné</span>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <button
+                        onClick={() => openOfficialReceipt(job)}
+                        className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-[#1E53E5] hover:bg-[#1E53E5]/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Télécharger Facture / Reçu PDF</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* DRIVER DIRECT WORKFLOW CONTROLS (IF LOGGED IN AS DRIVER)                  */}
+            {/* ========================================================================= */}
             {(isDriver || currentUser?.role === 'driver') && !isDelivered && !isReturned && (
-              <div className="mt-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
+              <div className="mt-4 p-4 rounded-3xl bg-[#151C33] border border-[#222D4A] space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-emerald-400 flex items-center gap-1.5">
-                    <Bike className="w-4 h-4" />
-                    <span>Commandes d'Action du Livreur</span>
+                  <span className="text-xs font-black text-[#1E53E5] flex items-center gap-1.5">
+                    <Bike className="w-4 h-4 text-[#FF5B00]" />
+                    <span>Espace d'Action du Livreur</span>
                   </span>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                    Statut actuel : {job.status}
+                  <span className="text-[10px] bg-[#1E53E5]/20 text-blue-300 border border-[#1E53E5]/40 px-2 py-0.5 rounded-full font-bold">
+                    Statut : {job.orderStatus || job.status}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {/* Step A: Pickup & En Route button */}
+                <div className="space-y-2">
+                  {/* Step A: Pickup */}
                   {isAccepted && (
                     <button
                       onClick={handleDriverConfirmPickupDirect}
-                      className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow transition-all cursor-pointer"
+                      className="w-full py-3 px-4 rounded-xl bg-[#1E53E5] hover:bg-[#1644C4] text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#1E53E5]/30 transition-all cursor-pointer"
                     >
                       <Package className="w-4 h-4" />
-                      <span>Colis Vérifié & Emballé - Démarrer Course</span>
+                      <span>Colis Vérifié & Enlevé - Démarrer le Trajet GPS</span>
                     </button>
                   )}
 
-                  {/* Step B: Declare Arrival button */}
+                  {/* Step B: Declare Arrival */}
                   {isInTransit && (
                     <button
                       onClick={handleDriverDeclareArrivalDirect}
-                      className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow transition-all cursor-pointer"
+                      className="w-full py-3.5 px-4 rounded-xl bg-[#FF5B00] hover:bg-[#E05000] text-white font-black text-sm flex items-center justify-center gap-2 shadow-xl shadow-[#FF5B00]/30 transition-all cursor-pointer animate-bounce-short"
                     >
                       <MapPin className="w-4 h-4" />
-                      <span>Je suis Arrivé chez le Destinataire</span>
+                      <span>Signaler mon Arrivée sur Place (GPS)</span>
                     </button>
+                  )}
+
+                  {/* Step C: Awaiting Buyer Payment */}
+                  {isArrived && !isPaid && (
+                    <div className="p-3 bg-[#0B1021] rounded-xl border border-[#222D4A] text-xs text-center space-y-1">
+                      <p className="font-bold text-[#FF5B00]">⏳ En attente du paiement direct de l'acheteur...</p>
+                      <p className="text-[11px] text-slate-400">
+                        L'acheteur valide le montant ({totalBuyerAmount.toLocaleString('fr-FR')} FCFA) depuis son application. Dès confirmation du Webhook, il vous communiquera son Code OTP.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Step D: OTP Confirmation once Buyer has PAID with Mobile Touch Keypad */}
+                  {isPaid && !isDelivered && (
+                    <div className="p-4 bg-[#0B1021] rounded-2xl border border-[#00C853]/50 space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-black text-[#00C853] flex items-center gap-1">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Paiement Acheteur Validé !</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400">Saisissez l'OTP remis par l'acheteur</span>
+                      </div>
+
+                      {/* Display Digits */}
+                      <div className="flex justify-center gap-2 my-2">
+                        {[0, 1, 2, 3].map((idx) => (
+                          <div
+                            key={idx}
+                            className={`w-12 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-black font-mono-num transition-all ${
+                              driverEnteredOtp[idx]
+                                ? 'border-[#00C853] bg-[#00C853]/15 text-white'
+                                : 'border-[#222D4A] bg-[#151C33] text-slate-500'
+                            }`}
+                          >
+                            {driverEnteredOtp[idx] || '•'}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Mobile Ergonomic Touch Keypad (0-9) */}
+                      <div className="grid grid-cols-3 gap-1.5 max-w-xs mx-auto">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
+                          <button
+                            key={digit}
+                            type="button"
+                            onClick={() => {
+                              if (driverEnteredOtp.length < 4) {
+                                setDriverEnteredOtp((prev) => prev + digit);
+                              }
+                            }}
+                            className="py-2.5 rounded-xl bg-[#151C33] hover:bg-[#1C2644] active:bg-[#1E53E5] text-white font-bold text-lg border border-[#222D4A] cursor-pointer transition-colors"
+                          >
+                            {digit}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setDriverEnteredOtp('')}
+                          className="py-2.5 rounded-xl bg-[#151C33] text-red-400 font-bold text-xs border border-[#222D4A] cursor-pointer"
+                        >
+                          Effacer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (driverEnteredOtp.length < 4) {
+                              setDriverEnteredOtp((prev) => prev + '0');
+                            }
+                          }}
+                          className="py-2.5 rounded-xl bg-[#151C33] hover:bg-[#1C2644] text-white font-bold text-lg border border-[#222D4A] cursor-pointer"
+                        >
+                          0
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDriverEnteredOtp((prev) => prev.slice(0, -1))}
+                          className="py-2.5 rounded-xl bg-[#151C33] text-amber-400 font-bold text-xs border border-[#222D4A] cursor-pointer"
+                        >
+                          ⌫
+                        </button>
+                      </div>
+
+                      {/* Submit Action */}
+                      <button
+                        onClick={handleDriverSubmitOtp}
+                        disabled={driverEnteredOtp.length !== 4}
+                        className="w-full py-3.5 bg-[#00C853] hover:bg-[#00B048] disabled:opacity-40 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-[#00C853]/20 cursor-pointer transition-all flex items-center justify-center gap-2"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-slate-950" />
+                        <span>Valider le Code OTP & Encaisser {job.deliveryFee.toLocaleString('fr-FR')} FCFA</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Action Controls for Buyer or Seller */}
-            <div className="mt-4 pt-3 border-t border-slate-800/80">
-              {isBuyer && !isDelivered && !isReturning && !isReturned && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800">
-                  <div className="text-xs">
-                    <p className="font-bold text-white flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>Contrôle Qualité Réception Colis</span>
-                    </p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">
-                      Le livreur est arrivé ? Inspectez le colis avant toute validation.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button
-                      onClick={() => setCancelModalOpen(true)}
-                      className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Refuser / Annuler (Non-conforme)</span>
-                    </button>
-
-                    <button
-                      onClick={() => buyerConfirmDeliveryOTP(job.id, job.deliveryOtpCode)}
-                      className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Valider Réception Conforme</span>
-                    </button>
-                  </div>
+            {/* SELLER VIEW FOR PICKUP CODE */}
+            {isSeller && isAccepted && (
+              <div className="mt-4 p-4 rounded-2xl bg-gradient-to-br from-blue-500/15 to-transparent border border-blue-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wider block">
+                    Code d'Enlèvement Boutique (À donner au livreur) :
+                  </span>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Donnez ce code au livreur lors de la prise en charge après vérification du colis.
+                  </p>
                 </div>
-              )}
-
-              {isSeller && isReturning && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30">
-                  <div>
-                    <p className="font-bold text-white text-xs flex items-center gap-1.5">
-                      <RotateCcw className="w-4 h-4 text-amber-400" />
-                      <span>Colis en Retour chez vous ({job.pickupCommune})</span>
-                    </p>
-                    <p className="text-slate-300 text-[11px] mt-0.5">
-                      L'acheteur a refusé le colis pour non-conformité. Le livreur vous restitue la marchandise.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleSellerConfirmReturn}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs shadow-lg flex items-center gap-2 cursor-pointer"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Confirmer Réception du Colis Restitué</span>
-                  </button>
+                <div className="text-2xl font-black font-mono-num tracking-[0.25em] text-white bg-slate-950 px-4 py-2 rounded-xl border border-blue-500/40">
+                  {job.pickupCode || '4291'}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </>
         )}
 
-        {/* Security & Escrow Guarantee Footer */}
+        {/* Footer info: Direct Pay on Delivery Guarantee */}
         <div className="mt-4 pt-3 border-t border-slate-800 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Séquestre BRAD'CI Actif : Fonds garantis sous séquestre Wave / MoMo jusqu'à validation.</span>
+            <span>Paiement Direct à la Livraison BRAD'CI : Remise en main propre sécurisée par Code OTP.</span>
           </div>
 
           <button
@@ -741,20 +813,8 @@ export const GpsTrackingModal: React.FC = () => {
             </div>
 
             <div className="p-3.5 bg-slate-900/80 rounded-2xl border border-slate-800 text-xs space-y-2 text-slate-300">
-              <div className="flex justify-between">
-                <span>Remboursement Produit :</span>
-                <span className="font-bold text-emerald-400 font-mono">
-                  + {Number(job.itemValue).toLocaleString('fr-FR')} FCFA (sur votre solde)
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Frais de déplacement Livreur :</span>
-                <span className="font-bold text-amber-400 font-mono">
-                  - {job.deliveryFee.toLocaleString('fr-FR')} FCFA (versés au coursier)
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 pt-1 border-t border-slate-800">
-                Le livreur retournera immédiatement l'article au vendeur ({job.sellerName}). Un <strong>code OTP Retour</strong> sera généré.
+              <p className="text-[11px] text-slate-400">
+                En refusant le colis, aucun montant ne sera prélevé pour l'article. Le livreur retournera immédiatement la marchandise au vendeur ({job.sellerName}).
               </p>
             </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   X, 
@@ -15,7 +15,12 @@ import {
   Building,
   KeyRound,
   RotateCcw,
-  AlertCircle
+  AlertCircle,
+  Gift,
+  Check,
+  Tag,
+  Info,
+  ExternalLink
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { getTranslation } from '../utils/translations';
@@ -34,7 +39,10 @@ export const AuthModal: React.FC = () => {
     completeGoogleProfile,
     language,
     translate,
-    addToast 
+    addToast,
+    users,
+    pendingReferralCode,
+    setPendingReferralCode
   } = useApp();
 
   // 'login' | 'register' | 'otp_verify' | 'google_complete'
@@ -48,6 +56,8 @@ export const AuthModal: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('client');
+  const [referralCodeInput, setReferralCodeInput] = useState(pendingReferralCode || '');
+  const [showReferralInputManual, setShowReferralInputManual] = useState(false);
 
   // OTP Verification state
   const [enteredOtp, setEnteredOtp] = useState('');
@@ -59,7 +69,22 @@ export const AuthModal: React.FC = () => {
   const [loginEmail, setLoginEmail] = useState('kouassi.jean@bradci.ci');
   const [loginPassword, setLoginPassword] = useState('••••••••');
 
+  // Sync pending referral code when modal opens or changes
+  useEffect(() => {
+    if (pendingReferralCode) {
+      setReferralCodeInput(pendingReferralCode);
+      setAuthView('register');
+      setShowReferralInputManual(true);
+    }
+  }, [pendingReferralCode, authModalOpen]);
+
   if (!authModalOpen) return null;
+
+  // Active Sponsor verification check
+  const cleanEnteredRefCode = referralCodeInput.trim().toUpperCase();
+  const activeSponsor = cleanEnteredRefCode
+    ? users.find(u => u.referralCode?.toUpperCase() === cleanEnteredRefCode)
+    : null;
 
   const handleRoleChangeForLogin = (role: UserRole) => {
     setLoginRole(role);
@@ -92,7 +117,8 @@ export const AuthModal: React.FC = () => {
       email,
       phone,
       role: selectedRole,
-      password: password || '123456'
+      password: password || '123456',
+      referralCode: cleanEnteredRefCode || undefined
     });
 
     if (res.success) {
@@ -161,7 +187,8 @@ export const AuthModal: React.FC = () => {
       lastName,
       phone,
       city,
-      role: selectedRole
+      role: selectedRole,
+      referralCode: cleanEnteredRefCode || undefined
     });
     setAuthModalOpen(false);
     setAuthView('login');
@@ -181,7 +208,7 @@ export const AuthModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
       <div 
         id="auth-modal-card" 
-        className="w-full max-w-md bg-[#0C121E] border border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl relative my-auto max-h-[92vh] overflow-y-auto"
+        className="w-full max-w-md bg-[#0C121E] border border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl relative my-auto max-h-[94vh] overflow-y-auto"
       >
         {/* Top Glow Accent */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
@@ -197,7 +224,11 @@ export const AuthModal: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-5">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-2 text-amber-400">
-            <Lock className="w-6 h-6" />
+            {authView === 'register' && cleanEnteredRefCode ? (
+              <Gift className="w-6 h-6 text-amber-400 animate-pulse" />
+            ) : (
+              <Lock className="w-6 h-6" />
+            )}
           </div>
           <h3 className="text-lg sm:text-xl font-extrabold text-white font-display">
             {authView === 'register' 
@@ -361,7 +392,65 @@ export const AuthModal: React.FC = () => {
 
         {/* ================= VIEW 2: REGISTER ================= */}
         {authView === 'register' && (
-          <form onSubmit={handleRegisterSubmit} className="space-y-3">
+          <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+
+            {/* AUTOMATIC REFERRAL BANNER WITH DETAILED INSTRUCTIONS */}
+            {cleanEnteredRefCode && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-amber-500/15 via-slate-900 to-emerald-500/10 border border-amber-500/40 shadow-lg space-y-2.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                      <Gift className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-amber-300 uppercase tracking-wide">
+                        {translate("🎁 Parrainage Activé (+1 000 FCFA Offerts)", "🎁 Referral Activated (+1,000 FCFA Bonus)")}
+                      </h4>
+                      <p className="text-[11px] text-slate-300">
+                        {activeSponsor ? (
+                          <span>
+                            {translate("Parrainé par :", "Sponsored by:")} <strong className="text-white font-semibold">{activeSponsor.name}</strong> <span className="text-amber-400 font-mono font-bold">({activeSponsor.referralCode})</span>
+                          </span>
+                        ) : (
+                          <span>
+                            {translate("Code Parrain :", "Sponsor Code:")} <strong className="text-amber-400 font-mono font-bold">{cleanEnteredRefCode}</strong>
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-[10px] flex items-center gap-1 shrink-0">
+                    <Check className="w-3 h-3" />
+                    <span>{translate("Auto-Appliqué", "Auto-Applied")}</span>
+                  </span>
+                </div>
+
+                {/* Clear 3-Step Consignes */}
+                <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1.5 text-[10.5px]">
+                  <div className="font-extrabold text-amber-400 flex items-center gap-1">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>{translate("Consignes de Déblocage du Bonus :", "Bonus Release Instructions:")}</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-1 text-slate-300 pl-1">
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-amber-400 font-bold">1.</span>
+                      <span><strong>{translate("Inscription immédiate :", "Immediate signup:")}</strong> {translate("Votre compte est automatiquement relié à votre parrain.", "Your account is linked to your sponsor.")}</span>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-amber-400 font-bold">2.</span>
+                      <span><strong>{translate("Certification KYC :", "KYC Verification:")}</strong> {translate("Validez votre CNI/Passeport pour sécuriser 1 000 FCFA dans votre solde d'attente.", "Verify your ID to place 1,000 FCFA in your pending balance.")}</span>
+                    </div>
+                    <div className="flex items-start gap-1.5">
+                      <span className="text-emerald-400 font-bold">3.</span>
+                      <span><strong>{translate("1ère Livraison Validée OTP :", "1st OTP Delivery Validated:")}</strong> {translate("Dès votre 1er achat ou vente avec confirmation par code OTP, vos 1 000 FCFA sont instantanément utilisables pour vos achats !", "Upon your 1st OTP-confirmed purchase or sale, your 1,000 FCFA becomes fully spendable!")}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Account Role Selector */}
             <div>
               <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
@@ -373,7 +462,7 @@ export const AuthModal: React.FC = () => {
                   onClick={() => setSelectedRole('client')}
                   className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
                     selectedRole === 'client'
-                      ? 'bg-blue-500/20 border-blue-500 text-white shadow-sm'
+                      ? 'bg-blue-500/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500/40'
                       : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
@@ -389,7 +478,7 @@ export const AuthModal: React.FC = () => {
                   onClick={() => setSelectedRole('driver')}
                   className={`p-2.5 rounded-xl border text-left flex items-center gap-2 transition-all ${
                     selectedRole === 'driver'
-                      ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-sm'
+                      ? 'bg-emerald-500/20 border-emerald-500 text-white shadow-sm ring-1 ring-emerald-500/40'
                       : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
@@ -502,19 +591,88 @@ export const AuthModal: React.FC = () => {
               />
             </div>
 
+            {/* CODE DE PARRAINAGE EXPLICITE & CONSIGNES */}
+            <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
+                  <Gift className="w-3.5 h-3.5" />
+                  <span>{translate("Code de Parrainage (Optionnel / Automatique) :", "Referral Code (Optional / Automatic):")}</span>
+                </label>
+                {cleanEnteredRefCode && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReferralCodeInput('');
+                      setPendingReferralCode(null);
+                      localStorage.removeItem('bradci_pending_sponsor_code');
+                    }}
+                    className="text-[10px] text-slate-400 hover:text-rose-400 underline cursor-pointer"
+                  >
+                    {translate("Effacer le code", "Clear code")}
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  value={referralCodeInput}
+                  onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+                  placeholder="Ex: BRAD-89A2"
+                  className={`w-full bg-slate-950 border rounded-xl px-3.5 py-2 text-xs font-mono text-white tracking-wider focus:outline-none transition-colors ${
+                    cleanEnteredRefCode 
+                      ? 'border-amber-500/70 text-amber-300 ring-1 ring-amber-500/30' 
+                      : 'border-slate-700 focus:border-amber-500'
+                  }`}
+                />
+                {cleanEnteredRefCode && (
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">+1 000 FCFA</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Real-time status indicator & Quick test chip */}
+              <div className="flex flex-wrap items-center justify-between gap-1.5 pt-0.5 text-[10.5px]">
+                {activeSponsor ? (
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>{translate("Parrain validé :", "Verified Sponsor:")} {activeSponsor.name} (+1 000 FCFA)</span>
+                  </span>
+                ) : cleanEnteredRefCode ? (
+                  <span className="text-amber-400 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    <span>{translate("Code pris en compte (+1 000 FCFA sous réserve de validation)", "Code registered (+1,000 FCFA upon validation)")}</span>
+                  </span>
+                ) : (
+                  <div className="w-full flex items-center justify-between text-slate-400">
+                    <span>{translate("Vous avez un lien parrain ou un code ami ?", "Have a referral link or friend code?")}</span>
+                    <button
+                      type="button"
+                      onClick={() => setReferralCodeInput('BRAD-89A2')}
+                      className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+                    >
+                      {translate("Tester BRAD-89A2", "Test BRAD-89A2")}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <button
               type="submit"
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>{translate("Créer mon Compte & Recevoir l'OTP Email", "Create Account & Receive Email OTP")}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-4 h-4" />
             </button>
 
             <div className="text-center pt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => setAuthView('login')}
-                className="text-xs text-slate-400 hover:text-white"
+                className="text-xs text-slate-400 hover:text-white cursor-pointer"
               >
                 {translate("Vous avez déjà un compte ?", "Already have an account?")} <strong className="text-amber-400 underline">{translate("Se Connecter", "Sign In")}</strong>
               </button>
@@ -558,7 +716,7 @@ export const AuthModal: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{translate("Valider l'Email & Accéder au KYC", "Verify Email & Proceed to KYC")}</span>
@@ -567,7 +725,7 @@ export const AuthModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setAuthView('register')}
-              className="w-full text-center text-xs text-slate-400 hover:text-white"
+              className="w-full text-center text-xs text-slate-400 hover:text-white cursor-pointer"
             >
               ← {translate("Modifier l'adresse email", "Change email address")}
             </button>
@@ -583,6 +741,19 @@ export const AuthModal: React.FC = () => {
                 {translate("Veuillez compléter votre inscription avec vos informations réelles (Nom, Prénom, Téléphone, Ville).", "Please complete your registration with your verified info (First Name, Last Name, Phone, City).")}
               </p>
             </div>
+
+            {/* AUTOMATIC REFERRAL BANNER IN GOOGLE COMPLETION */}
+            {cleanEnteredRefCode && (
+              <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-xs space-y-1">
+                <div className="flex items-center gap-2 font-bold text-amber-300">
+                  <Gift className="w-4 h-4 text-amber-400" />
+                  <span>{translate("Bonus de Parrainage (+1 000 FCFA)", "Referral Bonus (+1,000 FCFA)")}</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  {translate("Code Parrain Appliqué :", "Sponsor Code Applied:")} <strong className="text-amber-400 font-mono">{cleanEnteredRefCode}</strong> {activeSponsor && `(${activeSponsor.name})`}
+                </p>
+              </div>
+            )}
 
             {/* Nom & Prénom */}
             <div className="grid grid-cols-2 gap-2">
@@ -649,9 +820,23 @@ export const AuthModal: React.FC = () => {
               </div>
             </div>
 
+            {/* Code Parrain optionnel dans Google */}
+            <div>
+              <label className="text-[11px] text-slate-300 font-medium block mb-1">
+                {translate("Code Parrainage (Optionnel) :", "Referral Code (Optional):")}
+              </label>
+              <input
+                type="text"
+                value={referralCodeInput}
+                onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
+                placeholder="Ex: BRAD-89A2"
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-amber-500"
+              />
+            </div>
+
             <button
               type="submit"
-              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>{translate("Finaliser & Accéder à BRAD'CI", "Finalize & Enter BRAD'CI")}</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -668,3 +853,4 @@ export const AuthModal: React.FC = () => {
     </div>
   );
 };
+

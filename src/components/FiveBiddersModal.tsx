@@ -170,7 +170,7 @@ export const FiveBiddersModal: React.FC = () => {
         {currentSelection && (
           <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 mb-6">
             <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-              {translate("Détail Financier Séquestre Wave :", "Wave Escrow Financial Breakdown:")}
+              {translate("Détail Financier Paiement Direct à la Livraison :", "Direct Pay on Delivery Financial Breakdown:")}
             </h4>
             <div className="space-y-1.5 text-xs">
               <div className="flex justify-between text-slate-400">
@@ -188,7 +188,7 @@ export const FiveBiddersModal: React.FC = () => {
                 </span>
               </div>
               <div className="pt-2 border-t border-slate-800 flex justify-between text-sm font-bold">
-                <span className="text-emerald-400">{translate("Montant Net Vendeur Débloqué :", "Seller Net Payout:")}</span>
+                <span className="text-emerald-400">{translate("Montant Net Vendeur :", "Seller Net Payout:")}</span>
                 <span className="font-mono-num text-emerald-400 text-base">
                   {sellerNet.toLocaleString('fr-FR')} FCFA
                 </span>
@@ -202,7 +202,7 @@ export const FiveBiddersModal: React.FC = () => {
           <button
             type="button"
             onClick={handleCancel}
-            className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all"
+            className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <RotateCcw className="w-4 h-4 text-slate-400" />
             <span>{translate("Annuler la Vente Sans Frais", "Cancel Auction Without Fees")}</span>
@@ -213,16 +213,16 @@ export const FiveBiddersModal: React.FC = () => {
             type="button"
             onClick={handleValidate}
             disabled={!currentSelection}
-            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
           >
             <CheckCircle2 className="w-4 h-4 text-slate-950" />
-            <span>{translate("Valider & Demander Dépôt Séquestre", "Award & Request Escrow Deposit")}</span>
+            <span>{translate("Attribuer & Lancer la Livraison", "Award & Launch Delivery")}</span>
           </button>
         </div>
 
         <div className="mt-4 text-center text-slate-500 text-[11px] flex items-center justify-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{translate("L'acheteur sélectionné recevra l'alerte pour payer sous séquestre. S'il refuse, vous pourrez choisir parmi les autres.", "Selected buyer will receive deposit alert. If they decline, you can pick another bidder.")}</span>
+          <span>{translate("L'acheteur paiera directement à la livraison via API (Wave/MoMo/Carte).", "The buyer will pay directly on delivery via API (Wave/MoMo/Card).")}</span>
         </div>
       </div>
     </div>

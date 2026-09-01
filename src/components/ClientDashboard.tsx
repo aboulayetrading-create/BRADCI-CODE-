@@ -36,9 +36,11 @@ import {
   RotateCcw,
   XCircle,
   Undo2,
-  FileText
+  FileText,
+  Gift
 } from 'lucide-react';
-import { Product, ShopProfile, PaymentMethod } from '../types';
+import { Product, ShopProfile, PaymentMethod, DeliveryJob } from '../types';
+import { ReferralDashboard } from './ReferralDashboard';
 
 export const ClientDashboard: React.FC = () => {
   const { 
@@ -68,13 +70,14 @@ export const ClientDashboard: React.FC = () => {
     sellerConfirmReturnReceived,
     withdrawalRequests,
     financialTransactions,
+    openOfficialReceipt,
     setKycModalOpen,
     setProfileAvatarModalOpen,
     addToast,
     translate
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'sales' | 'expeditions' | 'shop' | 'purchases' | 'transactions' | 'kyc'>('sales');
+  const [activeSubTab, setActiveSubTab] = useState<'sales' | 'expeditions' | 'shop' | 'purchases' | 'transactions' | 'kyc' | 'referral'>('sales');
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'withdrawals' | 'sales' | 'purchases' | 'subscriptions'>('all');
 
   // Withdrawal state
@@ -95,7 +98,7 @@ export const ClientDashboard: React.FC = () => {
     sellerId: currentUser?.id || '',
     name: `Boutique ${currentUser?.name || ''}`,
     slogan: 'Vente & Enchères Express certifiées à Abidjan',
-    description: 'Articles certifiés avec livraison sécurisée sous séquestre Wave/MoMo et garantie conformité.',
+    description: 'Articles certifiés avec Paiement Direct à la Livraison (Wave, Orange Money, MTN MoMo, MoVo, Carte Bancaire) et garantie conformité.',
     logo: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
     banner: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1200&auto=format&fit=crop&q=80',
     commune: userLocation?.commune || currentUser?.gpsLocation?.commune || 'Cocody',
@@ -271,41 +274,21 @@ export const ClientDashboard: React.FC = () => {
             )}
           </div>
 
-          {/* Solde Séquestre Vendeur Bloqué */}
-          {sellerBlocked > 0 && (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-3">
-              <div>
-                <span className="text-[10px] text-amber-400 block uppercase font-bold flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-amber-400" />
-                  <span>Solde Vente Bloqué :</span>
-                </span>
-                <span className="text-sm font-extrabold text-amber-300 font-mono-num">
-                  {sellerBlocked.toLocaleString('fr-FR')} FCFA
-                </span>
-              </div>
-              <span className="text-[9px] bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded font-medium max-w-[110px] text-center leading-tight">
-                Débloqué dès validation acheteur
+          {/* Information Paiement Direct */}
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-3">
+            <div>
+              <span className="text-[10px] text-emerald-400 block uppercase font-bold flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                <span>Paiement Direct à la Livraison (POD) :</span>
+              </span>
+              <span className="text-xs font-semibold text-slate-200">
+                Paiement par API une fois le colis reçu
               </span>
             </div>
-          )}
-
-          {/* Solde Séquestre Acheteur Bloqué */}
-          {buyerBlocked > 0 && (
-            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-2xl flex items-center gap-3">
-              <div>
-                <span className="text-[10px] text-blue-400 block uppercase font-bold flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-blue-400" />
-                  <span>Solde Commandes Bloqué :</span>
-                </span>
-                <span className="text-sm font-extrabold text-blue-300 font-mono-num">
-                  {buyerBlocked.toLocaleString('fr-FR')} FCFA
-                </span>
-              </div>
-              <span className="text-[9px] bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded font-medium max-w-[110px] text-center leading-tight">
-                Séquestré jusqu'à livraison
-              </span>
-            </div>
-          )}
+            <span className="text-[9px] bg-emerald-500/20 text-emerald-200 px-2 py-0.5 rounded font-medium max-w-[110px] text-center leading-tight">
+              0% Blocage de fonds
+            </span>
+          </div>
         </div>
       </div>
 
@@ -610,28 +593,68 @@ export const ClientDashboard: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
           )}
         </button>
+
+        <button
+          onClick={() => setActiveSubTab('referral')}
+          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
+            activeSubTab === 'referral'
+              ? 'border-amber-500 text-amber-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Gift className="w-4 h-4 text-amber-400" />
+          <span>{translate("Parrainage & Bonus", "Referrals & Bonus")}</span>
+          <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
+            {currentUser.referralCount || 0}/10
+          </span>
+          {(currentUser.referralBalance || 0) > 0 && (
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          )}
+        </button>
       </div>
 
       {/* SUB-TAB 1: MES VENTES */}
       {activeSubTab === 'sales' && (
         <div className="space-y-5">
-          {/* Quota limit enforcement notice */}
+          {/* Seller Plan & Active Benefits Banner */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>Règle Quota Vendeur :</span>
-                <span className="font-mono-num text-amber-400">
-                  {currentUser.productsPublishedCount} / {currentUser.sellerPlan === 'pro' ? '∞' : quota.limit} annonces
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Formule Vendeur Active :</span>
+                  <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black uppercase ${
+                    currentUser.sellerPlan === 'pro'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : currentUser.sellerPlan === 'standard'
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  }`}>
+                    {currentUser.sellerPlan === 'pro' ? '👑 Pass Vendeur Or VIP (10 000 F/mois)' :
+                     currentUser.sellerPlan === 'standard' ? '✨ Pass Vendeur Certifié (5 000 F/mois)' : '🌱 Compte Basique Gratuit (0 FCFA)'}
+                  </span>
                 </span>
-              </h4>
-              <p className="text-xs text-slate-300 mt-0.5">
-                {currentUser.sellerPlan === 'basic' && 'Compte Basic : 3 produits offerts. Blocage au 4e produit vers Pass Standard ou Pro.'}
-                {currentUser.sellerPlan === 'standard' && 'Pass Pro Boutique Inférieure (5 000 F/mois) : 15 produits + Vitrine active. Comm. 7,5%.'}
-                {currentUser.sellerPlan === 'pro' && 'Pass Illimité Boutique Supérieure (10 000 F/mois) : Annonces illimitées + Vitrine VIP. Comm. 5%.'}
+              </div>
+              <p className="text-xs text-slate-300 mt-1">
+                {currentUser.sellerPlan === 'pro' && '✓ Avantages VIP actifs : Commission record minimale à 2.5% sur ventes directes, Badge Prestige "Boutique Officielle Or VIP", Top Algorithme Abidjan & Support Dédié VIP 7j/7.'}
+                {currentUser.sellerPlan === 'standard' && '✓ Avantages Certifiés actifs : Commission réduite à 5% sur ventes directes, Badge officiel "Vendeur Certifié & Vérifié", Vitrine Boutique Personnalisée & Virements instantanés.'}
+                {(!currentUser.sellerPlan || currentUser.sellerPlan === 'basic') && 'Compte Basique : Publication illimitée gratuite (10% de commission). Passez au Pass Certifié (5%) ou Or VIP (2.5%) pour maximiser vos gains et inspirer confiance.'}
               </p>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {currentUser.sellerPlan !== 'pro' && (
+                <button
+                  onClick={() => {
+                    setTargetPlanForPricing(currentUser.sellerPlan === 'standard' ? 'pro' : 'standard');
+                    setPricingModalOpen(true);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-xs shadow-md hover:scale-105 transition-all flex items-center gap-1.5"
+                >
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>{currentUser.sellerPlan === 'standard' ? 'Passer au Pass Or VIP' : 'Activer un Pass Vendeur'}</span>
+                </button>
+              )}
+
               <button
                 onClick={() => setActiveSubTab('shop')}
                 className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5"
@@ -879,15 +902,25 @@ export const ClientDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Driver details + Pickup code */}
+                    {/* Driver details + Vehicle Plate & Color + Pickup code */}
                     <div className="p-4 bg-slate-900/80 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                      <div className="flex items-start sm:items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
                           <Bike className="w-5 h-5" />
                         </div>
                         <div>
                           <p className="text-xs font-bold text-white">Livreur : {job.assignedDriverName || 'Bakary Traoré'}</p>
                           <p className="text-[11px] text-slate-400 font-mono">{job.assignedDriverPhone || '+225 01 44 77 89 22'}</p>
+                          
+                          {/* Vehicle identification for Seller */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+                            <span className="bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2 py-0.5 rounded font-mono font-bold uppercase">
+                              Plaque : {job.assignedDriverVehiclePlate || '4523 JJ 01'}
+                            </span>
+                            <span className="bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded">
+                              Couleur : <strong className="text-white">{job.assignedDriverVehicleColor || 'Noir & Rouge'}</strong>
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -1034,14 +1067,16 @@ export const ClientDashboard: React.FC = () => {
                 <Crown className="w-4 h-4 text-amber-400" />
                 <span className="text-xs font-bold text-white">Niveau de Boutique :</span>
                 <span className="text-xs font-extrabold text-amber-400 uppercase">
-                  {currentUser.sellerPlan === 'pro' ? 'Boutique Supérieure (Pass Illimité)' :
-                   currentUser.sellerPlan === 'standard' ? 'Boutique Pro (Pass Standard)' : 'Boutique Basique (Pass Gratuit)'}
+                  {currentUser.sellerPlan === 'pro' ? 'Boutique Officielle Or VIP (Pass Or 10 000 F)' :
+                   currentUser.sellerPlan === 'standard' ? 'Boutique Certifiée Pro (Pass Certifié 5 000 F)' : 'Boutique Basique (Compte Gratuit)'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 {currentUser.sellerPlan === 'pro' 
-                  ? 'Vous bénéficiez du badge VIP, annonces illimitées et commission réduite à 5%.'
-                  : 'Passez au Pass Pro (5 000 F) ou Pass Illimité (10 000 F) pour booster vos ventes et bénéficier des statistiques de vente.'}
+                  ? 'Vous bénéficiez du badge Or VIP, commission record minimale à 2.5%, algorithme prioritaire et support dédié 7j/7.'
+                  : currentUser.sellerPlan === 'standard'
+                  ? 'Vous bénéficiez du badge Vendeur Certifié, commission réduite à 5% et vitrine personnalisée.'
+                  : 'Passez au Pass Vendeur Certifié (5 000 F - 5% com.) ou Pass Vendeur Or VIP (10 000 F - 2.5% com.) pour maximiser vos marges nettes.'}
               </p>
             </div>
 
@@ -1380,9 +1415,9 @@ export const ClientDashboard: React.FC = () => {
           <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-3">
             <ShieldCheck className="w-6 h-6 shrink-0 text-emerald-400" />
             <div>
-              <p className="font-bold text-white">Garantie Séquestre Wave / MoMo Activée</p>
+              <p className="font-bold text-white">Modèle Paiement Direct à la Livraison (Pay on Delivery)</p>
               <p className="text-slate-300 mt-0.5">
-                Vos fonds sont sous séquestre sécurisé. Le vendeur ne recevra son paiement que lorsque vous fournirez votre code secret OTP au coursier après examen du colis.
+                Aucun débit préalable ni blocage de fonds. Vous payez par API (Wave, Orange Money, MTN MoMo, Moov, Carte) directement lorsque le livreur arrive et que vous avez examiné votre colis.
               </p>
             </div>
           </div>
@@ -1391,7 +1426,7 @@ export const ClientDashboard: React.FC = () => {
             <div className="p-10 text-center bg-slate-900/40 rounded-3xl border border-slate-800">
               <ShoppingBag className="w-10 h-10 text-slate-600 mx-auto mb-2" />
               <p className="text-sm text-slate-300 font-bold">Vous n'avez pas encore d'enchère ou commande en cours.</p>
-              <p className="text-xs text-slate-500 mt-1">Explorez les annonces et enchérissez en toute sécurité sous séquestre Wave.</p>
+              <p className="text-xs text-slate-500 mt-1">Explorez les annonces et commandez avec le Paiement Direct à la Livraison.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1434,6 +1469,44 @@ export const ClientDashboard: React.FC = () => {
                         {item.deliveryOtpCode || '8814'}
                       </span>
                     </div>
+
+                      {/* Driver & Vehicle Information for Buyer */}
+                      {job && job.assignedDriverName && (
+                        <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-xl space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                                <Bike className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-white">{job.assignedDriverName}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">{job.assignedDriverPhone || '+225 01 44 77 89 22'}</p>
+                              </div>
+                            </div>
+                            <a
+                              href={`tel:${job.assignedDriverPhone || '+2250144778922'}`}
+                              className="px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-[11px] font-bold rounded-lg border border-emerald-500/30 flex items-center gap-1"
+                            >
+                              <Phone className="w-3 h-3" />
+                              <span>Appeler</span>
+                            </a>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-800/80 text-[11px]">
+                            <span className="bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2 py-0.5 rounded font-mono font-bold uppercase">
+                              Matricule : {job.assignedDriverVehiclePlate || '4523 JJ 01'}
+                            </span>
+                            <span className="bg-slate-800 border border-slate-700 text-slate-300 px-2 py-0.5 rounded">
+                              Couleur : <strong className="text-white">{job.assignedDriverVehicleColor || 'Noir & Rouge'}</strong>
+                            </span>
+                            {job.assignedDriverVehicleModel && (
+                              <span className="text-[10px] text-slate-400">
+                                ({job.assignedDriverVehicleModel})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Live GPS Tracking & Inspection Guarded Actions */}
                       {job ? (
@@ -1500,19 +1573,24 @@ export const ClientDashboard: React.FC = () => {
                         <button
                           onClick={() => {
                             // Fallback sample tracking job
-                            const sampleJob = {
+                            const sampleJob: DeliveryJob = {
                               id: 'job-' + item.id,
                               productId: item.id,
                               productTitle: item.title,
+                              productImage: item.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30',
                               sellerName: item.sellerName,
                               sellerPhone: '+225 07 44 88 12 34',
                               buyerName: currentUser.name,
                               buyerPhone: currentUser.phone,
                               pickupCommune: item.commune,
                               dropoffCommune: userLocation?.commune || 'Cocody',
-                              pickupAddress: item.address,
+                              pickupAddress: item.pickupAddress || item.address || item.commune,
+                              pickupCoords: item.pickupCoords || { lat: 5.359952, lng: -4.008256 },
                               dropoffAddress: userLocation?.address || 'Abidjan',
+                              dropoffCoords: userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : { lat: 5.3484, lng: -4.0152 },
+                              requiredVehicle: item.requiredVehicle || 'moto',
                               deliveryFee: 1500,
+                              itemValue: item.currentPrice || 10000,
                               status: 'in_transit' as const,
                               assignedDriverName: 'Bakary Traoré',
                               assignedDriverPhone: '+225 01 44 77 89 22',
@@ -1554,6 +1632,48 @@ export const ClientDashboard: React.FC = () => {
                           <span>Colis restitué au vendeur & Achat Remboursé avec succès</span>
                         </div>
                       )}
+
+                      {/* Official Receipt & Cryptographic Audit Seal button */}
+                      <div className="pt-1">
+                        <button
+                          onClick={() => {
+                            if (job) {
+                              openOfficialReceipt(job);
+                            } else {
+                              // Fallback minimal job for product
+                              const tempJob: DeliveryJob = {
+                                id: 'job-' + item.id,
+                                productId: item.id,
+                                productTitle: item.title,
+                                productImage: item.images?.[0] || '',
+                                sellerName: item.sellerName,
+                                sellerPhone: '+225 07 44 88 12 34',
+                                buyerName: currentUser.name,
+                                buyerPhone: currentUser.phone,
+                                pickupCommune: item.commune,
+                                dropoffCommune: userLocation?.commune || 'Marcory',
+                                pickupAddress: item.pickupAddress || item.commune,
+                                pickupCoords: item.pickupCoords || { lat: 5.359952, lng: -4.008256 },
+                                dropoffAddress: userLocation?.address || 'Abidjan',
+                                dropoffCoords: userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : { lat: 5.3484, lng: -4.0152 },
+                                requiredVehicle: item.requiredVehicle || 'moto',
+                                deliveryFee: 1500,
+                                itemValue: item.currentPrice || 10000,
+                                status: 'delivered',
+                                orderStatus: 'PAID',
+                                paymentStatus: 'PAID',
+                                pickupCode: item.pickupCode || '5521',
+                                deliveryOtpCode: item.deliveryOtpCode || '8814'
+                              };
+                              openOfficialReceipt(tempJob);
+                            }
+                          }}
+                          className="w-full py-2 px-3 rounded-xl bg-[#151C33] hover:bg-[#1E53E5]/20 border border-[#222D4A] hover:border-[#1E53E5]/40 text-blue-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-[#1E53E5]" />
+                          <span>Voir Reçu / Facture PDF Sécurisée</span>
+                        </button>
+                      </div>
                   </div>
                 );
               })}
@@ -1755,10 +1875,10 @@ export const ClientDashboard: React.FC = () => {
                   {financialTransactions.slice(0, 10).map(tx => (
                     <div
                       key={tx.id}
-                      className="p-3.5 rounded-xl bg-[#0C121E] border border-slate-800 flex items-center justify-between gap-3 text-xs"
+                      className="p-3.5 rounded-xl bg-[#0C121E] border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                           tx.category === 'revenue' ? 'bg-emerald-500/20 text-emerald-400' :
                           tx.category === 'payout' ? 'bg-amber-500/20 text-amber-400' :
                           'bg-blue-500/20 text-blue-400'
@@ -1773,10 +1893,24 @@ export const ClientDashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="text-right font-mono-num font-bold">
-                        <span className={tx.category === 'payout' ? 'text-amber-400' : 'text-emerald-400'}>
-                          {tx.grossAmount.toLocaleString('fr-FR')} FCFA
-                        </span>
+                      <div className="flex items-center gap-3 self-end sm:self-auto">
+                        <div className="text-right font-mono-num font-bold">
+                          <span className={tx.category === 'payout' ? 'text-amber-400' : 'text-emerald-400'}>
+                            {tx.grossAmount.toLocaleString('fr-FR')} FCFA
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const matchingJob = freightJobs.find(j => j.productTitle && tx.description.includes(j.productTitle)) || freightJobs[0];
+                            if (matchingJob) {
+                              openOfficialReceipt(matchingJob);
+                            }
+                          }}
+                          className="p-1.5 rounded-lg bg-[#151C33] hover:bg-[#1E53E5]/20 border border-[#222D4A] hover:border-[#1E53E5]/40 text-blue-400 cursor-pointer transition-all"
+                          title="Voir Reçu / Facture PDF"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1956,6 +2090,11 @@ export const ClientDashboard: React.FC = () => {
             </button>
           </form>
         </div>
+      )}
+
+      {/* SUB-TAB 7: PARRAINAGE & BONUS RÉCIPROQUES */}
+      {activeSubTab === 'referral' && (
+        <ReferralDashboard />
       )}
     </div>
   );

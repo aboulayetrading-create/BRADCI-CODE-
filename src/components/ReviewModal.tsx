@@ -18,17 +18,22 @@ import { DeliveryJob } from '../types';
 import { cleanReviewComment, containsProfanity } from '../utils/profanityFilter';
 
 interface ReviewModalProps {
-  job: DeliveryJob | null;
-  onClose: () => void;
+  job?: DeliveryJob | null;
+  onClose?: () => void;
 }
 
-export const ReviewModal: React.FC<ReviewModalProps> = ({ job, onClose }) => {
+export const ReviewModal: React.FC<ReviewModalProps> = ({ job: propJob, onClose: propOnClose }) => {
   const { 
     currentUser, 
     submitReview, 
     language,
-    addToast 
+    addToast,
+    reviewModalJob,
+    setReviewModalJob
   } = useApp();
+
+  const job = propJob !== undefined ? propJob : reviewModalJob;
+  const onClose = propOnClose || (() => setReviewModalJob(null));
 
   const [sellerRating, setSellerRating] = useState<number>(5);
   const [driverRating, setDriverRating] = useState<number>(5);

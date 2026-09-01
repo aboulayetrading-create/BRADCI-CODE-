@@ -95,27 +95,43 @@ export const TRANSLATIONS = {
     alreadyHaveAccount: "Vous avez déjà un compte ?",
     needAccount: "Pas encore de compte ? Inscrivez-vous",
     
-    // KYC Gate
+    // KYC Gate & Blocking
+    kycGateTitle: "Certification d'Identité KYC Obligatoire",
+    kycGateSubtitle: "L'accès à toutes les fonctionnalités de BRAD'CI est temporairement verrouillé jusqu'à la vérification de votre identité.",
+    kycGateBadgeBlocked: "ACCÈS BLOQUÉ - KYC REQUIS",
+    kycGateBadgePending: "KYC EN ATTENTE DE VALIDATION",
+    kycPendingNotice: "Votre dossier d'identification a été transmis à la cellule de conformité. Délai indicatif de traitement : 15 à 30 minutes (Délai maximum garanti : 24h).",
+    kycEstimatedTime: "Délai moyen de validation : 15 - 30 minutes (Max 24h)",
+    kycStepDocBuyerSeller: "1. Pièce d'Identité Officielle (CNI, Passeport ou Carte Consulaire)",
+    kycStepSelfieBuyerSeller: "2. Selfie Simple en Direct",
+    kycStepSelfieWithIdBuyerSeller: "3. Selfie Tenant la Pièce d'Identité",
+    kycStepDocDriver: "1. Pièce d'Identité Officielle (CNI ou Passeport)",
+    kycStepSelfieWithIdDriver: "2. Selfie Tenant la Pièce d'Identité",
+    kycStepDriverLicense: "3. Permis de Conduire (Recto / Verso)",
+    kycStepVehicleReg: "4. Carte Grise du Véhicule (Moto / Cargo / Fourgon)",
     kycBannerTitle: "Vérification KYC Obligatoire en cours",
-    kycBannerPending: "Compte en attente de vérification KYC par l'administration (Délai d'attente max : 24h).",
+    kycBannerPending: "Compte en attente de vérification KYC par l'administration (Délai moyen : 15-30 min, max 24h).",
     kycBannerUnverified: "Votre compte nécessite une vérification d'identité pour débloquer les achats, ventes et livraisons.",
-    kycBannerRejected: "Votre dossier KYC a été rejeté par l'administration. Veuillez soumettre à nouveau vos pièces.",
+    kycBannerRejected: "Votre dossier KYC a été rejeté par l'administration. Veuillez soumettre à nouveau vos pièces conformes.",
     kycBannerBtn: "Soumettre mes Pièces d'Identité",
-    kycBannerAdminBypass: "⚡ Valider KYC Instantanément (Mode Démo Admin)",
+    kycBannerAdminBypass: "⚡ Valider KYC Immédiatement (Mode Démo Admin / Testeur)",
     kycModalTitle: "Vérification d'Identité KYC (Know Your Customer)",
     kycModalSubtitle: "Protocole de sécurité anti-fraude et lutte contre l'usurpation d'identité",
-    kycStepDoc: "1. Pièce d'Identité Officielle (CNI / Passeport / Permis)",
-    kycStepSelfie: "2. Selfie de Contrôle avec Pièce d'Identité",
-    kycStepDriverLicense: "3. Permis de Conduire Valide (Livreur)",
-    kycStepDriverSelfie: "4. Selfie avec Permis de Conduire",
-    kycStepVehicleReg: "5. Carte Grise de la Moto / Véhicule",
     kycUploadOrCamera: "Prendre une photo avec la caméra ou importer un fichier",
     kycTakeCamera: "Ouvrir la Caméra",
     kycCapturePhoto: "Capturer la Photo",
     kycUploadFile: "Importer depuis la galerie",
     kycDocNumberLabel: "Numéro de la pièce d'identité :",
     kycDuplicateError: "Cette pièce d'identité est déjà associée à un compte vérifié sur BRAD'CI. La création de compte multiple est interdite.",
-    kycSubmitSuccess: "Dossier KYC transmis avec succès ! Analyse par l'administrateur en cours (Délai max 24h).",
+    kycSubmitSuccess: "Dossier KYC transmis avec succès ! Analyse par l'administrateur en cours (Délai moyen : 15-30 min).",
+    
+    // Biometric Verification
+    biometricTitle: "Reconnaissance Faciale & Biométrie IA",
+    biometricSubtitle: "Comparaison automatique entre votre photo de profil, votre pièce d'identité et vos selfies KYC",
+    biometricAnalyzing: "Analyse biométrique par IA en cours...",
+    biometricMatchSuccess: "Conformité Biométrique Validée (Score de similarité :",
+    biometricRejectionError: "Photo non conforme. La photo de profil doit être une photo claire de votre visage correspondant à votre pièce d'identité.",
+    biometricMandatoryAvatar: "La photo de profil est obligatoire pour tous les utilisateurs.",
 
     // Driver Workspace
     driverStatusOnDuty: "En Service (GPS Actif)",
@@ -185,13 +201,16 @@ export const TRANSLATIONS = {
     notifPushDisabled: "Activez les notifications pour être alerté dès l'arrivée du livreur.",
     notifPushAllowBtn: "Autoriser",
 
-    // Client Dashboard & History
+    // Client Dashboard & History by Role
     tabMySales: "Mes Ventes",
     tabMyExpeditions: "Suivi des Expéditions",
     tabMyShop: "Ma Boutique BRAD'CI",
     tabMyPurchases: "Mes Commandes & Colis",
     tabMyTransactions: "Historique & Retraits",
     tabMyKYC: "Sécurité KYC",
+    roleHistoryBuyerTitle: "Historique Acheteur (Achats, Enchères & Dépôts)",
+    roleHistorySellerTitle: "Historique Vendeur (Ventes, Commissions & Retraits)",
+    roleHistoryDriverTitle: "Historique Livreur (Courses, OTP & Gains)",
     shopCustomizerTitle: "Personnaliser ma Vitrine Vendeur",
     shopPhotoImportTitle: "Photos de la Boutique",
     shopLogoLabel: "Photo de Profil / Logo de la Boutique",
@@ -200,8 +219,10 @@ export const TRANSLATIONS = {
     importDeviceGallery: "Importer depuis l'appareil",
     presetLogos: "Modèles Prédéfinis",
     withdrawPending: "En Attente de Validation ⏳",
-    withdrawApproved: "Virement Approuvé & Transféré ✅",
-    withdrawRejected: "Demande Rejetée ❌",
+    withdrawApproved: "Approuvé ✅",
+    withdrawRejected: "Rejeté ❌",
+    withdrawPendingDesc: "Votre demande est en cours de traitement par l'équipe financière.",
+    withdrawApprovedNotif: "Votre demande de retrait de",
     voiceOnLabel: "VOIX ON",
     voiceOffLabel: "VOIX OFF"
   },
@@ -299,27 +320,43 @@ export const TRANSLATIONS = {
     alreadyHaveAccount: "Already have an account?",
     needAccount: "Don't have an account yet? Sign up",
 
-    // KYC Gate
+    // KYC Gate & Blocking
+    kycGateTitle: "Mandatory KYC Identity Verification",
+    kycGateSubtitle: "Access to all BRAD'CI platform features is temporarily locked until your identity is verified.",
+    kycGateBadgeBlocked: "ACCESS LOCKED - KYC REQUIRED",
+    kycGateBadgePending: "KYC PENDING APPROVAL",
+    kycPendingNotice: "Your verification dossier has been submitted to the compliance team. Estimated review time: 15 to 30 minutes (Guaranteed max: 24h).",
+    kycEstimatedTime: "Average review time: 15 - 30 minutes (Max 24h)",
+    kycStepDocBuyerSeller: "1. Official ID Document (National ID, Passport or Consular Card)",
+    kycStepSelfieBuyerSeller: "2. Simple Live Selfie",
+    kycStepSelfieWithIdBuyerSeller: "3. Live Selfie Holding ID Document",
+    kycStepDocDriver: "1. Official ID Document (National ID or Passport)",
+    kycStepSelfieWithIdDriver: "2. Live Selfie Holding ID Document",
+    kycStepDriverLicense: "3. Driver's License (Front / Back)",
+    kycStepVehicleReg: "4. Vehicle Registration Certificate (Motorcycle / Cargo Van)",
     kycBannerTitle: "Mandatory KYC Identity Verification in Progress",
-    kycBannerPending: "Account awaiting KYC approval by administration (Max waiting time: 24h).",
+    kycBannerPending: "Account awaiting KYC approval by administration (Average delay: 15-30 min, max 24h).",
     kycBannerUnverified: "Your account requires identity verification to unlock bidding, selling, and delivery dispatch.",
     kycBannerRejected: "Your KYC file was rejected by the administration. Please re-submit your identity documents.",
     kycBannerBtn: "Submit Identity Documents",
-    kycBannerAdminBypass: "⚡ Instant KYC Approval (Admin Demo Mode)",
+    kycBannerAdminBypass: "⚡ Instant KYC Approval (Admin / Tester Demo Mode)",
     kycModalTitle: "KYC Identity Verification (Know Your Customer)",
     kycModalSubtitle: "Anti-fraud security protocol & identity theft prevention",
-    kycStepDoc: "1. Official ID Document (National ID / Passport / Driver License)",
-    kycStepSelfie: "2. Control Selfie Holding ID Document",
-    kycStepDriverLicense: "3. Valid Driver's License (Courier)",
-    kycStepDriverSelfie: "4. Selfie Holding Driver's License",
-    kycStepVehicleReg: "5. Vehicle Registration Document (Carte Grise)",
     kycUploadOrCamera: "Take a photo with camera or upload a file",
     kycTakeCamera: "Open Camera",
     kycCapturePhoto: "Capture Photo",
     kycUploadFile: "Upload from Gallery",
     kycDocNumberLabel: "ID Document Number:",
     kycDuplicateError: "This identity document is already associated with a verified account on BRAD'CI. Multiple accounts are strictly forbidden.",
-    kycSubmitSuccess: "KYC file submitted successfully! Admin review in progress (Max 24h delay).",
+    kycSubmitSuccess: "KYC file submitted successfully! Admin review in progress (Average time: 15-30 min).",
+
+    // Biometric Verification
+    biometricTitle: "AI Face Recognition & Biometrics",
+    biometricSubtitle: "Automatic match verification between your profile photo, ID document and live KYC selfies",
+    biometricAnalyzing: "AI Biometric analysis in progress...",
+    biometricMatchSuccess: "Biometric Compliance Verified (Similarity score:",
+    biometricRejectionError: "Non-compliant photo. Profile photo must be a clear picture of your face matching your ID document.",
+    biometricMandatoryAvatar: "Profile picture is mandatory for all users.",
 
     // Driver Workspace
     driverStatusOnDuty: "On Duty (Active GPS)",
@@ -389,13 +426,16 @@ export const TRANSLATIONS = {
     notifPushDisabled: "Enable push notifications to be alerted when the courier arrives.",
     notifPushAllowBtn: "Enable",
 
-    // Client Dashboard & History
+    // Client Dashboard & History by Role
     tabMySales: "My Sales",
     tabMyExpeditions: "Shipment Tracking",
     tabMyShop: "My BRAD'CI Store",
     tabMyPurchases: "My Orders & Parcels",
     tabMyTransactions: "History & Withdrawals",
     tabMyKYC: "KYC Security",
+    roleHistoryBuyerTitle: "Buyer Ledger (Purchases, Bids & Deposits)",
+    roleHistorySellerTitle: "Seller Ledger (Sales, Commissions & Withdrawals)",
+    roleHistoryDriverTitle: "Courier Ledger (Deliveries, OTP & Payouts)",
     shopCustomizerTitle: "Customize My Storefront",
     shopPhotoImportTitle: "Storefront Photos",
     shopLogoLabel: "Store Profile Photo / Logo",
@@ -404,8 +444,10 @@ export const TRANSLATIONS = {
     importDeviceGallery: "Upload from Device",
     presetLogos: "Preset Templates",
     withdrawPending: "Pending Approval ⏳",
-    withdrawApproved: "Payout Approved & Transferred ✅",
-    withdrawRejected: "Request Declined ❌",
+    withdrawApproved: "Approved ✅",
+    withdrawRejected: "Declined ❌",
+    withdrawPendingDesc: "Your payout request is being processed by the finance team.",
+    withdrawApprovedNotif: "Your withdrawal request of",
     voiceOnLabel: "VOICE ON",
     voiceOffLabel: "VOICE OFF"
   }
@@ -413,7 +455,15 @@ export const TRANSLATIONS = {
 
 export type TranslationKey = keyof typeof TRANSLATIONS['fr'];
 
-export function getTranslation(lang: AppLanguage, key: TranslationKey): string {
-  const dictionary = TRANSLATIONS[lang] || TRANSLATIONS.fr;
-  return dictionary[key] || TRANSLATIONS.fr[key] || (key as string);
+export function getTranslation(lang?: AppLanguage | string | null, key?: TranslationKey | string | null): string {
+  if (!key) return '';
+  const safeLang = (lang && (lang === 'fr' || lang === 'en')) ? lang : 'fr';
+  const dictionary = (TRANSLATIONS as any)[safeLang] || TRANSLATIONS.fr;
+  if (dictionary && dictionary[key]) {
+    return dictionary[key];
+  }
+  if (TRANSLATIONS.fr && (TRANSLATIONS.fr as any)[key]) {
+    return (TRANSLATIONS.fr as any)[key];
+  }
+  return String(key);
 }

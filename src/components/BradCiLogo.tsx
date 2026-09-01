@@ -20,15 +20,15 @@ export const BradCiLogoIcon: React.FC<{ className?: string; size?: number }> = (
       height={size}
     >
       {/* Orange motion / speed lines on the left */}
-      <rect x="2" y="38" width="12" height="3.5" rx="1.75" fill="#f97316" />
-      <rect x="0" y="47" width="16" height="3.5" rx="1.75" fill="#f97316" />
-      <rect x="3" y="56" width="10" height="3.5" rx="1.75" fill="#f97316" />
+      <rect x="2" y="38" width="12" height="3.5" rx="1.75" fill="#FF5B00" />
+      <rect x="0" y="47" width="16" height="3.5" rx="1.75" fill="#FF5B00" />
+      <rect x="3" y="56" width="10" height="3.5" rx="1.75" fill="#FF5B00" />
 
-      {/* Royal Blue Shield */}
+      {/* Royal Blue Shield (#1E53E5) */}
       <path 
         d="M56 8C74 13 88 18 88 18V50C88 68.5 73.5 83.5 56 92C38.5 83.5 24 68.5 24 50V18C24 18 38 13 56 8Z" 
-        fill="#1e40af" 
-        stroke="#3b82f6" 
+        fill="#1E53E5" 
+        stroke="#467BFF" 
         strokeWidth="3.5" 
         strokeLinejoin="round"
       />
@@ -36,8 +36,8 @@ export const BradCiLogoIcon: React.FC<{ className?: string; size?: number }> = (
       {/* Inner shield shading */}
       <path 
         d="M56 12C71.5 16.5 84 21 84 21V50C84 66 71 79.5 56 87.5V12Z" 
-        fill="#2563eb" 
-        opacity="0.5"
+        fill="#1644C4" 
+        opacity="0.6"
       />
 
       {/* Delivery Truck Body */}
@@ -47,28 +47,28 @@ export const BradCiLogoIcon: React.FC<{ className?: string; size?: number }> = (
       {/* Blue Padlock on Cargo Box */}
       <path 
         d="M44 42.5V40C44 38.3431 45.3431 37 47 37C48.6569 37 50 38.3431 50 40V42.5" 
-        stroke="#1e40af" 
+        stroke="#1E53E5" 
         strokeWidth="1.8" 
-        strokeLinecap="round"
+        strokeLinecap="round" 
       />
-      <rect x="42.5" y="42.5" width="9" height="7.5" rx="1.5" fill="#1e40af" />
+      <rect x="42.5" y="42.5" width="9" height="7.5" rx="1.5" fill="#1E53E5" />
       <circle cx="47" cy="45.5" r="1" fill="#ffffff" />
       <path d="M47 46.5V48.5" stroke="#ffffff" strokeWidth="1" strokeLinecap="round" />
 
-      {/* Orange Truck Cabin */}
+      {/* Orange Truck Cabin (#FF5B00) */}
       <path 
         d="M62 42H70.5L75 48.5V58H62V42Z" 
-        fill="#f97316" 
+        fill="#FF5B00" 
       />
 
       {/* Truck Windshield / Window */}
       <path 
         d="M64 44H69.5L72.8 49H64V44Z" 
-        fill="#0f172a" 
+        fill="#0B1021" 
       />
 
-      {/* Green Verified Badge hovering top-right of cab */}
-      <circle cx="72" cy="37" r="5.5" fill="#10b981" />
+      {/* Green Verified Badge (#00C853) */}
+      <circle cx="72" cy="37" r="5.5" fill="#00C853" />
       <path 
         d="M69.8 37L71.3 38.5L74.5 35.3" 
         stroke="#ffffff" 
@@ -79,11 +79,11 @@ export const BradCiLogoIcon: React.FC<{ className?: string; size?: number }> = (
 
       {/* Wheels */}
       {/* Front Wheel */}
-      <circle cx="69" cy="58" r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="1.5" />
+      <circle cx="69" cy="58" r="5" fill="#0B1021" stroke="#ffffff" strokeWidth="1.5" />
       <circle cx="69" cy="58" r="2" fill="#e2e8f0" />
 
       {/* Rear Wheel */}
-      <circle cx="39" cy="58" r="5" fill="#0f172a" stroke="#ffffff" strokeWidth="1.5" />
+      <circle cx="39" cy="58" r="5" fill="#0B1021" stroke="#ffffff" strokeWidth="1.5" />
       <circle cx="39" cy="58" r="2" fill="#e2e8f0" />
     </svg>
   );
@@ -123,13 +123,13 @@ export const BradCiLogo: React.FC<BradCiLogoProps> = ({
       <div className="flex flex-col min-w-0 justify-center">
         <div className={`font-display ${textSizes[size]} font-black tracking-tight flex items-baseline leading-none select-none drop-shadow-sm`}>
           <span className="text-white">BRAD</span>
-          <span className="text-[#f97316] font-black">'</span>
-          <span className="text-[#3b82f6] font-black ml-0.5">CI</span>
+          <span className="text-[#FF5B00] font-black">'</span>
+          <span className="text-[#1E53E5] font-black ml-0.5">CI</span>
         </div>
         
         {showSubtitle && (
           <p className={`hidden xl:block ${subTextSizes[size]} text-slate-300 font-bold uppercase tracking-[0.12em] mt-0.5 whitespace-nowrap leading-none opacity-90`}>
-            SÉQUESTRÉ • LIVRAISON GPS
+            ENCHÈRES • PAIEMENT À LA LIVRAISON • LIVRAISON GPS
           </p>
         )}
       </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Bike, 
@@ -31,7 +31,9 @@ import {
   CreditCard,
   RotateCcw,
   Headphones,
-  Camera
+  Camera,
+  Timer,
+  Zap
 } from 'lucide-react';
 import { DeliveryJob, VehicleType, PaymentMethod } from '../types';
 import { COMMUNE_NAMES_ABIDJAN, COMMUNE_NAMES_ENVIRONS, getCommuneBadgeInfo } from '../data/communes';
@@ -52,6 +54,8 @@ export const DriverDashboard: React.FC = () => {
     driverSetInspectionVerdict,
     driverConfirmDeliveryOTP,
     driverConfirmReturnOTP,
+    driverStartAbsentTimer,
+    driverCancelDueToAbsentBuyer,
     requestUserWithdrawal,
     setPricingModalOpen,
     setTargetPlanForPricing,
@@ -69,6 +73,33 @@ export const DriverDashboard: React.FC = () => {
   const [pickupCodeInput, setPickupCodeInput] = useState('');
   const [deliveryOtpInput, setDeliveryOtpInput] = useState('');
   const [returnOtpInput, setReturnOtpInput] = useState('');
+  const [absentTimerSeconds, setAbsentTimerSeconds] = useState<number>(20 * 60); // 20 minutes countdown (1200 seconds)
+  const [isAbsentTimerRunning, setIsAbsentTimerRunning] = useState<boolean>(false);
+
+  // Active timer effect for absent buyer countdown (20 minutes)
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isAbsentTimerRunning && absentTimerSeconds > 0) {
+      interval = setInterval(() => {
+        setAbsentTimerSeconds(prev => {
+          if (prev <= 1) {
+            clearInterval(interval!);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isAbsentTimerRunning, absentTimerSeconds]);
+
+  const formatTimerMinutesSeconds = (totalSec: number) => {
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Driver Withdrawal state
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
@@ -137,7 +168,6 @@ export const DriverDashboard: React.FC = () => {
   const getVehicleIcon = (v: VehicleType) => {
     switch (v) {
       case 'cargo': return <Truck className="w-4 h-4 text-purple-400" />;
-      case 'voiture': return <Car className="w-4 h-4 text-blue-400" />;
       default: return <Bike className="w-4 h-4 text-emerald-400" />;
     }
   };
@@ -200,14 +230,47 @@ export const DriverDashboard: React.FC = () => {
               <p className="text-xs text-slate-400 mt-1">
                 {currentUser.phone} • {currentUser.gpsLocation?.commune || 'Abidjan'} • {currentUser.kycStatus === 'verified' ? '✓ Livreur Certifié KYC' : '⚠️ KYC en cours'}
               </p>
-              <button
-                type="button"
-                onClick={() => setProfileAvatarModalOpen(true)}
-                className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 mt-1 transition-colors"
-              >
-                <Camera className="w-3 h-3" />
-                <span>Modifier ma photo de profil (Caméra / Galerie)</span>
-              </button>
+
+              {/* Dynamic Vehicle Plate & Color Badge */}
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-amber-500/40 text-[11px] font-bold text-amber-300 shadow-sm">
+                  <Bike className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-slate-400 font-normal">Matricule :</span>
+                  <span className="font-mono text-white uppercase">{currentUser.kycVehiclePlate || currentUser.vehicleDetails?.plate || '4523 JJ 01'}</span>
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-700 text-[11px] font-medium text-slate-300 shadow-sm">
+                  <span className="text-slate-400">Couleur :</span>
+                  <span className="font-bold text-white">{currentUser.kycVehicleColor || currentUser.vehicleDetails?.color || 'Noir & Rouge'}</span>
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-700 text-[11px] font-medium text-slate-300 shadow-sm">
+                  <span className="text-slate-400">Modèle :</span>
+                  <span className="text-white font-medium">{currentUser.kycVehicleModel || currentUser.vehicleDetails?.model || 'Yamaha Crypton 110'}</span>
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 mt-1.5">
+                <button
+                  type="button"
+                  onClick={() => setProfileAvatarModalOpen(true)}
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition-colors"
+                >
+                  <Camera className="w-3 h-3" />
+                  <span>Modifier photo</span>
+                </button>
+
+                <span className="text-slate-700">•</span>
+
+                <button
+                  type="button"
+                  onClick={() => setKycModalOpen(true)}
+                  className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition-colors"
+                >
+                  <FileCheck className="w-3 h-3" />
+                  <span>Modifier Véhicule & KYC</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -256,33 +319,25 @@ export const DriverDashboard: React.FC = () => {
             </button>
 
             {/* Trial / VIP quota status */}
-            <div className={`p-2.5 px-3.5 rounded-2xl border flex items-center gap-2.5 ${
-              isTrial && remainingTrial <= 0
-                ? 'bg-red-500/15 border-red-500 text-red-200'
-                : isTrial
-                ? 'bg-amber-500/15 border-amber-500 text-amber-200'
-                : 'bg-emerald-500/15 border-emerald-500 text-emerald-200'
-            }`}>
+            <div className="p-2.5 px-3.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/15 text-emerald-200 flex items-center gap-2.5">
               <div>
                 <span className="text-[9px] uppercase font-extrabold block text-slate-400">
-                  {isTrial ? 'Courses restantes :' : 'Abonnement :'}
+                  Formule Livreur :
                 </span>
-                <span className="text-sm font-black font-mono-num">
-                  {isTrial ? `${remainingTrial} / 5 offertes` : 'Illimité (Pass VIP)'}
+                <span className="text-sm font-black font-mono-num text-emerald-400">
+                  {currentUser.driverPlan === 'vip_pass' ? 'Pass VIP (Illimité)' : 'Offre Gratuite (Illimitée)'}
                 </span>
               </div>
-              {isTrial && (
-                <button
-                  id="driver-header-upgrade-btn"
-                  onClick={() => {
-                    setTargetPlanForPricing('vip_pass');
-                    setPricingModalOpen(true);
-                  }}
-                  className="text-xs bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-2.5 py-1 rounded-xl font-bold transition-all shadow shrink-0"
-                >
-                  Pass 6 000 F
-                </button>
-              )}
+              <button
+                id="driver-header-upgrade-btn"
+                onClick={() => {
+                  setTargetPlanForPricing('vip_pass');
+                  setPricingModalOpen(true);
+                }}
+                className="text-xs bg-amber-500 hover:bg-amber-400 text-slate-950 px-2.5 py-1 rounded-xl font-bold transition-all shadow shrink-0"
+              >
+                Pass VIP (Bientôt)
+              </button>
             </div>
 
             {/* Wallet Balance Widget with Retrait Button */}
@@ -491,28 +546,46 @@ export const DriverDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Lock Banner if Trial is 0 and no VIP pass */}
-      {isTrial && remainingTrial <= 0 && (
-        <div id="driver-locked-trial-banner" className="p-6 rounded-3xl bg-red-500/15 border border-red-500/50 text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto">
-            <Lock className="w-6 h-6" />
+      {/* 3. Special Driver Offer Banner */}
+      <div id="driver-launch-offer-banner" className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-amber-950/40 border-2 border-emerald-500/50 shadow-2xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center shrink-0 shadow-inner">
+              <Sparkles className="w-6 h-6 animate-pulse text-amber-300" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-black text-[10px] tracking-wider uppercase border border-emerald-500/40">
+                  🎉 Offre Gratuite Active
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] uppercase border border-emerald-500/30 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-400" />
+                  <span>Courses Illimitées (0 FCFA)</span>
+                </span>
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-white">
+                Courses 100% Illimitées & 0% de Commission
+              </h3>
+              <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                L'accès à la bourse de fret reste <strong>100% gratuit et illimité</strong> pour tous les livreurs de Côte d'Ivoire (comme les comptes basiques). Le Pass Livreur VIP (6 000 FCFA / mois) sera disponible prochainement et s'activera avec <strong>5 courses d'essai offertes</strong>.
+              </p>
+            </div>
           </div>
-          <h3 className="text-lg font-bold text-white">Bourse de Fret Verrouillée (0 / 5 Courses)</h3>
-          <p className="text-xs text-slate-300 max-w-lg mx-auto leading-relaxed">
-            Vos 5 courses d'essai offertes ont été effectuées. Pour continuer à recevoir des courses et débloquer les virements instantanés Wave, activez votre <strong>Pass Livreur VIP (6 000 FCFA / mois)</strong>.
-          </p>
-          <button
-            id="driver-activate-vip-btn"
-            onClick={() => {
-              setTargetPlanForPricing('vip_pass');
-              setPricingModalOpen(true);
-            }}
-            className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-lg transition-all"
-          >
-            Activer le Pass Livreur (6 000 FCFA / mois)
-          </button>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0 w-full md:w-auto">
+            <div className="p-3 bg-slate-950/80 rounded-2xl border border-emerald-500/30 text-center">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">Statut Actuel</span>
+              <span className="text-sm font-black text-emerald-400">Gratuit & Illimité</span>
+            </div>
+            <div className="p-3 bg-slate-950/80 rounded-2xl border border-amber-500/30 text-center">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">Pass VIP (6 000 F)</span>
+              <span className="text-xs font-black text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md inline-block">
+                ⏳ Bientôt (+5 Offertes)
+              </span>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* 4. Active Job in Progress (GPS Navigation & 2-Step Codes) */}
       {myActiveJob && (
@@ -739,7 +812,7 @@ export const DriverDashboard: React.FC = () => {
                     >
                       <CheckCircle2 className={`w-5 h-5 mt-0.5 shrink-0 ${myActiveJob.inspectionStatus === 'client_confirmed_good' ? 'text-emerald-400' : 'text-slate-500'}`} />
                       <div>
-                        <div className="font-bold text-xs text-emerald-400">1. Produit Confirmé Bon / Conforme</div>
+                        <div className="font-bold text-xs text-emerald-400">1. Client Présent & Produit Conforme</div>
                         <div className="text-[11px] text-slate-400">Le client accepte le produit et va vous communiquer son Code OTP Secret.</div>
                       </div>
                     </button>
@@ -755,10 +828,85 @@ export const DriverDashboard: React.FC = () => {
                     >
                       <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${myActiveJob.inspectionStatus === 'client_confirmed_bad' ? 'text-red-400' : 'text-slate-500'}`} />
                       <div>
-                        <div className="font-bold text-xs text-red-400">2. Produit Mauvais / Non Conforme</div>
-                        <div className="text-[11px] text-slate-400">Le client refuse l'article. Le bouton retour s'active sur son application.</div>
+                        <div className="font-bold text-xs text-red-400">2. Client Présent mais Produit Refusé</div>
+                        <div className="text-[11px] text-slate-400">Le client refuse l'article pour non-conformité. Le retour vers le vendeur s'active.</div>
                       </div>
                     </button>
+                  </div>
+
+                  {/* 3. Section CLIENT ABSENT / ATTENTE 20 MINUTES AVEC BONUS 15% */}
+                  <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-amber-300 font-extrabold text-xs">
+                        <Timer className="w-4 h-4 text-amber-400 animate-pulse" />
+                        <span>Alternative : Client Injoignable ou Absent ?</span>
+                      </div>
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
+                        Chrono 20 min
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-300">
+                      Si l'acheteur ne se présente pas à l'adresse de livraison, lancez le <strong>Chrono d'attente officiel (20 minutes)</strong>. Si le délai expire sans réponse, vous pouvez annuler la course : <strong>vous encaissez la course + 15% de bonus sur la valeur de l'article</strong>.
+                    </p>
+
+                    {!isAbsentTimerRunning && absentTimerSeconds === 1200 ? (
+                      <button
+                        id="driver-start-absent-timer-btn"
+                        type="button"
+                        onClick={() => {
+                          setIsAbsentTimerRunning(true);
+                          driverStartAbsentTimer(myActiveJob.id);
+                        }}
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow flex items-center justify-center gap-2 transition-all"
+                      >
+                        <Clock className="w-4 h-4" />
+                        <span>Démarrer le Chronomètre d'Attente (20:00)</span>
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-amber-500/40">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-amber-400 animate-spin" />
+                            <span className="text-xs text-slate-300">Temps d'attente restant :</span>
+                          </div>
+                          <span className="font-mono text-base font-black text-amber-400">
+                            {formatTimerMinutesSeconds(absentTimerSeconds)}
+                          </span>
+                        </div>
+
+                        {absentTimerSeconds === 0 ? (
+                          <div className="space-y-2 animate-in fade-in">
+                            <div className="p-2.5 bg-red-500/20 border border-red-500/40 rounded-xl text-xs text-red-200">
+                              ⏱️ <strong>Délai de 20 minutes expiré !</strong> L'acheteur n'a pas répondu. Vous pouvez maintenant annuler, récupérer le bonus de 15% ({Math.round((myActiveJob.itemValue || 0) * 0.15).toLocaleString('fr-FR')} FCFA) et retourner le colis.
+                            </div>
+                            <button
+                              id="driver-cancel-absent-buyer-btn"
+                              type="button"
+                              onClick={() => {
+                                driverCancelDueToAbsentBuyer(myActiveJob.id);
+                                setIsAbsentTimerRunning(false);
+                              }}
+                              className="w-full py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              <span>Annuler (Client Absent) & Encaisser Bonus 15% (+{Math.round((myActiveJob.itemValue || 0) * 0.15).toLocaleString('fr-FR')} F)</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAbsentTimerSeconds(0)}
+                              className="text-[10px] text-slate-400 hover:text-amber-300 underline"
+                            >
+                              [Simuler fin du chrono 20 min]
+                            </button>
+                            <span className="text-[10px] text-amber-400 font-medium">Alerte envoyée au client</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* If Good: OTP entry */}
@@ -831,6 +979,40 @@ export const DriverDashboard: React.FC = () => {
                   <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 text-[11px] text-slate-300">
                     <p className="font-bold text-white">Adresse de restitution boutique :</p>
                     <p className="text-slate-400">{myActiveJob.sellerName} • {myActiveJob.pickupCommune} ({myActiveJob.pickupAddress})</p>
+                  </div>
+
+                  {/* Return Trip Radar: Match available orders towards seller commune */}
+                  <div className="p-3 bg-gradient-to-r from-emerald-950/70 via-slate-900 to-amber-950/40 rounded-xl border border-emerald-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
+                        <Compass className="w-4 h-4 animate-spin" />
+                        <span>Radar Retour : Colis en direction de {myActiveJob.pickupCommune}</span>
+                      </div>
+                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded">
+                        Optimisation Trajet
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Pendant votre trajet retour vers <strong>{myActiveJob.pickupCommune}</strong>, maximisez vos gains en transportant un colis sur le même axe :
+                    </p>
+                    {freightJobs.filter(j => (j.status === 'available' || j.status === 'pending_driver') && (j.dropoffCommune === myActiveJob.pickupCommune || j.pickupCommune === myActiveJob.dropoffCommune)).length > 0 ? (
+                      <div className="space-y-1.5 pt-1">
+                        {freightJobs.filter(j => (j.status === 'available' || j.status === 'pending_driver') && (j.dropoffCommune === myActiveJob.pickupCommune || j.pickupCommune === myActiveJob.dropoffCommune)).map(rj => (
+                          <div key={rj.id} className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
+                            <div className="text-xs">
+                              <span className="font-bold text-white block">{rj.productTitle}</span>
+                              <span className="text-[10px] text-slate-400">{rj.pickupCommune} ➔ {rj.dropoffCommune}</span>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-emerald-400">+{rj.deliveryFee.toLocaleString('fr-FR')} F</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-[10px] text-slate-400 flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>Recherche de colis disponibles en cours sur l'axe {myActiveJob.dropoffCommune} ➔ {myActiveJob.pickupCommune}...</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -952,7 +1134,7 @@ export const DriverDashboard: React.FC = () => {
 
               {/* Vehicle filters */}
               <div className="flex gap-1">
-                {['Tous', 'moto', 'voiture', 'cargo'].map((v) => (
+                {['Tous', 'moto', 'cargo'].map((v) => (
                   <button
                     key={v}
                     id={`driver-vehicle-filter-${v}`}
@@ -963,7 +1145,7 @@ export const DriverDashboard: React.FC = () => {
                         : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                   >
-                    {v === 'Tous' ? 'Tous' : v}
+                    {v === 'Tous' ? 'Tous' : (v === 'moto' ? '🏍️ Moto' : '🚚 Cargo')}
                   </button>
                 ))}
               </div>
@@ -1188,37 +1370,59 @@ export const DriverDashboard: React.FC = () => {
 
           {/* Vehicle Details */}
           <div className="p-6 rounded-3xl bg-[#0C121E] border border-slate-800 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-                <Bike className="w-5 h-5" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <Bike className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-white">Véhicule & Matériel Déclaré</h4>
+                  <p className="text-xs text-slate-400">Engin enregistré et contrôlé pour livraisons sécurisées</p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-bold text-sm text-white">Véhicule & Matériel Déclaré</h4>
-                <p className="text-xs text-slate-400">Engin inspecté pour transport sécurisé de colis</p>
-              </div>
+
+              <button
+                onClick={() => setKycModalOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold transition-colors"
+              >
+                Modifier
+              </button>
             </div>
 
             <div className="space-y-3 pt-2 text-xs">
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex justify-between items-center">
-                <span className="text-slate-400">Type de Véhicule Principal :</span>
-                <span className="text-emerald-400 font-bold capitalize">Moto Express (Yamaha XTZ 125)</span>
+                <span className="text-slate-400">Matricule / Plaque :</span>
+                <span className="text-amber-300 font-mono font-bold uppercase text-sm bg-amber-500/10 px-2.5 py-0.5 rounded border border-amber-500/20">
+                  {currentUser.kycVehiclePlate || currentUser.vehicleDetails?.plate || '4523 JJ 01'}
+                </span>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex justify-between items-center">
-                <span className="text-slate-400">Immatriculation / Plaque :</span>
-                <span className="text-white font-mono font-bold">CI-4920-AB01</span>
+                <span className="text-slate-400">Couleur de l'engin :</span>
+                <span className="text-white font-bold">
+                  {currentUser.kycVehicleColor || currentUser.vehicleDetails?.color || 'Noir & Rouge'}
+                </span>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex justify-between items-center">
-                <span className="text-slate-400">Équipement de Sécurité :</span>
-                <span className="text-white font-medium">Top-Case Verrouillé + Casque Homologué</span>
+                <span className="text-slate-400">Modèle du Véhicule :</span>
+                <span className="text-emerald-400 font-bold capitalize">
+                  {currentUser.kycVehicleModel || currentUser.vehicleDetails?.model || 'Yamaha Crypton 110'}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex justify-between items-center">
+                <span className="text-slate-400">Type de Véhicule :</span>
+                <span className="text-white font-medium capitalize">
+                  {currentUser.kycVehicleType || currentUser.vehicleDetails?.type || 'Moto Express'}
+                </span>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 flex justify-between items-center">
                 <span className="text-slate-400">Note Globale Clients :</span>
                 <span className="text-amber-400 font-bold flex items-center gap-1">
                   <Star className="w-3.5 h-3.5 fill-amber-400" />
-                  <span>4.9 / 5.0 (34 avis vérifiés)</span>
+                  <span>{currentUser.rating || 4.9} / 5.0 ({currentUser.reviewCount || 34} avis vérifiés)</span>
                 </span>
               </div>
             </div>

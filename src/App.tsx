@@ -31,11 +31,15 @@ import { AdminExportModal } from './components/AdminExportModal';
 import { LiveDeliveryStatusBar } from './components/LiveDeliveryStatusBar';
 import { NotificationsModal } from './components/NotificationsModal';
 import { KYCModal } from './components/KYCModal';
+import { MandatoryKYCGate } from './components/MandatoryKYCGate';
 import { ProfileAvatarModal } from './components/ProfileAvatarModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OrderDispatchModal } from './components/OrderDispatchModal';
 import { ReviewModal } from './components/ReviewModal';
 import { TermsAndConditionsModal } from './components/TermsAndConditionsModal';
+import { ReceiptModal } from './components/ReceiptModal';
+import { DemoDebugPanel } from './components/DemoDebugPanel';
+import { B2BLiquidationHub } from './components/B2BLiquidationHub';
 import { 
   ShieldCheck, 
   Lock, 
@@ -63,28 +67,35 @@ const AppContent: React.FC = () => {
   // If site is in maintenance mode and user is not an authenticated admin, show maintenance screen
   if (isMaintenanceMode && !isAdminAuthenticated && activeTab !== 'dashboard_admin') {
     return (
-      <>
+      <ErrorBoundary fallbackTitle="Écran de maintenance">
         <MaintenanceScreen />
         <ToastContainer />
-      </>
+      </ErrorBoundary>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-200">
       {/* 1. Main Navigation Bar */}
-      <Navbar />
+      <ErrorBoundary fallbackTitle="Navigation">
+        <Navbar />
+      </ErrorBoundary>
 
       {/* 2. Persistent Live Delivery Status Bar (Buyer, Seller & Driver Dispatch Notification) */}
-      <LiveDeliveryStatusBar />
+      <ErrorBoundary fallbackTitle="Statut de livraison">
+        <LiveDeliveryStatusBar />
+      </ErrorBoundary>
 
-      {/* 3. Main Views Container */}
+      {/* 3. Main Views Container with Isolated Error Boundary */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-        {(activeTab === 'explore' || activeTab === 'feed') && <VisitorFeed />}
-        {(activeTab === 'dashboard_client' || activeTab === 'client_dashboard') && <ClientDashboard />}
-        {(activeTab === 'dashboard_driver' || activeTab === 'driver_dashboard') && <DriverDashboard />}
-        {(activeTab === 'dashboard_admin' || activeTab === 'admin_backoffice') && <AdminBackOffice />}
-        {(activeTab === 'about' || activeTab === 'about_security' || activeTab === 'tarifs') && <SecurityGuideView />}
+        <ErrorBoundary fallbackTitle="Vue Principale">
+          {(activeTab === 'explore' || activeTab === 'feed') && <VisitorFeed />}
+          {(activeTab === 'b2b_liquidation' || activeTab === 'destockage_b2b' || activeTab === 'b2b') && <B2BLiquidationHub />}
+          {(activeTab === 'dashboard_client' || activeTab === 'client_dashboard') && <ClientDashboard />}
+          {(activeTab === 'dashboard_driver' || activeTab === 'driver_dashboard') && <DriverDashboard />}
+          {(activeTab === 'dashboard_admin' || activeTab === 'admin_backoffice') && <AdminBackOffice />}
+          {(activeTab === 'about' || activeTab === 'about_security' || activeTab === 'tarifs') && <SecurityGuideView />}
+        </ErrorBoundary>
       </main>
 
       {/* 4. Footer */}
@@ -102,7 +113,7 @@ const AppContent: React.FC = () => {
               </p>
               <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
                 <ShieldCheck className="w-4 h-4" />
-                <span>{translate("Séquestre Garanti Multi-Opérateurs", "Multi-Operator Escrow Guaranteed")}</span>
+                <span>{translate("Paiement Direct à la Livraison Garanti", "Direct Pay on Delivery Guaranteed")}</span>
               </div>
             </div>
 
@@ -160,8 +171,8 @@ const AppContent: React.FC = () => {
               </div>
               <p className="text-[10px] text-slate-500 mt-2">
                 {translate(
-                  "Fonds sous séquestre jusqu'à validation OTP en main propre.",
-                  "Funds held in escrow until in-person OTP delivery validation."
+                  "Paiement direct à la livraison via API sans blocage de fonds.",
+                  "Direct pay on delivery via API with zero upfront fund locking."
                 )}
               </p>
             </div>
@@ -177,28 +188,76 @@ const AppContent: React.FC = () => {
       </footer>
 
       {/* 5. Mobile Bottom Navigation Bar (Smartphones & Small Tablets) */}
-      <MobileBottomNav />
+      <ErrorBoundary fallbackTitle="Barre Mobile">
+        <MobileBottomNav />
+      </ErrorBoundary>
 
-      {/* 6. Modals & Overlays */}
-      <AuthModal />
-      <KYCModal />
-      <ProfileAvatarModal />
-      <OrderDispatchModal />
-      <ReviewModal />
-      <PricingModal />
-      <ProductDetailModal />
-      <FiveBiddersModal />
-      <BuyerDepositModal />
-      <NewProductModal />
-      <GpsTrackingModal />
-      <GpsModal />
-      <NotificationsModal />
-      <ShopStorefrontModal />
-      <AdminMessageModal />
-      <AdminMemberDetailModal />
-      <AdminExportModal />
-      <TermsAndConditionsModal />
-      <AIChatSupport />
+      {/* 6. Modals & Overlays Protected by Error Boundaries */}
+      <ErrorBoundary fallbackTitle="Module d'authentification">
+        <AuthModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Vérification KYC Obligatoire">
+        <MandatoryKYCGate />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Modal KYC">
+        <KYCModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Avatar Profile">
+        <ProfileAvatarModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Dispatch Livreur">
+        <OrderDispatchModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Avis & Évaluations">
+        <ReviewModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Tarification">
+        <PricingModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Détails Produit">
+        <ProductDetailModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Enchères">
+        <FiveBiddersModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Dépôt">
+        <BuyerDepositModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Nouveau Produit">
+        <NewProductModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Tracking GPS">
+        <GpsTrackingModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Position GPS">
+        <GpsModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Centre de Notifications">
+        <NotificationsModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Boutique Officielle">
+        <ShopStorefrontModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Administration">
+        <AdminMessageModal />
+        <AdminMemberDetailModal />
+        <AdminExportModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Conditions d'utilisation">
+        <TermsAndConditionsModal />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Support Client IA">
+        <AIChatSupport />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Reçu Officiel & Facture PDF">
+        <ReceiptModal />
+      </ErrorBoundary>
+
+      {/* 7. Diagnostic & Debug Floating Panel for Demo/Preview mode */}
+      <ErrorBoundary fallbackTitle="Panneau de Débogage">
+        <DemoDebugPanel />
+      </ErrorBoundary>
+
       <ToastContainer />
     </div>
   );
@@ -206,8 +265,10 @@ const AppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <ErrorBoundary fallbackTitle="Application BRAD'CI">
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

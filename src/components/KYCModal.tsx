@@ -9,7 +9,9 @@ import {
   AlertTriangle, 
   FileText, 
   UserCheck, 
-  Car, 
+  Truck, 
+  Bike,
+  Palette,
   Sparkles, 
   RotateCw,
   Eye,
@@ -19,49 +21,73 @@ import {
   User,
   Check,
   HelpCircle,
-  BookOpen
+  BookOpen,
+  ArrowRight
 } from 'lucide-react';
-import { UserRole } from '../types';
+import { UserRole, VehicleType } from '../types';
 import { getTranslation } from '../utils/translations';
 import { KYCDemoGuideModal } from './KYCDemoGuideModal';
+import { verifyFacialBiometrics, BiometricCheckResult } from '../utils/biometricVerification';
 
 interface KYCModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 // Authentic demonstration photos for easy testing without camera hardware constraints
 const DEMO_KYC_PHOTOS = {
   cni: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80',
   selfie: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
+  selfieWithId: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=800&q=80',
   driverLicense: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=800&q=80',
+  driverLicenseVerso: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80',
   driverLicenseSelfie: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
   vehicleReg: 'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&w=800&q=80'
 };
 
-export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
+export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose: propOnClose }) => {
   const { 
     currentUser, 
     submitKYC, 
     adminInstantApproveMyKYC, 
     language, 
     translate,
-    addToast 
+    addToast,
+    kycModalOpen,
+    setKycModalOpen
   } = useApp();
 
+  const isOpen = propIsOpen !== undefined ? propIsOpen : kycModalOpen;
+  const onClose = propOnClose || (() => setKycModalOpen(false));
+
   const isDriver = currentUser?.role === 'driver';
-  const totalSteps = isDriver ? 5 : 2;
+  // Buyer / Seller: 3 steps | Driver: 4 steps
+  const totalSteps = isDriver ? 4 : 3;
 
   const [currentStep, setCurrentStep] = useState<number>(1);
-  const [docType, setDocType] = useState<'cni' | 'passeport' | 'attestation' | 'permis'>('cni');
+  const [docType, setDocType] = useState<'cni' | 'passeport' | 'attestation' | 'permis' | 'carte_consulaire'>('cni');
   const [docNumber, setDocNumber] = useState<string>(currentUser?.kycDocumentNumber || 'CI003928174');
   
   // Captured or uploaded photos
   const [docPhoto, setDocPhoto] = useState<string>(currentUser?.kycPhotoUrl || '');
   const [selfiePhoto, setSelfiePhoto] = useState<string>(currentUser?.kycSelfieUrl || '');
+  const [selfieWithIdPhoto, setSelfieWithIdPhoto] = useState<string>(currentUser?.kycSelfieWithIdUrl || '');
   const [driverLicensePhoto, setDriverLicensePhoto] = useState<string>(currentUser?.kycDriverLicenseUrl || '');
-  const [driverLicenseSelfiePhoto, setDriverLicenseSelfiePhoto] = useState<string>(currentUser?.kycDriverLicenseSelfieUrl || '');
+  const [driverLicenseVersoPhoto, setDriverLicenseVersoPhoto] = useState<string>(currentUser?.kycDriverLicenseVersoUrl || '');
   const [vehicleRegPhoto, setVehicleRegPhoto] = useState<string>(currentUser?.kycVehicleRegistrationUrl || '');
+  
+  // Driver Vehicle Details (Matricule, Couleur, Modèle, Type)
+  const [vehiclePlate, setVehiclePlate] = useState<string>(currentUser?.kycVehiclePlate || currentUser?.vehicleDetails?.plate || '4523 JJ 01');
+  const [vehicleColor, setVehicleColor] = useState<string>(currentUser?.kycVehicleColor || currentUser?.vehicleDetails?.color || 'Noir & Rouge');
+  const [vehicleModel, setVehicleModel] = useState<string>(currentUser?.kycVehicleModel || currentUser?.vehicleDetails?.model || 'Yamaha Crypton 110');
+  const [vehicleType, setVehicleType] = useState<VehicleType>(currentUser?.kycVehicleType || currentUser?.vehicleDetails?.type || 'moto');
+
+  // Reset steps if modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep(1);
+    }
+  }, [isOpen]);
 
   // Camera capture states
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -76,17 +102,21 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [demoGuideOpen, setDemoGuideOpen] = useState<boolean>(false);
 
-  const handleApplyDemoPhotoFromGuide = (type: 'cni' | 'selfie' | 'driverLicense' | 'driverLicenseSelfie' | 'vehicleReg', url: string, docNum?: string) => {
+  if (!isOpen) return null;
+
+  const handleApplyDemoPhotoFromGuide = (type: string, url: string, docNum?: string) => {
     if (type === 'cni') {
       setDocPhoto(url);
       if (docNum) setDocNumber(docNum);
     } else if (type === 'selfie') {
       setSelfiePhoto(url);
+    } else if (type === 'selfieWithId') {
+      setSelfieWithIdPhoto(url);
     } else if (type === 'driverLicense') {
       setDriverLicensePhoto(url);
       if (docNum) setDocNumber(docNum);
     } else if (type === 'driverLicenseSelfie') {
-      setDriverLicenseSelfiePhoto(url);
+      setSelfieWithIdPhoto(url);
     } else if (type === 'vehicleReg') {
       setVehicleRegPhoto(url);
     }
@@ -132,45 +162,25 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
         setTimeout(() => {
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(e => {
-              console.warn("Video play error:", e);
-            });
+            videoRef.current.play().catch(e => console.warn("Video play warning:", e));
           }
         }, 100);
       } else {
         setCameraError(translate(
-          "La caméra n'est pas supportée dans cet environnement. Veuillez importer une photo depuis votre appareil.",
-          "Camera is not supported in this environment. Please import a photo from your device."
+          "Caméra non disponible sur ce navigateur. Utilisez le bouton 'Importer depuis la galerie' ou 'Photo Démo'.",
+          "Camera not available. Please use 'Upload from gallery' or 'Demo Photo'."
         ));
       }
-    } catch (err: any) {
+    } catch (err) {
       console.warn("getUserMedia error:", err);
       setCameraError(translate(
-        "Accès à la caméra refusé ou non disponible. Utilisez le bouton 'Importer depuis l'appareil' ou 'Photo Démo'.",
-        "Camera access denied or unavailable. Use the 'Import from device' or 'Demo Photo' button."
+        "Accès caméra refusé. Utilisez l'importation de fichier ou le guide démo.",
+        "Camera access denied. Please use file upload or demo guide."
       ));
     }
   };
 
-  // Set default camera facing mode based on step
-  useEffect(() => {
-    if (currentStep === 2 || currentStep === 4) {
-      setFacingMode('user');
-    } else {
-      setFacingMode('environment');
-    }
-  }, [currentStep]);
-
-  // Clean up camera stream on unmount or close
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
-
-  if (!isOpen || !currentUser) return null;
-
-  // Capture Image from Video
+  // Capture frame from video to canvas
   const capturePhoto = () => {
     if (!videoRef.current) return;
     try {
@@ -185,17 +195,17 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
         stopCamera();
         addToast(
           translate('Photo capturée avec succès', 'Photo captured successfully'),
-          translate('Votre photo a été enregistrée pour cette étape.', 'Your photo has been saved for this step.'),
+          translate('Votre photo a été enregistrée pour cette étape.', 'Your photo has been recorded for this step.'),
           'success'
         );
       }
     } catch (e) {
       console.error("Capture photo error:", e);
-      setCameraError("Erreur lors de la capture. Veuillez importer le fichier directement.");
+      setCameraError("Erreur lors de la capture.");
     }
   };
 
-  // File Upload handler
+  // Handle manual file selection
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -205,7 +215,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
           assignPhotoForCurrentStep(event.target.result as string);
           addToast(
             translate('Photo importée', 'Photo imported'),
-            translate('Le fichier sélectionné est affiché et prêt pour vérification.', 'Selected file is displayed and ready for verification.'),
+            translate('Le fichier est prêt pour la vérification.', 'File ready for verification.'),
             'success'
           );
         }
@@ -214,67 +224,105 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Use Demo Photo for quick 1-click test
-  const handleUseDemoPhoto = () => {
-    let url = DEMO_KYC_PHOTOS.cni;
-    if (currentStep === 2) url = DEMO_KYC_PHOTOS.selfie;
-    else if (currentStep === 3) url = DEMO_KYC_PHOTOS.driverLicense;
-    else if (currentStep === 4) url = DEMO_KYC_PHOTOS.driverLicenseSelfie;
-    else if (currentStep === 5) url = DEMO_KYC_PHOTOS.vehicleReg;
+  const assignPhotoForCurrentStep = (url: string) => {
+    setErrorMessage(null);
+    if (!isDriver) {
+      if (currentStep === 1) setDocPhoto(url);
+      else if (currentStep === 2) setSelfiePhoto(url);
+      else if (currentStep === 3) setSelfieWithIdPhoto(url);
+    } else {
+      if (currentStep === 1) setDocPhoto(url);
+      else if (currentStep === 2) setSelfieWithIdPhoto(url);
+      else if (currentStep === 3) {
+        if (!driverLicensePhoto) setDriverLicensePhoto(url);
+        else setDriverLicenseVersoPhoto(url);
+      }
+      else if (currentStep === 4) setVehicleRegPhoto(url);
+    }
+  };
 
-    assignPhotoForCurrentStep(url);
+  const handleUseDemoPhoto = () => {
+    if (!isDriver) {
+      if (currentStep === 1) setDocPhoto(DEMO_KYC_PHOTOS.cni);
+      else if (currentStep === 2) setSelfiePhoto(DEMO_KYC_PHOTOS.selfie);
+      else if (currentStep === 3) setSelfieWithIdPhoto(DEMO_KYC_PHOTOS.selfieWithId);
+    } else {
+      if (currentStep === 1) setDocPhoto(DEMO_KYC_PHOTOS.cni);
+      else if (currentStep === 2) setSelfieWithIdPhoto(DEMO_KYC_PHOTOS.driverLicenseSelfie);
+      else if (currentStep === 3) {
+        setDriverLicensePhoto(DEMO_KYC_PHOTOS.driverLicense);
+        setDriverLicenseVersoPhoto(DEMO_KYC_PHOTOS.driverLicenseVerso);
+      }
+      else if (currentStep === 4) setVehicleRegPhoto(DEMO_KYC_PHOTOS.vehicleReg);
+    }
     if (!docNumber) setDocNumber('CI003928174');
     addToast(
-      translate('Photo de démonstration chargée', 'Demo photo loaded'),
-      translate('Image de test haute résolution insérée avec succès.', 'High resolution test image inserted successfully.'),
+      translate('Photo démo chargée', 'Demo photo loaded'),
+      translate('Exemple officiel appliqué pour cette étape.', 'Official sample applied for this step.'),
       'info'
     );
   };
 
-  const assignPhotoForCurrentStep = (photoUrl: string) => {
-    if (currentStep === 1) setDocPhoto(photoUrl);
-    else if (currentStep === 2) setSelfiePhoto(photoUrl);
-    else if (currentStep === 3) setDriverLicensePhoto(photoUrl);
-    else if (currentStep === 4) setDriverLicenseSelfiePhoto(photoUrl);
-    else if (currentStep === 5) setVehicleRegPhoto(photoUrl);
-    setErrorMessage(null);
-  };
-
   const getCurrentStepPhoto = () => {
-    if (currentStep === 1) return docPhoto;
-    if (currentStep === 2) return selfiePhoto;
-    if (currentStep === 3) return driverLicensePhoto;
-    if (currentStep === 4) return driverLicenseSelfiePhoto;
-    if (currentStep === 5) return vehicleRegPhoto;
+    if (!isDriver) {
+      if (currentStep === 1) return docPhoto;
+      if (currentStep === 2) return selfiePhoto;
+      if (currentStep === 3) return selfieWithIdPhoto;
+    } else {
+      if (currentStep === 1) return docPhoto;
+      if (currentStep === 2) return selfieWithIdPhoto;
+      if (currentStep === 3) return driverLicensePhoto;
+      if (currentStep === 4) return vehicleRegPhoto;
+    }
     return '';
   };
 
-  const canProceedToNext = () => {
+  const canProceed = () => {
     if (currentStep === 1) {
-      return docNumber.trim().length >= 4 && Boolean(docPhoto);
+      return Boolean(docPhoto) && docNumber.trim().length >= 4;
     }
-    return Boolean(getCurrentStepPhoto());
+    if (!isDriver) {
+      if (currentStep === 2) return Boolean(selfiePhoto);
+      if (currentStep === 3) return Boolean(selfieWithIdPhoto);
+    } else {
+      if (currentStep === 2) return Boolean(selfieWithIdPhoto);
+      if (currentStep === 3) return Boolean(driverLicensePhoto);
+      if (currentStep === 4) return Boolean(vehicleRegPhoto) && vehiclePlate.trim().length >= 3;
+    }
+    return false;
   };
 
-  const handleNextStep = () => {
+  const handleNext = async () => {
     if (currentStep < totalSteps) {
       stopCamera();
       setCurrentStep(prev => prev + 1);
     } else {
-      handleSubmitAll();
+      await handleSubmit();
     }
   };
 
-  const handlePrevStep = () => {
+  const handleBack = () => {
     if (currentStep > 1) {
       stopCamera();
       setCurrentStep(prev => prev - 1);
     }
   };
 
-  const handleSubmitAll = () => {
+  const handleSubmit = async () => {
     setIsSubmitting(true);
     setErrorMessage(null);
+
+    // AI Biometric Check
+    const bioResult = await verifyFacialBiometrics(
+      selfiePhoto || selfieWithIdPhoto || DEMO_KYC_PHOTOS.selfie,
+      docPhoto || DEMO_KYC_PHOTOS.cni
+    );
+
+    if (!bioResult.success) {
+      setIsSubmitting(false);
+      setErrorMessage(language === 'en' ? (bioResult.errorMessageEn || bioResult.errorMessage) : bioResult.errorMessage);
+      return;
+    }
 
     const result = submitKYC({
       docType,
@@ -282,8 +330,12 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
       photoUrl: docPhoto || DEMO_KYC_PHOTOS.cni,
       selfieUrl: selfiePhoto || DEMO_KYC_PHOTOS.selfie,
       driverLicenseUrl: driverLicensePhoto || (isDriver ? DEMO_KYC_PHOTOS.driverLicense : undefined),
-      driverLicenseSelfieUrl: driverLicenseSelfiePhoto || (isDriver ? DEMO_KYC_PHOTOS.driverLicenseSelfie : undefined),
-      vehicleRegistrationUrl: vehicleRegPhoto || (isDriver ? DEMO_KYC_PHOTOS.vehicleReg : undefined)
+      driverLicenseSelfieUrl: selfieWithIdPhoto || (isDriver ? DEMO_KYC_PHOTOS.driverLicenseSelfie : undefined),
+      vehicleRegistrationUrl: vehicleRegPhoto || (isDriver ? DEMO_KYC_PHOTOS.vehicleReg : undefined),
+      vehiclePlate: isDriver ? vehiclePlate.trim().toUpperCase() : undefined,
+      vehicleColor: isDriver ? vehicleColor.trim() : undefined,
+      vehicleModel: isDriver ? vehicleModel.trim() : undefined,
+      vehicleType: isDriver ? vehicleType : undefined
     });
 
     setIsSubmitting(false);
@@ -293,7 +345,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
       onClose();
       addToast(
         translate('Dossier KYC Soumis', 'KYC Dossier Submitted'),
-        translate('Votre dossier est en cours de validation par nos agents de conformité.', 'Your dossier is being reviewed by our compliance officers.'),
+        translate('Votre dossier est en cours de validation par nos agents (Délai moyen : 15 à 30 minutes).', 'Your dossier is being reviewed by compliance officers (Average time: 15-30 min).'),
         'success'
       );
     } else {
@@ -302,25 +354,25 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
   };
 
   const stepTitles = isDriver ? [
-    translate("Étape 1 : Pièce d'Identité Officielle (Recto CNI / Passeport)", "Step 1: Official ID Document (Front CNI / Passport)"),
-    translate("Étape 2 : Selfie en Direct avec votre Pièce d'Identité", "Step 2: Live Selfie holding your ID Document"),
-    translate("Étape 3 : Permis de Conduire Valide (Recto)", "Step 3: Valid Driving License (Front)"),
-    translate("Étape 4 : Selfie en Direct avec votre Permis de Conduire", "Step 4: Live Selfie with Driving License"),
-    translate("Étape 5 : Carte Grise du Véhicule / Moto", "Step 5: Vehicle / Motorcycle Registration Document")
+    translate("1. Pièce d'Identité Officielle (CNI / Passeport)", "1. Official ID Document (CNI / Passport)"),
+    translate("2. Selfie Tenant la Pièce d'Identité", "2. Live Selfie Holding ID Document"),
+    translate("3. Permis de Conduire (Recto / Verso)", "3. Driver's License (Front / Back)"),
+    translate("4. Carte Grise du Véhicule (Moto / Fourgon)", "4. Vehicle Registration Certificate (Motorcycle / Cargo)")
   ] : [
-    translate("Étape 1 : Pièce d'Identité Officielle (Recto CNI / Passeport)", "Step 1: Official ID Document (Front CNI / Passport)"),
-    translate("Étape 2 : Selfie en Direct avec votre Pièce d'Identité", "Step 2: Live Selfie holding your ID Document")
+    translate("1. Pièce d'Identité Officielle (CNI / Passeport / Carte Consulaire)", "1. Official ID Document (CNI / Passport / Consular Card)"),
+    translate("2. Selfie Simple en Direct", "2. Simple Live Selfie"),
+    translate("3. Selfie Tenant la Pièce d'Identité", "3. Live Selfie Holding ID Document")
   ];
 
   const stepInstructions = isDriver ? [
-    translate("Prenez en photo ou importez le recto de votre CNI, passeport ou attestation ONECI.", "Take a photo or import the front of your ID card, passport or ONECI certificate."),
-    translate("Prenez un selfie tenant votre pièce d'identité à côté de votre visage, sans lunettes de soleil.", "Take a selfie holding your ID next to your face, without sunglasses."),
-    translate("Prenez en photo ou importez votre permis de conduire ivoirien (Catégorie A / B).", "Take a photo or import your Ivorian driving license (Category A / B)."),
-    translate("Prenez un selfie tenant votre permis de conduire à côté de votre joue.", "Take a selfie holding your driving license next to your cheek."),
-    translate("Prenez en photo ou importez la carte grise du véhicule utilisé pour vos livraisons.", "Take a photo or import the registration certificate of your delivery vehicle.")
+    translate("Prenez en photo ou importez le recto de votre CNI ou Passeport.", "Take a photo or upload the front of your National ID or Passport."),
+    translate("Prenez un selfie tenant votre pièce d'identité bien visible à côté de votre visage.", "Take a selfie holding your ID clearly visible next to your face."),
+    translate("Prenez en photo votre permis de conduire ivoirien valide.", "Take a photo of your valid Ivorian driver's license."),
+    translate("Prenez en photo la carte grise du véhicule utilisé pour vos livraisons.", "Take a photo of the registration certificate of your delivery vehicle.")
   ] : [
-    translate("Prenez en photo ou importez le recto de votre CNI, passeport ou attestation ONECI.", "Take a photo or import the front of your ID card, passport or ONECI certificate."),
-    translate("Prenez un selfie tenant votre pièce d'identité à côté de votre visage, sans lunettes de soleil.", "Take a selfie holding your ID next to your face, without sunglasses.")
+    translate("Prenez en photo ou importez le recto de votre CNI, passeport ou carte consulaire.", "Take a photo or import the front of your ID card, passport or consular card."),
+    translate("Prenez un selfie simple de face, bien éclairé, sans lunettes de soleil ni chapeau.", "Take a clear front-facing selfie in good lighting, without sunglasses or hat."),
+    translate("Prenez un selfie tenant votre pièce d'identité bien visible à côté de votre visage.", "Take a selfie holding your ID clearly visible next to your face.")
   ];
 
   const currentPhoto = getCurrentStepPhoto();
@@ -352,18 +404,18 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
             {isDriver 
-              ? translate("Vérification en 5 étapes pour Livreurs Express Agréés", "5-Step Verification for Express Couriers") 
-              : translate("Vérification en 2 étapes pour Acheteurs et Vendeurs", "2-Step Verification for Buyers and Sellers")}
+              ? translate("Vérification en 4 étapes pour Livreurs Express Agréés", "4-Step Verification for Express Couriers") 
+              : translate("Vérification en 3 étapes pour Acheteurs et Vendeurs", "3-Step Verification for Buyers and Sellers")}
           </p>
 
-          {/* Dedicated Guide & Demo Modal Trigger */}
+          {/* Guide & Demo Modal Trigger */}
           <button
             type="button"
             onClick={() => setDemoGuideOpen(true)}
             className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all shadow-sm cursor-pointer hover:scale-105"
           >
             <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{translate("📸 Guide & Démo Visuelle de Prise en Photo (Voir Exemples)", "📸 Visual Photo Guide & Demo (View Samples)")}</span>
+            <span>{translate("📸 Guide & Démo Visuelle de Prise en Photo", "📸 Visual Photo Guide & Demo")}</span>
           </button>
         </div>
 
@@ -397,7 +449,9 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
               {translate("Étape", "Step")} {currentStep} {translate("sur", "of")} {totalSteps}
             </span>
             <span className="text-[10px] text-slate-400 font-mono">
-              {currentStep === 2 || currentStep === 4 ? translate("Mode Selfie Visage", "Selfie Mode") : translate("Mode Document", "Document Mode")}
+              {(!isDriver && (currentStep === 2 || currentStep === 3)) || (isDriver && currentStep === 2)
+                ? translate("Mode Selfie", "Selfie Mode") 
+                : translate("Mode Document", "Document Mode")}
             </span>
           </div>
           <h4 className="text-sm sm:text-base font-extrabold text-white mt-1">
@@ -413,7 +467,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
           <div className="mb-4 p-3.5 rounded-2xl bg-red-500/15 border border-red-500/40 text-red-300 text-xs flex items-start gap-2.5 animate-in fade-in">
             <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-red-200">{translate("Refus de validation / Fraude détectée :", "Verification issue / Fraud check:")}</p>
+              <p className="font-bold text-red-200">{translate("Refus de validation / Non-conformité :", "Validation Issue / Rejection:")}</p>
               <p className="mt-0.5">{errorMessage}</p>
             </div>
           </div>
@@ -430,16 +484,16 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
                 {[
                   { id: 'cni', label: 'CNI Ivoirienne' },
                   { id: 'passeport', label: 'Passeport' },
-                  { id: 'attestation', label: 'Attestation ONECI' }
+                  { id: isDriver ? 'attestation' : 'carte_consulaire', label: isDriver ? 'Attestation ONECI' : 'Carte Consulaire' }
                 ].map(item => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setDocType(item.id as any)}
-                    className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all text-center ${
+                    className={`p-2 rounded-xl text-xs font-bold border transition-all text-center ${
                       docType === item.id 
-                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm' 
-                        : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
+                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' 
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                     }`}
                   >
                     {item.label}
@@ -450,280 +504,285 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen, onClose }) => {
 
             <div>
               <label className="text-xs text-slate-300 font-bold block mb-1">
-                {translate("Numéro de la pièce d'identité (Identifiant Unique Anti-Fraude) :", "Identity Document Number (Unique Anti-Fraud ID):")}
+                {translate("Numéro de la pièce d'identité (Recherche anti-doublon) :", "Document ID number (Anti-duplicate search):")}
               </label>
               <input
                 type="text"
                 value={docNumber}
-                onChange={(e) => { setDocNumber(e.target.value.toUpperCase()); setErrorMessage(null); }}
-                placeholder="Ex: CI003928174 / C01928374"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono-num uppercase focus:outline-none focus:border-emerald-500"
-                required
+                onChange={(e) => setDocNumber(e.target.value.toUpperCase())}
+                placeholder="Ex: C011829482"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white uppercase font-mono focus:border-emerald-500 focus:outline-none"
               />
-              <p className="text-[10px] text-slate-400 mt-1">
-                {translate("Le numéro est vérifié contre la base anti-doublon et sécurisé.", "The document number is verified against the anti-duplicate escrow registry.")}
-              </p>
             </div>
           </div>
         )}
 
-        {/* Hidden File Input for Native Image Import / Mobile Camera */}
-        <input
-          ref={fileInputRef}
-          id="kyc-native-file-picker"
-          type="file"
-          accept="image/*"
-          capture={currentStep === 2 || currentStep === 4 ? "user" : "environment"}
-          onChange={handleFileUpload}
-          className="hidden"
-        />
+        {/* Step 4 Specific for Driver: Vehicle Registration, Plate & Color Information */}
+        {isDriver && currentStep === 4 && (
+          <div className="space-y-3 mb-4 p-3 bg-slate-950/70 rounded-2xl border border-amber-500/30">
+            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold pb-2 border-b border-slate-800">
+              <Bike className="w-4 h-4" />
+              <span>{translate("Identification du Véhicule ou Moto de Livraison", "Delivery Vehicle / Motorcycle Identification")}</span>
+            </div>
 
-        {/* Camera / Capture / Upload Area */}
-        <div className="mb-5">
-          {/* Active Camera Viewfinder */}
-          {isCameraActive ? (
-            <div className="rounded-2xl overflow-hidden border-2 border-emerald-500 bg-black relative aspect-video flex items-center justify-center shadow-2xl">
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                className="w-full h-full object-cover"
-              />
-              
-              {/* Overlay Guideline Box */}
-              <div className="absolute inset-0 border-2 border-dashed border-emerald-400/60 pointer-events-none m-4 sm:m-6 rounded-2xl flex items-center justify-center bg-emerald-500/5">
-                <span className="text-[11px] text-white font-bold bg-black/70 px-3 py-1 rounded-full backdrop-blur border border-white/20 shadow">
-                  {currentStep === 2 || currentStep === 4 
-                    ? translate("Cadrez votre visage et la pièce", "Frame your face and the ID") 
-                    : translate("Cadrez bien le document", "Frame document clearly")}
-                </span>
-              </div>
-
-              {/* Top Controls: Flip Front/Back Camera */}
-              <button
-                type="button"
-                onClick={toggleFacingMode}
-                className="absolute top-3 right-3 px-2.5 py-1.5 rounded-xl bg-slate-900/90 text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 shadow"
-                title="Basculer caméra avant / arrière"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>{facingMode === 'user' ? 'Caméra Arrière' : 'Caméra Avant (Selfie)'}</span>
-              </button>
-
-              {/* Bottom Shutter Buttons */}
-              <div className="absolute bottom-3 inset-x-0 flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={capturePhoto}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-xl flex items-center gap-2 transition-all hover:scale-105"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>{translate("Prendre la Photo", "Take Photo")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="px-3.5 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-bold border border-slate-700 transition-colors"
-                >
-                  {translate("Annuler", "Cancel")}
-                </button>
+            {/* Vehicle Type Selection */}
+            <div>
+              <label className="text-xs text-slate-300 font-bold block mb-1.5">
+                {translate("Type d'engin :", "Vehicle type:")}
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'moto', label: 'Moto / Scooter', icon: Bike },
+                  { id: 'cargo', label: 'Cargo / Fourgon / Tricycle', icon: Truck }
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setVehicleType(item.id as VehicleType)}
+                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
+                      vehicleType === item.id 
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-sm' 
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          ) : currentPhoto ? (
-            /* Photo Preview Card - High Visibility Full Display */
-            <div className="rounded-2xl overflow-hidden border-2 border-emerald-500/50 bg-slate-950 relative flex flex-col items-center justify-center shadow-xl">
-              <div className="w-full max-h-72 bg-black/90 flex items-center justify-center overflow-hidden p-2">
-                <img 
-                  src={currentPhoto} 
-                  alt="Capture KYC" 
-                  referrerPolicy="no-referrer"
-                  className="max-h-64 w-auto max-w-full object-contain rounded-xl shadow-md border border-slate-800"
-                />
-              </div>
 
-              {/* Status Header Badge */}
-              <div className="absolute top-3 right-3 bg-emerald-500 text-slate-950 font-extrabold text-[11px] px-3 py-1 rounded-full flex items-center gap-1.5 shadow-lg border border-white/30">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>{translate("✓ Photo Enregistrée & Prête", "✓ Photo Saved & Ready")}</span>
-              </div>
-
-              {/* Action Buttons underneath preview */}
-              <div className="w-full p-3 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium">
-                  <ImageIcon className="w-4 h-4 text-emerald-400" />
-                  <span>{translate("Image nette & lisible", "Clear & legible image")}</span>
+            {/* Plate (Matricule) & Color in 2 columns */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  {translate("Matricule / Plaque d'immatriculation * :", "License Plate / Registration *:")}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={vehiclePlate}
+                    onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())}
+                    placeholder="Ex: 4523 JJ 01 ou CI-3920-AB"
+                    className="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-amber-300 uppercase font-mono font-bold tracking-wider focus:border-amber-400 focus:outline-none"
+                  />
+                  <span className="absolute right-2.5 top-2.5 text-[10px] font-bold text-amber-500/60 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                    CI
+                  </span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      assignPhotoForCurrentStep('');
-                      startCamera();
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-all"
-                  >
-                    <Camera className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{translate("Reprendre Caméra", "Retake Camera")}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (fileInputRef.current) {
-                        fileInputRef.current.click();
-                      }
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 border border-slate-700 flex items-center gap-1.5 transition-all"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{translate("Changer de fichier", "Change file")}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            /* Option Select: Camera vs Import from Device vs Demo Example */
-            <div className="rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/60 p-5 sm:p-6 text-center space-y-4">
-              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
-                {currentStep === 2 || currentStep === 4 ? (
-                  <UserCheck className="w-7 h-7" />
-                ) : (
-                  <Camera className="w-7 h-7" />
-                )}
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {translate("Visible par le vendeur et l'acheteur lors des livraisons.", "Visible to buyer and seller during deliveries.")}
+                </p>
               </div>
 
               <div>
-                <p className="text-sm font-bold text-white">
-                  {currentStep === 2 || currentStep === 4 
-                    ? translate("Prenez un selfie tenant votre pièce à côté du visage", "Take a selfie holding your ID next to your face") 
-                    : translate("Capturez ou importez le document d'identité", "Capture or import identity document")}
-                </p>
-                <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                  {translate(
-                    "Choisissez ci-dessous pour utiliser votre appareil photo, importer une image de votre galerie ou utiliser une photo d'exemple.",
-                    "Choose below to use your camera, import an image from your gallery or use a demo photo."
-                  )}
-                </p>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  {translate("Couleur du véhicule / moto * :", "Vehicle / Motorcycle Color *:")}
+                </label>
+                <input
+                  type="text"
+                  value={vehicleColor}
+                  onChange={(e) => setVehicleColor(e.target.value)}
+                  placeholder="Ex: Noir & Rouge, Bleu Nuit, Blanc"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
+                />
+                {/* Quick color chips */}
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {['Noir', 'Rouge', 'Bleu', 'Blanc', 'Gris', 'Noir & Rouge'].map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setVehicleColor(c)}
+                      className={`text-[10px] px-2 py-0.5 rounded-full border transition-all ${
+                        vehicleColor === c 
+                          ? 'bg-amber-500 text-slate-950 font-bold border-amber-400' 
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Model input */}
+            <div>
+              <label className="text-xs text-slate-300 font-bold block mb-1">
+                {translate("Marque / Modèle de l'engin :", "Brand / Model of vehicle:")}
+              </label>
+              <input
+                type="text"
+                value={vehicleModel}
+                onChange={(e) => setVehicleModel(e.target.value)}
+                placeholder="Ex: Yamaha Crypton 110, TVS HLX 150, Boxer BM 150"
+                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Central View: Live Camera OR Captured Photo Preview */}
+        <div className="mb-4">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+
+          {isCameraActive ? (
+            <div className="relative rounded-2xl overflow-hidden bg-black aspect-video flex items-center justify-center border-2 border-emerald-500 shadow-xl">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
+
+              {/* Viewfinder Target Framing */}
+              <div className="absolute inset-0 m-4 rounded-xl border-2 border-dashed border-emerald-400/80 pointer-events-none flex items-center justify-center bg-emerald-500/5">
+                <span className="text-[10px] text-white font-bold bg-black/70 px-2.5 py-0.5 rounded-full">
+                  {(!isDriver && (currentStep === 2 || currentStep === 3)) || (isDriver && currentStep === 2)
+                    ? translate("Cadrez votre visage", "Center your face") 
+                    : translate("Cadrez le document", "Center the document")}
+                </span>
               </div>
 
-              {cameraError && (
-                <p className="text-xs text-amber-300 bg-amber-500/15 p-2.5 rounded-xl border border-amber-500/30 text-left">
-                  ⚠️ {cameraError}
-                </p>
+              {/* Controls bar inside camera view */}
+              <div className="absolute bottom-3 inset-x-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={toggleFacingMode}
+                  className="p-2 rounded-xl bg-black/60 text-slate-200 border border-white/20 hover:bg-black/80 transition-colors"
+                  title="Changer de caméra"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={capturePhoto}
+                  className="px-5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg transition-transform hover:scale-105 flex items-center gap-1.5"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>{translate("Capturer", "Capture")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="p-2 rounded-xl bg-black/60 text-rose-400 border border-white/20 hover:bg-black/80 transition-colors"
+                  title="Fermer la caméra"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {currentPhoto ? (
+                <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-emerald-500/50 p-2 text-center space-y-2">
+                  <img
+                    src={currentPhoto}
+                    alt={`Étape ${currentStep}`}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-44 object-cover rounded-xl"
+                  />
+                  <div className="flex items-center justify-center gap-1 text-xs text-emerald-400 font-bold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{translate("Photo Prête & Conforme", "Photo Ready & Compliant")}</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/40 text-center space-y-2">
+                  <Camera className="w-8 h-8 text-slate-600 mx-auto" />
+                  <p className="text-xs text-slate-400 font-medium">
+                    {translate("Aucune photo prise pour cette étape", "No photo captured for this step yet")}
+                  </p>
+                </div>
               )}
+            </div>
+          )}
 
-              {/* 3 Prominent Import Options */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
-                {/* 1. Camera Direct */}
-                <button
-                  id="btn-kyc-start-camera"
-                  type="button"
-                  onClick={() => startCamera()}
-                  className="p-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/20 transition-all hover:scale-[1.02]"
-                >
-                  <Camera className="w-5 h-5" />
-                  <span>{translate("Ouvrir la Caméra", "Open Camera")}</span>
-                  <span className="text-[9.5px] opacity-80 font-normal">{translate("Prendre photo en direct", "Take direct live photo")}</span>
-                </button>
+          {cameraError && (
+            <p className="text-[11px] text-amber-400 text-center mt-2">{cameraError}</p>
+          )}
 
-                {/* 2. Import from Device (File Picker) */}
-                <button
-                  id="btn-kyc-import-device"
-                  type="button"
-                  onClick={() => {
-                    if (fileInputRef.current) {
-                      fileInputRef.current.click();
-                    }
-                  }}
-                  className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-xs flex flex-col items-center justify-center gap-1.5 border border-slate-700 transition-all hover:scale-[1.02]"
-                >
-                  <Upload className="w-5 h-5 text-amber-400" />
-                  <span>{translate("Importer Appareil", "Import Device")}</span>
-                  <span className="text-[9.5px] text-slate-400 font-normal">{translate("Galerie / Fichiers", "Gallery / Files")}</span>
-                </button>
+          {/* Action triggers */}
+          {!isCameraActive && (
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => startCamera('user')}
+                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{translate("Prendre Photo (Caméra)", "Take Photo (Camera)")}</span>
+              </button>
 
-                {/* 3. Demo Preset Photo (1-Click Instant Test) */}
-                <button
-                  id="btn-kyc-use-demo-preset"
-                  type="button"
-                  onClick={handleUseDemoPhoto}
-                  className="p-3 rounded-2xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold text-xs flex flex-col items-center justify-center gap-1.5 border border-amber-500/30 transition-all hover:scale-[1.02]"
-                >
-                  <Sparkles className="w-5 h-5 text-amber-400" />
-                  <span>{translate("Photo Démo", "Demo Photo")}</span>
-                  <span className="text-[9.5px] text-amber-400/80 font-normal">{translate("Test 1-clic instantané", "Instant 1-click test")}</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5 text-blue-400" />
+                <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleUseDemoPhoto}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{translate("Photo Démo (1-Clic)", "Demo Photo (1-Click)")}</span>
+              </button>
             </div>
           )}
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
-          {currentStep > 1 ? (
+        {/* Modal Actions Footer */}
+        <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
+          <button
+            type="button"
+            onClick={handleBack}
+            disabled={currentStep === 1 || isSubmitting}
+            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 disabled:opacity-40 transition-colors"
+          >
+            {translate("Précédent", "Previous")}
+          </button>
+
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handlePrevStep}
-              className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all"
+              onClick={handleNext}
+              disabled={!canProceed() || isSubmitting}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-900/30 disabled:opacity-40 transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              ← {translate("Étape Précédente", "Previous Step")}
+              {isSubmitting ? (
+                <>
+                  <RotateCw className="w-4 h-4 animate-spin" />
+                  <span>{translate("Analyse Biométrique IA...", "AI Biometric Check...")}</span>
+                </>
+              ) : (
+                <>
+                  <span>{currentStep < totalSteps ? translate("Étape Suivante", "Next Step") : translate("Soumettre le Dossier", "Submit Dossier")}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
-          ) : (
-            <div />
-          )}
-
-          <button
-            id="btn-kyc-proceed-next"
-            type="button"
-            onClick={handleNextStep}
-            disabled={!canProceedToNext() || isSubmitting}
-            className={`px-5 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 transition-all shadow-lg ${
-              canProceedToNext() && !isSubmitting
-                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 shadow-emerald-500/20 cursor-pointer hover:scale-[1.02]'
-                : 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60'
-            }`}
-          >
-            {currentStep < totalSteps ? (
-              <span>{translate("Continuer vers l'Étape", "Continue to Step")} {currentStep + 1} →</span>
-            ) : (
-              <span>{translate("Soumettre mon Dossier KYC", "Submit my KYC Dossier")}</span>
-            )}
-          </button>
-        </div>
-
-        {/* Demo Admin Instant Validation Helper */}
-        <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-          <div className="flex items-center gap-1 text-slate-500">
-            <Lock className="w-3 h-3 text-slate-500" />
-            <span>{translate("Chiffrement Séquestre AES-256", "AES-256 Escrow Encryption")}</span>
           </div>
-
-          <button
-            id="btn-kyc-instant-approve-demo"
-            type="button"
-            onClick={() => {
-              adminInstantApproveMyKYC();
-              onClose();
-              addToast(
-                translate('KYC Validé Instantanément', 'KYC Approved Instantly'), 
-                translate('Votre compte est maintenant vérifié avec badge officiel.', 'Your account is now verified with official badge.'), 
-                'success'
-              );
-            }}
-            className="text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1 text-[10px]"
-          >
-            <Sparkles className="w-3 h-3" />
-            <span>{translate("⚡ Mode Démo : Valider KYC sans attente", "⚡ Demo Mode: Instant KYC Approval")}</span>
-          </button>
         </div>
 
-        {/* Visual KYC Guide Modal */}
+        {/* Dedicated Visual Guide Component Overlay */}
         <KYCDemoGuideModal 
           isOpen={demoGuideOpen} 
-          onClose={() => setDemoGuideOpen(false)} 
-          onApplyDemoPhoto={handleApplyDemoPhotoFromGuide} 
+          onClose={() => setDemoGuideOpen(false)}
+          onApplyDemoPhoto={handleApplyDemoPhotoFromGuide}
         />
       </div>
     </div>

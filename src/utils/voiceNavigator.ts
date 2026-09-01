@@ -385,6 +385,10 @@ class VoiceNavigatorService {
     playOrderAlertSound();
   }
 
+  public playWarningBeep() {
+    playOrderAlertSound();
+  }
+
   public playChime() {
     playOrderAlertSound();
   }

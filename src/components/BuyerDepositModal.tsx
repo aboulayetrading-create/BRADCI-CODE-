@@ -336,8 +336,8 @@ export const BuyerDepositModal: React.FC = () => {
             <Lock className="w-4 h-4" />
             <span>
               {isProcessing 
-                ? translate("Blocage Séquestre en cours...", "Locking Escrow...") 
-                : translate(`Bloquer sous Séquestre (${totalDeposit.toLocaleString('fr-FR')} F)`, `Lock in Escrow (${totalDeposit.toLocaleString('fr-FR')} F)`)}
+                ? translate("Pré-paiement Séquestre en cours...", "Processing Prepayment...") 
+                : translate(`Valider la Commande Prépayée (${totalDeposit.toLocaleString('fr-FR')} F)`, `Validate Prepaid Order (${totalDeposit.toLocaleString('fr-FR')} F)`)}
             </span>
           </button>
         </div>

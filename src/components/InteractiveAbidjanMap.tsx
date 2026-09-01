@@ -429,7 +429,7 @@ export const InteractiveAbidjanMap: React.FC<InteractiveAbidjanMapProps> = ({
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <img
-                        src={prod.imageUrl}
+                        src={prod.imageUrl || prod.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30'}
                         alt={prod.title}
                         className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-700"
                         referrerPolicy="no-referrer"

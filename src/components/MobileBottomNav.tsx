@@ -53,7 +53,7 @@ export const MobileBottomNav: React.FC = () => {
   return (
     <nav 
       id="mobile-bottom-nav" 
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#080C14]/95 backdrop-blur-xl border-t border-slate-800/90 px-2 py-1.5 shadow-2xl safe-area-inset-bottom"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B1021]/95 backdrop-blur-xl border-t border-[#222D4A] px-2 py-1.5 shadow-2xl safe-area-inset-bottom"
     >
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {/* 1. Explore / Auctions */}
@@ -62,11 +62,11 @@ export const MobileBottomNav: React.FC = () => {
           onClick={() => setActiveTab('explore')}
           className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all ${
             activeTab === 'explore' || activeTab === 'feed'
-              ? 'text-amber-400 font-bold'
+              ? 'text-[#FF5B00] font-bold'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Gavel className={`w-5 h-5 ${activeTab === 'explore' ? 'text-amber-400 scale-110' : ''}`} />
+          <Gavel className={`w-5 h-5 ${activeTab === 'explore' ? 'text-[#FF5B00] scale-110' : ''}`} />
           <span className="text-[10px] mt-0.5 tracking-tight">{translate("Enchères", "Auctions")}</span>
         </button>
 
@@ -74,22 +74,22 @@ export const MobileBottomNav: React.FC = () => {
         <button
           id="btn-mobile-nav-notifs"
           onClick={() => setNotificationsModalOpen(true)}
-          className="relative flex flex-col items-center justify-center w-12 py-1 rounded-xl text-slate-400 hover:text-amber-300 transition-all"
+          className="relative flex flex-col items-center justify-center w-12 py-1 rounded-xl text-slate-400 hover:text-[#FF5B00] transition-all"
         >
           <Bell className="w-5 h-5" />
           {unreadNotificationsCount > 0 && (
-            <span className="absolute top-0 right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[9px] flex items-center justify-center border border-[#080C14] animate-pulse">
+            <span className="absolute top-0 right-2 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[9px] flex items-center justify-center border border-[#0B1021] animate-pulse">
               {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
             </span>
           )}
           <span className="text-[10px] mt-0.5 tracking-tight">{translate("Notifs", "Notifs")}</span>
         </button>
 
-        {/* 3. Central Sell Action Button (Prominent) */}
+        {/* 3. Central Sell Action Button (Prominent Vibrant Orange #FF5B00) */}
         <button
           id="btn-mobile-nav-sell"
           onClick={handleSellClick}
-          className="flex flex-col items-center justify-center -mt-4 bg-gradient-to-tr from-amber-500 to-amber-400 text-slate-950 w-12 h-12 rounded-2xl shadow-xl shadow-amber-500/30 border-2 border-[#080C14] active:scale-95 transition-transform"
+          className="flex flex-col items-center justify-center -mt-4 bg-[#FF5B00] hover:bg-[#E05000] text-white w-12 h-12 rounded-2xl shadow-xl shadow-[#FF5B00]/30 border-2 border-[#0B1021] active:scale-95 transition-all cursor-pointer"
           title={translate("Publier une enchère", "Post an auction")}
         >
           <PlusCircle className="w-6 h-6 stroke-[2.5]" />
@@ -102,7 +102,7 @@ export const MobileBottomNav: React.FC = () => {
           onClick={() => setPricingModalOpen(true)}
           className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all ${
             activeTab === 'tarifs'
-              ? 'text-amber-400 font-bold'
+              ? 'text-[#1E53E5] font-bold'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
@@ -116,7 +116,7 @@ export const MobileBottomNav: React.FC = () => {
           onClick={handleProfileClick}
           className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all ${
             isProfileActive
-              ? 'text-amber-400 font-bold'
+              ? 'text-[#1E53E5] font-bold'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >

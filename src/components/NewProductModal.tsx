@@ -24,7 +24,10 @@ import {
   Trash2,
   Zap,
   Film,
-  Navigation
+  Navigation,
+  Building2,
+  Boxes,
+  FileText
 } from 'lucide-react';
 import { ListingType, VehicleType } from '../types';
 import { 
@@ -55,12 +58,24 @@ export const NewProductModal: React.FC = () => {
     currentUser?.hasShop ? 'shop' : 'auction'
   );
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<'High-Tech' | 'Mode & Luxe' | 'Maison & Électro' | 'Véhicules & Pièces' | 'Gaming' | 'Divers'>('High-Tech');
+  const [category, setCategory] = useState<'High-Tech' | 'Mode & Luxe' | 'Maison & Électro' | 'Véhicules & Pièces' | 'Gaming' | 'Divers' | 'Déstockage B2B'>('High-Tech');
   const [description, setDescription] = useState('');
   const [startingPrice, setStartingPrice] = useState(25000);
   const [reservePrice, setReservePrice] = useState(35000);
   const [buyNowPrice, setBuyNowPrice] = useState(25000);
   const [stockQuantity, setStockQuantity] = useState<number>(5);
+  
+  // B2B Déstockage / Liquidation Lot States
+  const [isB2BLot, setIsB2BLot] = useState<boolean>(false);
+  const [b2bSaleKind, setB2bSaleKind] = useState<'destockage' | 'liquidation'>('destockage');
+  const [b2bLotType, setB2bLotType] = useState<'it_fleet' | 'fashion_stock' | 'appliances_stock' | 'office_furniture' | 'wholesale_mix'>('it_fleet');
+  const [b2bCompanyName, setB2bCompanyName] = useState<string>(currentUser?.companyName || 'SITEL Technologies CI SAS');
+  const [b2bTotalUnitsCount, setB2bTotalUnitsCount] = useState<number>(50);
+  const [b2bEstimatedPublicValue, setB2bEstimatedPublicValue] = useState<number>(5000000);
+  const [b2bWarehouseLocation, setB2bWarehouseLocation] = useState<string>('Marcory Zone 4 / Vridi');
+  const [b2bInspectionAllowed, setB2bInspectionAllowed] = useState<boolean>(true);
+  const [b2bInspectionHours, setB2bInspectionHours] = useState<string>('Du Lundi au Vendredi, 09h00 - 16h00');
+
   const [commune, setCommune] = useState(userLocation?.commune || 'Cocody');
   const [pickupAddress, setPickupAddress] = useState(userLocation?.address || 'Boulevard Latrille, Résidence Soleil');
   const [pickupCoords, setPickupCoords] = useState<{ lat: number; lng: number } | undefined>(
@@ -311,21 +326,41 @@ export const NewProductModal: React.FC = () => {
 
     const success = publishProduct({
       title,
-      category,
+      category: isB2BLot ? 'Déstockage B2B' : category,
       description,
       startingPrice: Number(startingPrice),
       reservePrice: Number(reservePrice),
       buyNowPrice: listingType === 'shop' ? Number(buyNowPrice) : undefined,
-      stockQuantity: listingType === 'shop' ? Number(stockQuantity) : undefined,
+      stockQuantity: Number(stockQuantity || 1),
       listingType,
       commune,
       pickupAddress,
       pickupCoords: pickupCoords || getCommuneCoords(commune),
-      requiredVehicle,
+      requiredVehicle: isB2BLot ? 'cargo' : requiredVehicle,
       images: images.slice(0, 3),
       videoUrl: videoUrl || undefined,
       videoDurationSeconds: videoDuration || undefined,
-      isBoosted: isBoosted
+      isBoosted: isBoosted,
+      isB2BLot: isB2BLot,
+      b2bSaleKind: isB2BLot ? b2bSaleKind : undefined,
+      commissionRate: isB2BLot ? 0.05 : undefined,
+      b2bLotType: isB2BLot ? b2bLotType : undefined,
+      b2bCompanyName: isB2BLot ? b2bCompanyName : undefined,
+      b2bTotalUnitsCount: isB2BLot ? Number(b2bTotalUnitsCount) : undefined,
+      b2bEstimatedPublicValueFCFA: isB2BLot ? Number(b2bEstimatedPublicValue) : undefined,
+      b2bWarehouseLocation: isB2BLot ? b2bWarehouseLocation : undefined,
+      b2bInspectionAllowed: isB2BLot ? b2bInspectionAllowed : undefined,
+      b2bInspectionHours: isB2BLot ? b2bInspectionHours : undefined,
+      b2bManifest: isB2BLot ? [
+        {
+          id: 'man-1',
+          designation: title,
+          quantity: Number(b2bTotalUnitsCount),
+          unitCondition: 'tres_bon_etat',
+          estimatedUnitValueFCFA: Math.round(Number(b2bEstimatedPublicValue) / (Number(b2bTotalUnitsCount) || 1)),
+          specsSummary: description.substring(0, 100)
+        }
+      ] : undefined
     });
 
     if (success) {
@@ -398,58 +433,227 @@ export const NewProductModal: React.FC = () => {
           </p>
         </div>
 
-        {/* Format Selector: Enchère vs Boutique */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
+        {/* Format Selector: Enchère Unitaire vs Boutique vs Déstockage Lot B2B */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mb-5">
           <button
             type="button"
-            onClick={() => setListingType('auction')}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
-              listingType === 'auction'
+            onClick={() => { setListingType('auction'); setIsB2BLot(false); }}
+            className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-2.5 ${
+              listingType === 'auction' && !isB2BLot
                 ? 'bg-amber-500/15 border-amber-500 text-white shadow-lg shadow-amber-500/10'
                 : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
             }`}
           >
-            <div className={`p-2 rounded-xl shrink-0 ${listingType === 'auction' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
-              <Gavel className="w-5 h-5" />
+            <div className={`p-2 rounded-xl shrink-0 ${listingType === 'auction' && !isB2BLot ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+              <Gavel className="w-4 h-4" />
             </div>
             <div>
-              <div className="font-bold text-xs flex items-center gap-1.5">
-                <span>🔨 Enchère Express</span>
-                <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-black">
-                  Badge Enchère
-                </span>
+              <div className="font-bold text-xs flex items-center gap-1">
+                <span>🔨 Enchère Standard</span>
               </div>
               <p className="text-[10px] text-slate-400 mt-0.5">
-                Mise aux enchères avec règle des 5 offres et arbitrage vendeur.
+                Vente unitaire aux enchères.
               </p>
             </div>
           </button>
 
           <button
             type="button"
-            onClick={() => setListingType('shop')}
-            className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
-              listingType === 'shop'
+            onClick={() => { setListingType('shop'); setIsB2BLot(false); }}
+            className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-2.5 ${
+              listingType === 'shop' && !isB2BLot
                 ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10'
                 : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
             }`}
           >
-            <div className={`p-2 rounded-xl shrink-0 ${listingType === 'shop' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
-              <Store className="w-5 h-5" />
+            <div className={`p-2 rounded-xl shrink-0 ${listingType === 'shop' && !isB2BLot ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+              <Store className="w-4 h-4" />
             </div>
             <div>
-              <div className="font-bold text-xs flex items-center gap-1.5">
-                <span>🏪 Annonce Boutique</span>
-                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-black">
-                  Badge Boutique
-                </span>
+              <div className="font-bold text-xs flex items-center gap-1">
+                <span>🏪 Boutique</span>
               </div>
               <p className="text-[10px] text-slate-400 mt-0.5">
-                Achat immédiat en ligne avec vitrine certifiée et livraison directe.
+                Achat immédiat en ligne.
+              </p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setListingType('auction'); setIsB2BLot(true); setRequiredVehicle('cargo'); }}
+            className={`p-3 rounded-2xl border text-left transition-all flex items-start gap-2.5 ${
+              isB2BLot
+                ? 'bg-blue-600/20 border-blue-400 text-white shadow-lg shadow-blue-500/10'
+                : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            <div className={`p-2 rounded-xl shrink-0 ${isB2BLot ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold text-xs flex items-center gap-1 text-cyan-300">
+                <span>🏢 Déstockage B2B</span>
+                <span className="text-[9px] bg-blue-500/30 text-cyan-200 px-1 py-0.2 rounded font-black">LOTS</span>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Liquidation en gros volume / parcs.
               </p>
             </div>
           </button>
         </div>
+
+        {/* B2B Lot Specific Form Options */}
+        {isB2BLot && (
+          <div className="p-4 rounded-2xl bg-[#091326] border border-blue-500/40 mb-5 space-y-3.5 animate-in fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-blue-400" />
+                <span>Paramètres du Lot B2B & Enlèvement Entrepôt</span>
+              </span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1">
+                <span>Commission Brad'CI :</span>
+                <span className="font-black text-white">5% par article / lot</span>
+              </span>
+            </div>
+
+            {/* Selector between Déstockage vs Liquidation */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-semibold text-slate-300">
+                Type de publication & Badge affiché sur l'annonce :
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setB2bSaleKind('destockage')}
+                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    b2bSaleKind === 'destockage'
+                      ? 'bg-blue-600/30 border-blue-400 text-white shadow-md'
+                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-xs flex items-center gap-1.5 text-cyan-300">
+                      <span>📦 Déstockage</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                      Surplus, fins de série & invendus
+                    </p>
+                  </div>
+                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-500 text-white shrink-0">
+                    Badge Déstockage
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setB2bSaleKind('liquidation')}
+                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                    b2bSaleKind === 'liquidation'
+                      ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-md'
+                      : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold text-xs flex items-center gap-1.5 text-indigo-300">
+                      <span>⚖️ Liquidation</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                      Liquidation totale & parcs
+                    </p>
+                  </div>
+                  <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500 text-white shrink-0">
+                    Badge Liquidation
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Type de Lot
+                </label>
+                <select
+                  value={b2bLotType}
+                  onChange={(e) => setB2bLotType(e.target.value as any)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                >
+                  <option value="it_fleet">Parc Informatique (PC portables, serveurs, écrans)</option>
+                  <option value="fashion_stock">Stock Mode / Chaussures / Vêtements en gros</option>
+                  <option value="appliances_stock">Électroménager / Téléviseurs / Climatiseurs</option>
+                  <option value="office_furniture">Mobilier de Bureau & Chaises ergonomiques</option>
+                  <option value="wholesale_mix">Grossiste / Lots Mixtes & Quincaillerie</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Nombre Total d'Unités dans le Lot
+                </label>
+                <input
+                  type="number"
+                  min="2"
+                  value={b2bTotalUnitsCount}
+                  onChange={(e) => setB2bTotalUnitsCount(Number(e.target.value))}
+                  placeholder="Ex: 50 ordinateurs ou 100 paires"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Nom de l'Entreprise ou Vendeur
+                </label>
+                <input
+                  type="text"
+                  value={b2bCompanyName}
+                  onChange={(e) => setB2bCompanyName(e.target.value)}
+                  placeholder="Ex: SITEL Technologies CI ou Grossiste Yopougon"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Valeur Marchande Estimée du Lot (FCFA)
+                </label>
+                <input
+                  type="number"
+                  min="50000"
+                  step="10000"
+                  value={b2bEstimatedPublicValue}
+                  onChange={(e) => setB2bEstimatedPublicValue(Number(e.target.value))}
+                  placeholder="Ex: 5000000"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Emplacement Entrepôt / Lieu de Stockage & Enlèvement
+                </label>
+                <input
+                  type="text"
+                  value={b2bWarehouseLocation}
+                  onChange={(e) => setB2bWarehouseLocation(e.target.value)}
+                  placeholder="Ex: Zone Industrielle Marcory / Vridi - Hangar SITEL Logistique"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="sm:col-span-2 flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px]">
+                <span className="text-slate-300 font-medium">Visite & inspection physique autorisée avant clôture</span>
+                <input
+                  type="checkbox"
+                  checked={b2bInspectionAllowed}
+                  onChange={(e) => setB2bInspectionAllowed(e.target.checked)}
+                  className="w-4 h-4 accent-blue-500 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
             
@@ -616,30 +820,51 @@ export const NewProductModal: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-slate-300 font-medium block mb-1">Prix de départ (FCFA) :</label>
-                  <input
-                    type="number"
-                    min={1000}
-                    step={1000}
-                    value={startingPrice}
-                    onChange={(e) => setStartingPrice(Number(e.target.value))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono-num text-amber-400 focus:outline-none focus:border-amber-500"
-                    required
-                  />
-                </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-300 font-medium block mb-1">Prix de départ (FCFA) :</label>
+                    <input
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      value={startingPrice}
+                      onChange={(e) => setStartingPrice(Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono-num text-amber-400 focus:outline-none focus:border-amber-500"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <label className="text-xs text-slate-300 font-medium block mb-1">Prix de réserve conseillé :</label>
-                  <input
-                    type="number"
-                    min={startingPrice}
-                    step={1000}
-                    value={reservePrice}
-                    onChange={(e) => setReservePrice(Number(e.target.value))}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono-num text-slate-300 focus:outline-none focus:border-amber-500"
-                  />
+                  <div>
+                    <label className="text-xs text-slate-300 font-medium block mb-1">Prix de réserve conseillé :</label>
+                    <input
+                      type="number"
+                      min={startingPrice}
+                      step={1000}
+                      value={reservePrice}
+                      onChange={(e) => setReservePrice(Number(e.target.value))}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm font-mono-num text-slate-300 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-300 font-medium block mb-1 flex items-center justify-between">
+                      <span>Nombre d'articles (Lot) :</span>
+                      <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.2 rounded">Quantité</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={999}
+                      value={stockQuantity}
+                      onChange={(e) => setStockQuantity(Math.max(1, Number(e.target.value)))}
+                      className="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-sm font-mono-num text-white font-bold focus:outline-none focus:border-amber-500"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  <span>📦 Vous pouvez spécifier le nombre d'articles / pièces inclus dans cette enchère.</span>
                 </div>
               </div>
             )}
@@ -665,47 +890,33 @@ export const NewProductModal: React.FC = () => {
                   Tarif course estimé : ~{estDeliveryFee.toLocaleString('fr-FR')} F
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setRequiredVehicle('moto')}
-                  className={`p-2.5 rounded-xl border text-center flex flex-col items-center gap-1 transition-all ${
+                  className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all ${
                     requiredVehicle === 'moto'
-                      ? 'bg-emerald-500/15 border-emerald-500 text-white'
+                      ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-lg shadow-emerald-500/10'
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <Bike className={`w-5 h-5 ${requiredVehicle === 'moto' ? 'text-emerald-400' : 'text-slate-500'}`} />
-                  <span className="text-xs font-bold">Moto Express</span>
-                  <span className="text-[10px] text-slate-400">&lt; 10 kg</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setRequiredVehicle('voiture')}
-                  className={`p-2.5 rounded-xl border text-center flex flex-col items-center gap-1 transition-all ${
-                    requiredVehicle === 'voiture'
-                      ? 'bg-blue-500/15 border-blue-500 text-white'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Car className={`w-5 h-5 ${requiredVehicle === 'voiture' ? 'text-blue-400' : 'text-slate-500'}`} />
-                  <span className="text-xs font-bold">Voiture / Coffre</span>
-                  <span className="text-[10px] text-slate-400">10 à 50 kg</span>
+                  <Bike className={`w-6 h-6 ${requiredVehicle === 'moto' ? 'text-emerald-400' : 'text-slate-500'}`} />
+                  <span className="text-xs font-bold">🏍️ Moto Express</span>
+                  <span className="text-[10px] text-slate-400">Colis standards, cartons moyens (&lt; 15 kg)</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setRequiredVehicle('cargo')}
-                  className={`p-2.5 rounded-xl border text-center flex flex-col items-center gap-1 transition-all ${
+                  className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition-all ${
                     requiredVehicle === 'cargo'
-                      ? 'bg-purple-500/15 border-purple-500 text-white'
+                      ? 'bg-purple-500/15 border-purple-500 text-white shadow-lg shadow-purple-500/10'
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  <Truck className={`w-5 h-5 ${requiredVehicle === 'cargo' ? 'text-purple-400' : 'text-slate-500'}`} />
-                  <span className="text-xs font-bold">Cargo / Fourgon</span>
-                  <span className="text-[10px] text-slate-400">&gt; 50 kg (TV, Frigo)</span>
+                  <Truck className={`w-6 h-6 ${requiredVehicle === 'cargo' ? 'text-purple-400' : 'text-slate-500'}`} />
+                  <span className="text-xs font-bold">🚚 Cargo / Fourgon</span>
+                  <span className="text-[10px] text-slate-400">Gros volume, TV, Frigo, Mobilier (&gt; 15 kg)</span>
                 </button>
               </div>
             </div>

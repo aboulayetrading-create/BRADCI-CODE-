@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { 
   X, 
@@ -22,7 +23,12 @@ import {
   AlertTriangle,
   Navigation,
   Headphones,
-  Star
+  Star,
+  Gift,
+  Wallet,
+  Building2,
+  FileText,
+  Boxes
 } from 'lucide-react';
 import { PaymentMethod, VehicleType } from '../types';
 import { 
@@ -34,6 +40,7 @@ import {
   findNearestCommune,
   calculateDeliveryFee
 } from '../data/communes';
+import { evaluerCredibiliteVendeur } from '../utils/sellerCredibilityEngine';
 
 export const ProductDetailModal: React.FC = () => {
   const { 
@@ -52,13 +59,16 @@ export const ProductDetailModal: React.FC = () => {
     simulateFiveBids,
     translate,
     userLocation,
+    applyReferralBalanceToPurchase,
     addToast
   } = useApp();
 
   const [bidAmount, setBidAmount] = useState<number>(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('Wave');
+  const [paymentChoice, setPaymentChoice] = useState<'delivery' | 'direct'>('delivery');
   const [restockAmount, setRestockAmount] = useState<number>(5);
+  const [useShoppingBalance, setUseShoppingBalance] = useState<boolean>(true);
 
   // Buyer Delivery Location States
   const [buyerCommune, setBuyerCommune] = useState<string>(userLocation?.commune || 'Marcory');
@@ -68,6 +78,27 @@ export const ProductDetailModal: React.FC = () => {
   );
   const [isLocatingBuyer, setIsLocatingBuyer] = useState<boolean>(false);
   const [buyerGpsAccuracy, setBuyerGpsAccuracy] = useState<number | null>(userLocation?.accuracy || 15);
+  const [isPriceRising, setIsPriceRising] = useState<boolean>(false);
+  const [lastBidDifference, setLastBidDifference] = useState<number | null>(null);
+  const previousPriceRef = useRef<number>(productDetailModal?.currentPrice || 0);
+
+  const isProductShop = productDetailModal?.listingType === 'shop' || Boolean(productDetailModal?.shopId);
+  const currentModalPrice = productDetailModal?.currentPrice || 0;
+
+  // Track price changes to trigger real-time rise animation (must be before early return)
+  useEffect(() => {
+    if (!isProductShop && currentModalPrice > previousPriceRef.current && previousPriceRef.current > 0) {
+      const diff = currentModalPrice - previousPriceRef.current;
+      setLastBidDifference(diff);
+      setIsPriceRising(true);
+      const timer = setTimeout(() => {
+        setIsPriceRising(false);
+      }, 2400);
+      previousPriceRef.current = currentModalPrice;
+      return () => clearTimeout(timer);
+    }
+    previousPriceRef.current = currentModalPrice;
+  }, [currentModalPrice, isProductShop]);
 
   if (!productDetailModal) return null;
 
@@ -88,6 +119,9 @@ export const ProductDetailModal: React.FC = () => {
   const calculatedDeliveryFee = calculateDeliveryFee(prod.commune, buyerCommune, prod.requiredVehicle);
 
   const totalToPayBoutique = fixedPrice + calculatedDeliveryFee;
+  const availableShoppingBalance = currentUser?.referralBalance || 0;
+  const shoppingDiscount = (useShoppingBalance && availableShoppingBalance > 0) ? Math.min(availableShoppingBalance, totalToPayBoutique) : 0;
+  const finalToPayBoutique = Math.max(0, totalToPayBoutique - shoppingDiscount);
 
   const captureBuyerGPS = () => {
     setIsLocatingBuyer(true);
@@ -146,13 +180,15 @@ export const ProductDetailModal: React.FC = () => {
       setAuthModalOpen(true);
       return;
     }
+    if (useShoppingBalance && shoppingDiscount > 0) {
+      applyReferralBalanceToPurchase(shoppingDiscount);
+    }
     buyShopProductDirect(prod.id, selectedPaymentMethod);
   };
 
   const getVehicleIcon = (v: VehicleType) => {
     switch (v) {
       case 'cargo': return <Truck className="w-4 h-4 text-purple-400" />;
-      case 'voiture': return <Car className="w-4 h-4 text-blue-400" />;
       default: return <Bike className="w-4 h-4 text-emerald-400" />;
     }
   };
@@ -160,7 +196,6 @@ export const ProductDetailModal: React.FC = () => {
   const getVehicleLabel = (v: VehicleType) => {
     switch (v) {
       case 'cargo': return 'Fourgon / Cargo requis';
-      case 'voiture': return 'Voiture / Coffre requis';
       default: return 'Livraison Moto Express';
     }
   };
@@ -290,7 +325,19 @@ export const ProductDetailModal: React.FC = () => {
                 <span className="text-[10px] uppercase tracking-wider font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
                   {prod.category}
                 </span>
-                {isShop ? (
+                {prod.isB2BLot || prod.category === 'Déstockage B2B' ? (
+                  prod.b2bSaleKind === 'liquidation' ? (
+                    <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-indigo-500/40">
+                      <Building2 className="w-3 h-3 text-indigo-400" />
+                      <span>Liquidation ({prod.b2bTotalUnitsCount || 1} Unités)</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-cyan-300 bg-blue-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-blue-500/40">
+                      <Building2 className="w-3 h-3 text-cyan-400" />
+                      <span>Déstockage ({prod.b2bTotalUnitsCount || 1} Unités)</span>
+                    </span>
+                  )
+                ) : isShop ? (
                   <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-500/30">
                     <Store className="w-3 h-3" />
                     <span>Annonce Boutique</span>
@@ -338,23 +385,180 @@ export const ProductDetailModal: React.FC = () => {
                 {prod.description}
               </p>
 
+              {/* B2B Liquidation / Déstockage Details & Manifest */}
+              {(prod.isB2BLot || prod.category === 'Déstockage B2B') && (
+                <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-br from-[#0A1224] to-[#060B17] border border-blue-500/30 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
+                      <Building2 className="w-4 h-4 text-blue-400" />
+                      <span>{prod.b2bCompanyName || prod.sellerName}</span>
+                    </div>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      <span>Commission Brad'CI : 5% par article</span>
+                    </span>
+                  </div>
+
+                  {/* Warehouse Location & Inspection */}
+                  <div className="space-y-1 text-xs text-slate-300 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span><strong>Entrepôt / Retrait :</strong> {prod.b2bWarehouseLocation || prod.pickupAddress}</span>
+                    </div>
+                    {prod.b2bInspectionAllowed && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-cyan-300">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        <span><strong>Visite autorisée :</strong> {prod.b2bInspectionHours || 'Sur RDV avant clôture'}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Detailed Manifest Table */}
+                  {prod.b2bManifest && prod.b2bManifest.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
+                        <span className="flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Inventaire du Lot ({prod.b2bTotalUnitsCount || 1} pièces) :</span>
+                        </span>
+                        {prod.b2bEstimatedPublicValueFCFA && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            Valeur marchande : {prod.b2bEstimatedPublicValueFCFA.toLocaleString('fr-FR')} F
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 divide-y divide-slate-800/80 scrollbar-thin">
+                        {prod.b2bManifest.map((item) => (
+                          <div key={item.id} className="p-2 text-[11px] flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-white truncate">
+                                {item.quantity}x {item.designation}
+                              </div>
+                              {item.specsSummary && (
+                                <div className="text-[10px] text-slate-400 truncate">
+                                  {item.specsSummary}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-mono text-cyan-300 font-bold text-[11px] block">
+                                {(item.estimatedUnitValueFCFA * item.quantity).toLocaleString('fr-FR')} F
+                              </span>
+                              <span className="text-[9px] text-slate-500 font-mono">
+                                (~{item.estimatedUnitValueFCFA.toLocaleString('fr-FR')} F/u)
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Price card: Shop vs Auction */}
-              <div className={`mt-4 p-4 rounded-2xl bg-gradient-to-br ${
-                isShop 
-                  ? 'from-slate-900 via-emerald-950/20 to-[#0A101C] border border-emerald-500/30' 
-                  : 'from-slate-900 to-[#0A101C] border border-amber-500/20'
-              } shadow-lg`}>
-                <div className="flex justify-between items-end">
+              <motion.div 
+                animate={isPriceRising ? {
+                  scale: [1, 1.025, 1],
+                  borderColor: ['rgba(255, 91, 0, 0.3)', 'rgba(0, 200, 83, 0.9)', 'rgba(255, 91, 0, 0.4)'],
+                  boxShadow: [
+                    '0 10px 25px -5px rgba(0, 0, 0, 0.5)',
+                    '0 12px 35px -2px rgba(0, 200, 83, 0.35)',
+                    '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                  ]
+                } : {}}
+                transition={{ duration: 1.4, ease: 'easeOut' }}
+                className={`mt-4 p-4 rounded-2xl relative overflow-hidden bg-gradient-to-br ${
+                  isShop 
+                    ? 'from-slate-900 via-emerald-950/20 to-[#0A101C] border border-emerald-500/30 shadow-lg' 
+                    : isPriceRising
+                      ? 'from-[#151C33] via-emerald-950/30 to-[#0B1021] border border-[#00C853]/60 shadow-xl'
+                      : 'from-[#151C33] to-[#0B1021] border border-[#FF5B00]/30 shadow-lg shadow-[#FF5B00]/5'
+                } transition-all duration-500`}
+              >
+                {/* Visual pulse beam when price surges */}
+                <AnimatePresence>
+                  {isPriceRising && (
+                    <motion.div
+                      initial={{ x: '-100%', opacity: 0.6 }}
+                      animate={{ x: '200%', opacity: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 1.2, ease: 'easeInOut' }}
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-[#00C853]/25 to-transparent pointer-events-none skew-x-12"
+                    />
+                  )}
+                </AnimatePresence>
+
+                <div className="flex justify-between items-end relative z-10">
                   <div>
-                    <span className="text-[11px] text-slate-400 uppercase tracking-wider block">
-                      {isShop ? 'Prix Boutique Garanti :' : 'Offre Actuelle :'}
-                    </span>
-                    <span className={`text-2xl sm:text-3xl font-extrabold font-mono-num ${
-                      isShop ? 'text-emerald-400' : 'text-amber-400'
-                    }`}>
-                      {fixedPrice.toLocaleString('fr-FR')} F
-                    </span>
-                    <span className="text-xs text-slate-400 ml-1">CFA</span>
+                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                      <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-semibold">
+                        {isShop ? 'Prix Boutique Garanti :' : 'Offre Actuelle en Direct :'}
+                      </span>
+                      {!isShop && prod.bids.length > 0 && (
+                        <motion.span
+                          key={`live-badge-${prod.currentPrice}`}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.3 }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-[#FF5B00]/20 text-[#FF5B00] border border-[#FF5B00]/30 text-[9px] font-black uppercase tracking-wider animate-pulse"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#FF5B00] inline-block" />
+                          <span>Enchère Live</span>
+                        </motion.span>
+                      )}
+                      {!isShop && isPriceRising && lastBidDifference && (
+                        <motion.span
+                          initial={{ opacity: 0, y: 6, scale: 0.8 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00C853]/20 text-[#00C853] border border-[#00C853]/40 text-[10px] font-black uppercase tracking-wider shadow-sm"
+                        >
+                          <TrendingUp className="w-3 h-3 text-[#00C853]" />
+                          <span>+{lastBidDifference.toLocaleString('fr-FR')} F</span>
+                        </motion.span>
+                      )}
+                    </div>
+                    <div className="flex items-baseline overflow-hidden">
+                      <AnimatePresence mode="popLayout">
+                        <motion.span
+                          key={`price-${fixedPrice}`}
+                          initial={{ 
+                            opacity: 0, 
+                            y: -20, 
+                            scale: 0.88, 
+                            filter: 'blur(3px)',
+                            color: isShop ? '#00C853' : '#00E676'
+                          }}
+                          animate={{ 
+                            opacity: 1, 
+                            y: 0, 
+                            scale: [1.15, 1], 
+                            filter: 'blur(0px)',
+                            color: isShop ? '#00C853' : isPriceRising ? '#00E676' : '#FF5B00'
+                          }}
+                          exit={{ opacity: 0, y: 20, scale: 1.08, filter: 'blur(2px)' }}
+                          transition={{ 
+                            type: 'spring', 
+                            stiffness: 420, 
+                            damping: 22, 
+                            mass: 0.7 
+                          }}
+                          className={`text-2xl sm:text-3xl font-black font-mono-num inline-block ${
+                            isShop 
+                              ? 'text-[#00C853]' 
+                              : isPriceRising 
+                                ? 'text-[#00E676] drop-shadow-[0_0_12px_rgba(0,230,118,0.6)]' 
+                                : 'text-[#FF5B00] drop-shadow-sm'
+                          }`}
+                        >
+                          {fixedPrice.toLocaleString('fr-FR')} F
+                        </motion.span>
+                      </AnimatePresence>
+                      <span className="text-xs text-slate-400 ml-1.5 font-semibold">CFA</span>
+                    </div>
                   </div>
 
                   <div className="text-right">
@@ -366,7 +570,7 @@ export const ProductDetailModal: React.FC = () => {
                             <span>Stock Épuisé</span>
                           </span>
                         ) : (
-                          <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                          <span className="text-[10px] text-[#00C853] font-bold flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" />
                             <span>En Stock ({prod.stockQuantity ?? 1} dispo)</span>
                           </span>
@@ -378,7 +582,7 @@ export const ProductDetailModal: React.FC = () => {
                     ) : (
                       <div>
                         <span className="text-[10px] text-slate-400 block">Mise de départ :</span>
-                        <span className="text-xs text-slate-300 font-mono-num">{prod.startingPrice.toLocaleString('fr-FR')} F</span>
+                        <span className="text-xs text-slate-300 font-mono-num font-semibold">{prod.startingPrice.toLocaleString('fr-FR')} F</span>
                       </div>
                     )}
                   </div>
@@ -442,7 +646,7 @@ export const ProductDetailModal: React.FC = () => {
                     )}
                   </div>
                 )}
-              </div>
+              </motion.div>
 
               {/* Auction Specific Notice if 5 bids reached */}
               {!isShop && currentBidCount >= 5 && (
@@ -483,28 +687,32 @@ export const ProductDetailModal: React.FC = () => {
                     {prod.bids.length === 0 ? (
                       <p className="text-xs text-slate-500 italic">Aucune enchère pour le moment. Soyez le premier !</p>
                     ) : (
-                      [...prod.bids].reverse().map((b) => (
-                        <div 
+                      [...prod.bids].reverse().map((b, idx) => (
+                        <motion.div 
                           key={b.id} 
-                          className={`p-2 rounded-xl text-xs flex items-center justify-between ${
+                          layout
+                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          transition={{ duration: 0.25, delay: idx * 0.03 }}
+                          className={`p-2 rounded-xl text-xs flex items-center justify-between transition-colors ${
                             b.isLeading 
-                              ? 'bg-amber-500/10 border border-amber-500/30 text-amber-300' 
-                              : 'bg-slate-900/40 border border-slate-800 text-slate-300'
+                              ? 'bg-[#FF5B00]/15 border border-[#FF5B00]/40 text-white shadow-sm' 
+                              : 'bg-[#151C33] border border-[#222D4A] text-slate-300'
                           }`}
                         >
                           <div className="flex items-center gap-2">
                             <img src={b.bidderAvatar} className="w-5 h-5 rounded-full object-cover" />
-                            <span className="font-medium text-slate-200">{b.bidderName}</span>
+                            <span className="font-semibold text-slate-200">{b.bidderName}</span>
                             {b.isLeading && (
-                              <span className="text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 rounded">
+                              <span className="text-[9px] bg-[#FF5B00] text-white font-black px-1.5 rounded shadow-sm">
                                 EN TÊTE
                               </span>
                             )}
                           </div>
-                          <div className="text-right font-mono-num font-bold">
+                          <div className="text-right font-mono-num font-black text-white">
                             {b.amount.toLocaleString('fr-FR')} F
                           </div>
-                        </div>
+                        </motion.div>
                       ))
                     )}
                   </div>
@@ -518,7 +726,7 @@ export const ProductDetailModal: React.FC = () => {
                   <ul className="text-[11px] text-slate-300 space-y-1.5 pl-1">
                     <li className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      <span>Fonds consignés sous séquestre jusqu'à validation OTP livraison.</span>
+                      <span>Paiement Direct par API (Wave/MoMo/Carte) après inspection du colis sur place.</span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -546,11 +754,7 @@ export const ProductDetailModal: React.FC = () => {
                 </li>
                 <li className="flex items-start gap-1.5">
                   <span className="text-amber-400 font-bold">•</span>
-                  <span><strong>Conditions d'annulation :</strong> L'option "Refuser / Non-conforme" est débloquée sur place avec le livreur. En cas de refus avéré, <strong>la valeur intégrale de l'article vous est remboursée</strong> instantanément sous séquestre.</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-amber-400 font-bold">•</span>
-                  <span><strong>Frais de livraison :</strong> Les frais de course ({prod.deliveryFee?.toLocaleString('fr-FR') || '1 500'} FCFA) restent acquis au livreur pour couvrir son déplacement aller-retour à Abidjan.</span>
+                  <span><strong>Paiement Direct à la Livraison :</strong> Vous ne payez via l'application qu'une fois le livreur sur place et le colis vérifié conforme.</span>
                 </li>
                 <li className="flex items-start gap-1.5">
                   <span className="text-emerald-400 font-bold">✓</span>
@@ -660,6 +864,123 @@ export const ProductDetailModal: React.FC = () => {
                             />
                           </div>
 
+                          {/* Payment Choice Selector (Pay on Delivery vs Pay Immediately) */}
+                          <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-white block">
+                                {translate("Options de Paiement Sécurisé :", "Secure Payment Options:")}
+                              </span>
+                              {currentUser?.isCodSuspended && (
+                                <span className="text-[10px] bg-red-500/20 text-red-300 font-bold px-2 py-0.5 rounded-full border border-red-500/30">
+                                  ⚠️ Paiement Livraison Suspendu ({currentUser.prepaidOrdersCompletedCount || 0}/5 commandes prépayées)
+                                </span>
+                              )}
+                            </div>
+
+                            {currentUser?.isCodSuspended ? (
+                              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs space-y-2">
+                                <div className="flex items-start gap-2 text-red-400 font-bold">
+                                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                  <div>
+                                    <p>Option "Paiement à la Livraison" temporairement verrouillée</p>
+                                    <p className="text-[11px] font-normal text-slate-300 mt-0.5">
+                                      Suite à une absence ou une annulation lors de la présentation d'un livreur, vous devez régler d'avance <strong>5 commandes</strong> via dépôt sécurisé direct. Vous avez actuellement complété <strong>{currentUser.prepaidOrdersCompletedCount || 0}/5 commandes</strong>.
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-700">
+                                  <div 
+                                    className="bg-gradient-to-r from-amber-500 to-emerald-500 h-full rounded-full transition-all"
+                                    style={{ width: `${Math.min(100, ((currentUser.prepaidOrdersCompletedCount || 0) / 5) * 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : null}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                disabled={currentUser?.isCodSuspended}
+                                onClick={() => setPaymentChoice('delivery')}
+                                className={`p-2.5 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                                  currentUser?.isCodSuspended
+                                    ? 'bg-slate-950/50 border-slate-800/60 opacity-40 cursor-not-allowed text-slate-500'
+                                    : paymentChoice === 'delivery'
+                                      ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-sm'
+                                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black text-emerald-400">💵 Paiement à la Livraison</span>
+                                  <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded">
+                                    {currentUser?.isCodSuspended ? 'Suspendu' : 'Recommandé'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-300 leading-tight">
+                                  {currentUser?.isCodSuspended 
+                                    ? "Débloqué après 5 commandes prépayées avec succès." 
+                                    : "Inspectez votre colis devant le livreur, payez via Mobile Money sur place et donnez votre code OTP."}
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setPaymentChoice('direct')}
+                                className={`p-2.5 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                                  paymentChoice === 'direct' || currentUser?.isCodSuspended
+                                    ? 'bg-purple-500/15 border-purple-500 text-white shadow-sm ring-1 ring-purple-500/40'
+                                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black text-purple-400">🔒 Commande Prépayée (Séquestre)</span>
+                                  <span className="text-[9px] bg-purple-500/20 text-purple-300 font-bold px-1.5 py-0.5 rounded">
+                                    {currentUser?.isCodSuspended ? 'Obligatoire' : 'Sécurisé 100%'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-300 leading-tight">
+                                  Montant total bloqué sous séquestre d'avance. Remboursé intégralement sans frais si le colis est refusé/non-conforme à la livraison.
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Shopping Credit / Referral Balance Box */}
+                          <div className="p-3 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 text-xs space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                                <Gift className="w-4 h-4" />
+                                <span>{translate("Solde d'Achat (Crédit Cadeau / Parrainage) :", "Shopping Credit (Gift / Referral Balance):")}</span>
+                              </div>
+                              <span className="font-mono-num font-black text-sm text-emerald-300">
+                                {availableShoppingBalance.toLocaleString('fr-FR')} FCFA
+                              </span>
+                            </div>
+                            
+                            {availableShoppingBalance > 0 ? (
+                              <label className="flex items-center justify-between p-2 rounded-xl bg-slate-950/80 border border-emerald-500/40 cursor-pointer hover:bg-emerald-950/20 transition-all">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={useShoppingBalance}
+                                    onChange={(e) => setUseShoppingBalance(e.target.checked)}
+                                    className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-400 border-slate-700 bg-slate-900 accent-emerald-500"
+                                  />
+                                  <span className="text-slate-200 text-xs font-semibold">
+                                    {translate("Appliquer mon solde d'achat", "Apply my shopping credit")}
+                                  </span>
+                                </div>
+                                <span className="font-mono-num font-bold text-emerald-400 text-xs">
+                                  -{shoppingDiscount.toLocaleString('fr-FR')} FCFA
+                                </span>
+                              </label>
+                            ) : (
+                              <p className="text-[11px] text-slate-400">
+                                {translate("Aucun solde d'achat disponible. Invitez des proches via votre lien de parrainage pour recevoir 1 000 FCFA par ami certifié !", "No shopping credit available. Invite friends with your referral link to earn 1,000 FCFA per verified friend!")}
+                              </p>
+                            )}
+                          </div>
+
                           {/* Dynamic Cost Breakdown */}
                           <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
                             <div className="flex justify-between text-slate-300">
@@ -670,9 +991,15 @@ export const ProductDetailModal: React.FC = () => {
                               <span>🚚 {translate(`Frais Coursier (${prod.commune} ➔ ${buyerCommune}, ~${distKm} km)`, `Courier Fee (${prod.commune} ➔ ${buyerCommune}, ~${distKm} km)`)} :</span>
                               <span className="font-mono-num font-bold">+{calculatedDeliveryFee.toLocaleString('fr-FR')} FCFA</span>
                             </div>
+                            {shoppingDiscount > 0 && (
+                              <div className="flex justify-between text-emerald-400 text-[11px] font-bold">
+                                <span>🎁 {translate("Déduction Solde d'Achat", "Shopping Credit Discount")} :</span>
+                                <span className="font-mono-num">-{shoppingDiscount.toLocaleString('fr-FR')} FCFA</span>
+                              </div>
+                            )}
                             <div className="border-t border-slate-800 pt-1 flex justify-between font-black text-emerald-400">
-                              <span>🔒 {translate("Total Payé sous Séquestre", "Total Paid into Escrow")} :</span>
-                              <span className="font-mono-num text-sm">{totalToPayBoutique.toLocaleString('fr-FR')} FCFA</span>
+                              <span>💵 {paymentChoice === 'delivery' ? translate("Total à Payer à la Livraison :", "Total to Pay on Delivery:") : translate("Total Dépôt Séquestre :", "Total Escrow Deposit:")}</span>
+                              <span className="font-mono-num text-sm">{finalToPayBoutique.toLocaleString('fr-FR')} FCFA</span>
                             </div>
                           </div>
                         </div>
@@ -680,7 +1007,7 @@ export const ProductDetailModal: React.FC = () => {
                         {/* Payment Method Selector */}
                         <div>
                           <span className="text-[11px] text-slate-400 block font-medium mb-1.5">
-                            {translate("Sélectionnez le moyen de paiement pour le séquestre :", "Select payment method for escrow:")}
+                            {translate("Moyen de paiement Mobile Money :", "Mobile Money Payment Method:")}
                           </span>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
                             {(['Wave', 'Orange Money', 'MTN MoMo', 'Moov Money'] as PaymentMethod[]).map((method) => (
@@ -713,10 +1040,15 @@ export const ProductDetailModal: React.FC = () => {
                         {/* Direct Buy Button */}
                         <button
                           onClick={handleBuyShop}
-                          className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
                         >
                           <ShoppingBag className="w-4 h-4" />
-                          <span>{translate(`Acheter & Payer Séquestre (${totalToPayBoutique.toLocaleString('fr-FR')} FCFA)`, `Buy & Pay Escrow (${totalToPayBoutique.toLocaleString('fr-FR')} FCFA)`)}</span>
+                          <span>
+                            {paymentChoice === 'delivery' 
+                              ? translate(`Commander & Payer à la Livraison (${finalToPayBoutique.toLocaleString('fr-FR')} FCFA)`, `Order & Pay on Delivery (${finalToPayBoutique.toLocaleString('fr-FR')} FCFA)`)
+                              : translate(`Valider la Commande Prépayée (${finalToPayBoutique.toLocaleString('fr-FR')} FCFA)`, `Validate Prepaid Order (${finalToPayBoutique.toLocaleString('fr-FR')} FCFA)`)
+                            }
+                          </span>
                         </button>
                       </>
                     )}
@@ -777,13 +1109,26 @@ export const ProductDetailModal: React.FC = () => {
                       </div>
                     </div>
 
+                    {/* User Wallet Balance for Bidding Notice */}
+                    {currentUser && (
+                      <div className="mb-2.5 p-2 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between text-xs">
+                        <span className="text-slate-400 flex items-center gap-1.5 text-[11px]">
+                          <Wallet className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{translate("Votre Solde Disponible Wave/Wallet :", "Your Available Wave/Wallet Balance:")}</span>
+                        </span>
+                        <span className="font-mono-num font-bold text-amber-300 text-xs">
+                          {(currentUser.walletBalance || 0).toLocaleString('fr-FR')} FCFA
+                        </span>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-3 gap-1.5 mb-2.5">
                       {[5000, 10000, 25000].map((increment) => (
                         <button
                           key={increment}
                           type="button"
                           onClick={() => handlePlaceBid(prod.currentPrice + increment)}
-                          className="py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-mono-num font-bold transition-all"
+                          className="py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-mono-num font-bold transition-all cursor-pointer"
                         >
                           + {increment.toLocaleString('fr-FR')} F
                         </button>

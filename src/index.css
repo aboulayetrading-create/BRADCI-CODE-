@@ -1,18 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --bg-main: #080C14;
-  --bg-surface: #0E1626;
-  --bg-surface-elevated: #151F32;
-  --bg-card: #0F172A;
-  --bg-input: #131E30;
-  --border-color: #1E293B;
-  --border-subtle: #182234;
-  --text-primary: #F8FAFC;
+  --bg-main: #0B1021;
+  --bg-surface: #151C33;
+  --bg-surface-elevated: #1C2644;
+  --bg-card: #151C33;
+  --bg-input: #10162A;
+  --border-color: #222D4A;
+  --border-subtle: #1C2644;
+  --text-primary: #FFFFFF;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
-  --header-bg: rgba(8, 12, 20, 0.95);
-  --footer-bg: #060A10;
+  --header-bg: rgba(11, 16, 33, 0.96);
+  --footer-bg: #070B18;
+  --brand-blue: #1E53E5;
+  --brand-orange: #FF5B00;
+  --brand-green: #00C853;
 }
 
 html.light, body.light, [data-theme="light"] {
@@ -21,13 +24,16 @@ html.light, body.light, [data-theme="light"] {
   --bg-surface-elevated: #F1F5F9;
   --bg-card: #FFFFFF;
   --bg-input: #FFFFFF;
-  --border-color: #CBD5E1;
-  --border-subtle: #94A3B8;
-  --text-primary: #0A0F1D;
-  --text-secondary: #1E293B;
-  --text-muted: #475569;
+  --border-color: #E2E8F0;
+  --border-subtle: #CBD5E1;
+  --text-primary: #0D1326;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
   --header-bg: rgba(255, 255, 255, 0.98);
-  --footer-bg: #F1F5F9;
+  --footer-bg: #F8FAFC;
+  --brand-blue: #1E53E5;
+  --brand-orange: #FF5B00;
+  --brand-green: #00C853;
 }
 
 @layer base {
@@ -39,25 +45,33 @@ html.light, body.light, [data-theme="light"] {
 }
 
 /* =========================================================================
-   ULTRA-HIGH CONTRAST LIGHT THEME (OPTIMIZED FOR BLINDING OUTDOOR SUNLIGHT)
+   BRAD'CI DESIGN SYSTEM THEME RULES & OVERRIDES
    ========================================================================= */
 
-/* Root and Base Canvas */
+/* Dark Mode Canvas & Navy Onyx Backgrounds (#0B1021) */
+html.dark, html:not(.light) body {
+  background-color: #0B1021;
+  color: #FFFFFF;
+}
+
+/* Base Light Theme Canvas (#F8FAFC) & Text (#0D1326) */
 html.light,
 html.light body,
 [data-theme="light"],
 [data-theme="light"] body {
   background-color: #F8FAFC !important;
-  color: #0A0F1D !important;
+  color: #0D1326 !important;
 }
 
 /* Global Container Background Overrides in Light Mode */
+html.light .bg-\[\#0B1021\],
 html.light .bg-\[\#080C14\],
 html.light .bg-\[\#060A10\],
 html.light .bg-\[\#070B14\],
 html.light .bg-\[\#060A12\],
 html.light .bg-\[\#05080E\],
 html.light .bg-slate-950,
+[data-theme="light"] .bg-\[\#0B1021\],
 [data-theme="light"] .bg-\[\#080C14\],
 [data-theme="light"] .bg-\[\#060A10\],
 [data-theme="light"] .bg-\[\#070B14\],
@@ -65,7 +79,9 @@ html.light .bg-slate-950,
   background-color: #F8FAFC !important;
 }
 
-/* Surface & Cards in Light Mode: Pure Crisp White */
+/* Surface & Cards in Light Mode: Pure Crisp White (#FFFFFF) with Soft Shadows */
+html.light .bg-\[\#151C33\],
+html.light .bg-\[\#1C2644\],
 html.light .bg-\[\#0B111E\],
 html.light .bg-\[\#0C121E\],
 html.light .bg-\[\#0C1424\],
@@ -85,13 +101,15 @@ html.light .bg-slate-900\/70,
 html.light .bg-slate-900\/60,
 html.light .bg-slate-900\/50,
 html.light .bg-slate-900\/40,
+[data-theme="light"] .bg-\[\#151C33\],
 [data-theme="light"] .bg-\[\#0C121E\],
 [data-theme="light"] .bg-\[\#0B111E\],
 [data-theme="light"] .bg-slate-900 {
   background-color: #FFFFFF !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-/* Secondary Surface & Soft Containers */
+/* Secondary Surface & Soft Containers in Light Mode */
 html.light .bg-slate-800,
 html.light .bg-slate-800\/90,
 html.light .bg-slate-800\/80,
@@ -103,7 +121,7 @@ html.light .bg-slate-800\/40,
   background-color: #F1F5F9 !important;
 }
 
-/* Hover States */
+/* Hover States in Light Mode */
 html.light .hover\:bg-slate-800:hover,
 html.light .hover\:bg-slate-800\/80:hover,
 html.light .hover\:bg-slate-800\/50:hover,
@@ -116,11 +134,12 @@ html.light .hover\:bg-slate-900\/80:hover {
 html.light header#main-navbar,
 [data-theme="light"] header#main-navbar {
   background-color: rgba(255, 255, 255, 0.98) !important;
-  border-bottom-color: #CBD5E1 !important;
-  box-shadow: 0 2px 10px 0 rgba(0, 0, 0, 0.05) !important;
+  border-bottom-color: #E2E8F0 !important;
+  box-shadow: 0 2px 10px 0 rgba(0, 0, 0, 0.04) !important;
 }
 
-/* Crisp Sharp Borders in Light Mode */
+/* Light Mode Borders (#E2E8F0) */
+html.light .border-\[\#222D4A\],
 html.light .border-slate-800,
 html.light .border-slate-800\/80,
 html.light .border-slate-800\/60,
@@ -130,10 +149,10 @@ html.light .border-slate-700\/80,
 html.light .border-slate-700\/50,
 [data-theme="light"] .border-slate-800,
 [data-theme="light"] .border-slate-700 {
-  border-color: #CBD5E1 !important;
+  border-color: #E2E8F0 !important;
 }
 
-/* Deep Sunlight-Legible Text (Pure High Contrast Ink Blacks) */
+/* Text Hierarchy in Light Mode */
 html.light h1,
 html.light h2,
 html.light h3,
@@ -144,112 +163,98 @@ html.light h6,
 [data-theme="light"] h2,
 [data-theme="light"] h3,
 [data-theme="light"] h4 {
-  color: #0A0F1D !important;
+  color: #0D1326 !important;
 }
 
 html.light .text-slate-100,
 html.light .text-slate-200,
 [data-theme="light"] .text-slate-100,
 [data-theme="light"] .text-slate-200 {
-  color: #0A0F1D !important;
+  color: #0D1326 !important;
 }
 
 html.light .text-slate-300,
 html.light .text-slate-400,
 [data-theme="light"] .text-slate-300,
 [data-theme="light"] .text-slate-400 {
-  color: #1E293B !important;
+  color: #64748B !important;
 }
 
 html.light .text-slate-500,
 [data-theme="light"] .text-slate-500 {
-  color: #475569 !important;
+  color: #64748B !important;
 }
 
-/* Ensure text on cards and general containers is pitch dark */
-html.light div:not([class*="bg-amber"]):not([class*="bg-blue"]):not([class*="bg-emerald"]):not([class*="bg-red"]):not([class*="bg-indigo"]):not([class*="bg-purple"]) > .text-white,
-html.light span:not([class*="bg-"]):not([class*="text-amber"]):not([class*="text-emerald"]):not([class*="text-blue"]):not([class*="text-red"]):not([class*="text-purple"]) {
-  color: inherit;
+/* Specific Brand Accent Colors across the Platform */
+.bg-brand-blue {
+  background-color: #1E53E5 !important;
+}
+.text-brand-blue {
+  color: #1E53E5 !important;
+}
+.border-brand-blue {
+  border-color: #1E53E5 !important;
 }
 
-/* Button & Badge Contrast Rules in Light Mode */
-/* Amber/Yellow buttons: Black bold text */
-html.light .bg-amber-500,
-html.light .bg-amber-400,
-html.light .bg-yellow-400,
-[data-theme="light"] .bg-amber-500 {
-  color: #0A0F1D !important;
+.bg-brand-orange {
+  background-color: #FF5B00 !important;
+}
+.text-brand-orange {
+  color: #FF5B00 !important;
+}
+.border-brand-orange {
+  border-color: #FF5B00 !important;
 }
 
-/* Dark/Primary Colored buttons: Crisp White text */
-html.light .bg-blue-600,
-html.light .bg-blue-700,
-html.light .bg-emerald-600,
-html.light .bg-emerald-700,
-html.light .bg-red-600,
-html.light .bg-red-700,
-html.light .bg-indigo-600,
-html.light .bg-purple-600,
-html.light .bg-slate-950.text-white,
-[data-theme="light"] .bg-blue-600,
-[data-theme="light"] .bg-emerald-600,
-[data-theme="light"] .bg-red-600 {
+.bg-brand-green {
+  background-color: #00C853 !important;
+}
+.text-brand-green {
+  color: #00C853 !important;
+}
+.border-brand-green {
+  border-color: #00C853 !important;
+}
+
+.bg-brand-dark {
+  background-color: #0B1021 !important;
+}
+.bg-brand-card-dark {
+  background-color: #151C33 !important;
+}
+.border-brand-dark {
+  border-color: #222D4A !important;
+}
+
+/* Primary CTA Button: Vibrant Orange (#FF5B00) with Crisp White text */
+.btn-cta-orange,
+.bg-orange-600,
+.bg-orange-500 {
+  background-color: #FF5B00 !important;
   color: #FFFFFF !important;
 }
-
-/* Badges with Soft Backgrounds: Deep Rich Saturated Text for 100% Sunlight Contrast */
-html.light .bg-emerald-500\/10,
-html.light .bg-emerald-500\/20,
-[data-theme="light"] .bg-emerald-500\/10,
-[data-theme="light"] .bg-emerald-500\/20 {
-  background-color: #DCFCE7 !important;
-  color: #14532D !important;
-  border-color: #86EFAC !important;
-}
-html.light .bg-emerald-500\/10 *,
-html.light .bg-emerald-500\/20 * {
-  color: #14532D !important;
+.btn-cta-orange:hover,
+.bg-orange-600:hover,
+.bg-orange-500:hover {
+  background-color: #E05000 !important;
 }
 
-html.light .bg-amber-500\/10,
-html.light .bg-amber-500\/20,
-html.light .bg-amber-500\/30,
-[data-theme="light"] .bg-amber-500\/10,
-[data-theme="light"] .bg-amber-500\/20 {
-  background-color: #FEF3C7 !important;
-  color: #78350F !important;
-  border-color: #FCD34D !important;
+/* Secondary Button: Royal Blue (#1E53E5) */
+.btn-secondary-blue,
+.bg-blue-600 {
+  background-color: #1E53E5 !important;
+  color: #FFFFFF !important;
 }
-html.light .bg-amber-500\/10 *,
-html.light .bg-amber-500\/20 * {
-  color: #78350F !important;
+.btn-secondary-blue:hover,
+.bg-blue-600:hover {
+  background-color: #1643BF !important;
 }
 
-html.light .bg-blue-500\/10,
-html.light .bg-blue-500\/20,
-html.light .bg-blue-600\/20,
-[data-theme="light"] .bg-blue-500\/10,
-[data-theme="light"] .bg-blue-500\/20 {
-  background-color: #DBEAFE !important;
-  color: #1E3A8A !important;
-  border-color: #93C5FD !important;
-}
-html.light .bg-blue-500\/10 *,
-html.light .bg-blue-500\/20 * {
-  color: #1E3A8A !important;
-}
-
-html.light .bg-red-500\/10,
-html.light .bg-red-500\/20,
-[data-theme="light"] .bg-red-500\/10,
-[data-theme="light"] .bg-red-500\/20 {
-  background-color: #FEE2E2 !important;
-  color: #7F1D1D !important;
-  border-color: #FCA5A5 !important;
-}
-html.light .bg-red-500\/10 *,
-html.light .bg-red-500\/20 * {
-  color: #7F1D1D !important;
+/* Validated & OTP Badge: Crisp Green (#00C853) */
+.badge-otp-green,
+.text-emerald-400,
+.text-emerald-500 {
+  color: #00C853 !important;
 }
 
 /* Inputs, Selects, and Textareas in Light Mode */
@@ -260,48 +265,48 @@ html.light textarea,
 [data-theme="light"] select,
 [data-theme="light"] textarea {
   background-color: #FFFFFF !important;
-  color: #0A0F1D !important;
+  color: #0D1326 !important;
   border-color: #CBD5E1 !important;
-  font-weight: 600 !important;
+  font-weight: 500 !important;
 }
 
 html.light input:focus,
 html.light select:focus,
 html.light textarea:focus {
-  border-color: #F59E0B !important;
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2) !important;
+  border-color: #1E53E5 !important;
+  box-shadow: 0 0 0 2px rgba(30, 83, 229, 0.2) !important;
 }
 
 html.light input::placeholder,
 html.light textarea::placeholder,
 [data-theme="light"] input::placeholder,
 [data-theme="light"] textarea::placeholder {
-  color: #64748B !important;
+  color: #94A3B8 !important;
   font-weight: 400 !important;
 }
 
-/* Modals Overlay Backdrop in Light Mode */
+/* Modals Overlay Backdrop */
 html.light .bg-black\/80,
 html.light .bg-black\/85,
 html.light .bg-black\/90,
 [data-theme="light"] .bg-black\/80,
 [data-theme="light"] .bg-black\/85 {
-  background-color: rgba(15, 23, 42, 0.65) !important;
+  background-color: rgba(13, 19, 38, 0.6) !important;
   backdrop-filter: blur(8px) !important;
 }
 
 /* Modal and Dropdown Cards in Light Mode */
 html.light .shadow-2xl,
 [data-theme="light"] .shadow-2xl {
-  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.15), 0 0 1px 1px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.1), 0 0 1px 1px rgba(0, 0, 0, 0.05) !important;
 }
 
 /* Footer in Light Mode */
 html.light footer,
 [data-theme="light"] footer {
-  background-color: #F1F5F9 !important;
-  border-top-color: #CBD5E1 !important;
-  color: #334155 !important;
+  background-color: #F8FAFC !important;
+  border-top-color: #E2E8F0 !important;
+  color: #64748B !important;
 }
 
 /* Custom Modern Scrollbars */
@@ -313,20 +318,20 @@ html.light footer,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #222D4A;
   border-radius: 9999px;
 }
 html.light ::-webkit-scrollbar-thumb {
   background: #CBD5E1;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #3B4B75;
 }
 html.light ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
 
-/* Subtle Fintech Grid Background */
+/* Subtle Grid Background */
 .fintech-grid {
   background-size: 32px 32px;
   background-image: 
@@ -340,16 +345,16 @@ html.light .fintech-grid {
     linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
 }
 
-.glow-amber {
-  box-shadow: 0 0 35px -8px rgba(245, 158, 11, 0.25);
+.glow-orange {
+  box-shadow: 0 0 35px -8px rgba(255, 91, 0, 0.35);
 }
 
-.glow-cyan {
-  box-shadow: 0 0 35px -8px rgba(6, 182, 212, 0.25);
+.glow-blue {
+  box-shadow: 0 0 35px -8px rgba(30, 83, 229, 0.35);
 }
 
-.glow-emerald {
-  box-shadow: 0 0 35px -8px rgba(16, 185, 129, 0.25);
+.glow-green {
+  box-shadow: 0 0 35px -8px rgba(0, 200, 83, 0.35);
 }
 
 .font-display {

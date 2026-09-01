@@ -101,45 +101,45 @@ export const SecurityGuideView: React.FC = () => {
             04
           </div>
           <h3 className="text-lg font-bold text-white">
-            {translate("Sécurité Anti-Fraude KYC & Séquestre Garanti", "Anti-Fraud KYC & Guaranteed Escrow")}
+            {translate("Sécurité Anti-Fraude KYC & Paiement Direct à la Livraison (POD)", "Anti-Fraud KYC & Direct Pay on Delivery (POD)")}
           </h3>
           <p className="text-xs text-slate-300 leading-relaxed">
             {translate(
-              "Détection automatique des doublons d'identité. Les fonds de chaque vente sont bloqués sous séquestre Wave/Orange/MTN/Moov et débloqués uniquement après remise en main propre et code OTP.",
-              "Automatic identity duplicate detection. All transaction funds are held in Wave/Orange/MTN/Moov escrow and only released after physical inspection and OTP code."
+              "Détection automatique des doublons d'identité. Aucun blocage de fonds en amont : le paiement s'effectue directement via API (Wave, Orange Money, MTN MoMo, Moov, Carte) uniquement lorsque le livreur arrive et après vérification du colis.",
+              "Automatic identity duplicate detection. Zero upfront fund holding: payment is executed directly via API (Wave, Orange Money, MTN MoMo, Moov, Card) only when the courier arrives and after parcel verification."
             )}
           </p>
           <div className="text-[11px] text-red-300 bg-red-500/10 p-2.5 rounded-xl border border-red-500/20">
-            {translate("🛡️ Zéro arnaque : remboursement garanti en cas de non-conformité.", "🛡️ Zero scams: guaranteed instant refund if item is non-compliant.")}
+            {translate("🛡️ Zéro arnaque : vous ne payez que le produit que vous avez entre les mains.", "🛡️ Zero scams: you only pay for the product in your hands.")}
           </div>
         </div>
       </div>
 
-      {/* Escrow Mechanism Explanation */}
+      {/* Pay on Delivery Mechanism Explanation */}
       <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#0C1424] to-[#070B14] border border-slate-800 space-y-4">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Lock className="w-5 h-5 text-amber-400" />
-          <span>{translate("Le Mécanisme du Compte Séquestre Garanti Multi-Opérateurs (Escrow)", "The Multi-Operator Guaranteed Escrow Mechanism")}</span>
+          <ShieldCheck className="w-5 h-5 text-amber-400" />
+          <span>{translate("Le Mécanisme du Paiement Direct à la Livraison (Pay on Delivery API)", "The Direct Pay on Delivery Mechanism (API)")}</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
           {translate(
-            "Lorsqu'une vente ou une enchère est conclue, les fonds de l'acheteur sont immédiatement consignés sous séquestre sécurisé via Wave, Orange Money, MTN MoMo, Moov Money ou Carte Bancaire. Le livreur achemine le colis. L'acheteur inspecte physiquement le produit puis communique son Code Secret OTP à 4 chiffres au livreur. La validation de ce code déclenche instantanément le virement garanti au vendeur et au transporteur.",
-            "When a sale or auction concludes, buyer funds are securely deposited in escrow via Wave, Orange Money, MTN MoMo, Moov Money, or Credit Card. The courier transports the package. The buyer inspects the item physically, then shares their 4-digit OTP Code with the courier. Validating the code triggers instantaneous payouts to both seller and courier."
+            "L'acheteur passe commande ou gagne une enchère sans aucun débit préalable. Le livreur achemine le colis et signale son arrivée par GPS. L'acheteur examine le produit, initie son paiement direct via l'API de son choix (Wave, Orange Money, MTN MoMo, Moov Money, Carte), puis transmet son code secret OTP au livreur pour clôturer la livraison avec répartition automatique des fonds.",
+            "The buyer places an order or wins an auction without upfront debit. The driver transports the package and reports GPS arrival. The buyer inspects the item, initiates direct payment via their chosen API (Wave, Orange Money, MTN MoMo, Moov Money, Card), and provides the secret OTP code to complete delivery with automatic split payout."
           )}
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
           <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-center">
-            <span className="text-amber-400 font-mono font-black text-sm block">1. {translate("Séquestre Garanti", "Guaranteed Escrow")}</span>
-            <span className="text-[11px] text-slate-400">{translate("Wave, Orange, MTN, Moov consignés", "Wave, Orange, MTN, Moov locked")}</span>
+            <span className="text-amber-400 font-mono font-black text-sm block">1. {translate("Arrivée GPS Livreur", "Driver GPS Arrival")}</span>
+            <span className="text-[11px] text-slate-400">{translate("Bouton de paiement débloqué", "Payment button unlocked")}</span>
           </div>
           <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-center">
-            <span className="text-blue-400 font-mono font-black text-sm block">2. {translate("Inspection Physique", "Physical Inspection")}</span>
-            <span className="text-[11px] text-slate-400">{translate("Vérification contradictoire du colis", "Hands-on item verification")}</span>
+            <span className="text-blue-400 font-mono font-black text-sm block">2. {translate("Paiement API Acheteur", "Buyer API Payment")}</span>
+            <span className="text-[11px] text-slate-400">{translate("Wave, Orange, MTN, Moov, Carte", "Wave, Orange, MTN, Moov, Card")}</span>
           </div>
           <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-center">
-            <span className="text-emerald-400 font-mono font-black text-sm block">3. {translate("Déblocage OTP", "OTP Code Release")}</span>
-            <span className="text-[11px] text-slate-400">{translate("Virement instantané garanti", "Guaranteed instant payout")}</span>
+            <span className="text-emerald-400 font-mono font-black text-sm block">3. {translate("Validation OTP Livreur", "Driver OTP Validation")}</span>
+            <span className="text-[11px] text-slate-400">{translate("Répartition atomique immédiate", "Immediate atomic split payout")}</span>
           </div>
         </div>
       </div>
