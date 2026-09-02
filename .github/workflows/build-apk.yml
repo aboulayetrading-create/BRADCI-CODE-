@@ -28,11 +28,12 @@ jobs:
           export CI=false
           npm run build || npx vite build
 
-      - name: Configure Capacitor & Add Android
+      - name: Configure Capacitor & Generate Android Platform
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
           npx cap init "BRAD'CI" "com.bradci.app" --web-dir dist || true
-          npx cap add android || true
+          rm -rf android
+          npx cap add android
           npx cap sync android
 
       - name: Setup Java JDK 17
@@ -41,11 +42,14 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload Production APK
         uses: actions/upload-artifact@v4
