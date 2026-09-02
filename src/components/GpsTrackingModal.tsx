@@ -4,6 +4,8 @@ import {
   X, 
   MapPin, 
   Bike, 
+  Car,
+  Truck,
   Phone, 
   ShieldCheck, 
   KeyRound, 
@@ -416,11 +418,28 @@ export const GpsTrackingModal: React.FC = () => {
             <div className="mb-4 p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                    <Bike className="w-5 h-5" />
+                  <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${
+                    job.requiredVehicle === 'voiture' || job.requiredVehicle === 'car'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                      : job.requiredVehicle === 'cargo'
+                      ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                  }`}>
+                    {job.requiredVehicle === 'voiture' || job.requiredVehicle === 'car' ? (
+                      <Car className="w-5 h-5 animate-pulse" />
+                    ) : job.requiredVehicle === 'cargo' ? (
+                      <Truck className="w-5 h-5 animate-pulse" />
+                    ) : (
+                      <Bike className="w-5 h-5 animate-bounce" />
+                    )}
                   </div>
                   <div className="min-w-0">
-                    <p className="font-bold text-sm text-white truncate">{job.assignedDriverName || 'Bakary Traoré'}</p>
+                    <p className="font-bold text-sm text-white truncate">
+                      {job.assignedDriverName || 'Bakary Traoré'} 
+                      <span className="ml-2 text-xs text-slate-400 font-normal">
+                        ({job.requiredVehicle === 'voiture' || job.requiredVehicle === 'car' ? 'Voiture' : job.requiredVehicle === 'cargo' ? 'Camionnette' : 'Moto'})
+                      </span>
+                    </p>
                     <p className="text-xs text-emerald-400 font-medium">Livreur Certifié Brad'CI • Paiement Direct à la Livraison</p>
                     <p className="text-[11px] text-slate-400 font-mono mt-0.5">{job.assignedDriverPhone || '+225 01 44 77 89 22'}</p>
                   </div>

@@ -15,6 +15,7 @@ import {
   Scan
 } from 'lucide-react';
 import { verifyFacialBiometrics, BiometricCheckResult, STRICT_BIOMETRIC_REJECTION_MESSAGE_FR, STRICT_BIOMETRIC_REJECTION_MESSAGE_EN } from '../utils/biometricVerification';
+import { nativeBridge } from '../utils/nativeBridge';
 
 const PRESET_AVATARS = [
   {
@@ -79,6 +80,36 @@ export const ProfileAvatarModal: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!profileAvatarModalOpen || !currentUser) return null;
+
+  // Native Capacitor Camera & Gallery capture with browser fallback
+  const captureWithNativeCamera = async (source: 'camera' | 'photos') => {
+    try {
+      const result = await nativeBridge.capturePhoto({
+        source,
+        direction: 'user',
+        quality: 90
+      });
+      if (result && result.dataUrl) {
+        setSelectedAvatar(result.dataUrl);
+        setBiometricError(null);
+        setBiometricSuccess(null);
+        addToast(
+          translate('Photo chargée', 'Photo loaded'),
+          translate('Aperçu mis à jour. Cliquez sur Valider pour la vérification biométrique.', 'Preview updated. Click Save for biometric check.'),
+          'success'
+        );
+      }
+    } catch (err: any) {
+      console.warn('Native photo capture cancelled or failed:', err?.message);
+      if (!nativeBridge.isNative()) {
+        if (source === 'camera') {
+          startCamera('user');
+        } else {
+          fileInputRef.current?.click();
+        }
+      }
+    }
+  };
 
   const startCamera = async (mode: 'user' | 'environment' = facingMode) => {
     try {
@@ -329,12 +360,12 @@ export const ProfileAvatarModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Action Buttons: Camera & Gallery */}
+              {/* Action Buttons: Camera & Gallery (Capacitor Native + Web Fallback) */}
               <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => startCamera('user')}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-colors flex items-center gap-1.5"
+                  onClick={() => captureWithNativeCamera('camera')}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   <Camera className="w-4 h-4" />
                   <span>{translate("Prendre une Photo (Caméra)", "Take Photo (Camera)")}</span>
@@ -342,8 +373,8 @@ export const ProfileAvatarModal: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3.5 py-2 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 border border-blue-500/30 text-xs font-bold transition-colors flex items-center gap-1.5"
+                  onClick={() => captureWithNativeCamera('photos')}
+                  className="px-3.5 py-2 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 border border-blue-500/30 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   <Upload className="w-4 h-4" />
                   <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>

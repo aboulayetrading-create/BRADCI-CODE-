@@ -116,7 +116,7 @@ export const DriverDashboard: React.FC = () => {
         <Lock className="w-10 h-10 text-red-400 mx-auto mb-3" />
         <h3 className="text-lg font-bold text-white">Accès Restreint Livreur (RBAC)</h3>
         <p className="text-xs text-slate-300 mt-2">
-          Cet espace et la bourse de fret sont strictement réservés aux livreurs agréés Brad'CI.
+          Cet espace et la bourse de fret sont strictement réservés aux livreurs agréés BRAD'CI.
         </p>
         <div className="mt-4 pt-4 border-t border-slate-800">
           <p className="text-xs text-slate-400 mb-3">Sélectionnez un compte livreur disponible pour accéder :</p>
@@ -167,8 +167,13 @@ export const DriverDashboard: React.FC = () => {
 
   const getVehicleIcon = (v: VehicleType) => {
     switch (v) {
-      case 'cargo': return <Truck className="w-4 h-4 text-purple-400" />;
-      default: return <Bike className="w-4 h-4 text-emerald-400" />;
+      case 'voiture':
+      case 'car':
+        return <Car className="w-4 h-4 text-amber-400" />;
+      case 'cargo':
+        return <Truck className="w-4 h-4 text-purple-400" />;
+      default:
+        return <Bike className="w-4 h-4 text-emerald-400" />;
     }
   };
 
@@ -280,29 +285,11 @@ export const DriverDashboard: React.FC = () => {
             <button
               onClick={() => window.dispatchEvent(new CustomEvent('bradci_open_support', { detail: { tab: 'human' } }))}
               className="px-3.5 py-2 rounded-2xl font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 shadow-sm flex items-center gap-1.5 cursor-pointer transition-all"
-              title="Contacter le service client Brad'CI en direct"
+              title="Contacter le service client BRAD'CI en direct"
             >
               <Headphones className="w-4 h-4" />
-              <span>Assistance Brad'CI 24/7</span>
+              <span>Assistance BRAD'CI 24/7</span>
             </button>
-
-            {/* Simulate Incoming 30s Dispatch Offer */}
-            {isOnline && (
-              <button
-                id="btn-simulate-dispatch-order"
-                onClick={() => {
-                  const jobToOffer = freightJobs.find(j => j.status === 'available') || freightJobs[0];
-                  if (jobToOffer) {
-                    triggerOrderDispatchToDriver(jobToOffer);
-                  }
-                }}
-                className="px-3.5 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-md"
-                title="Déclencher la fenêtre d'affectation avec alerte sonore et compte à rebours de 30s"
-              >
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>Simuler Course Entrante (30s)</span>
-              </button>
-            )}
 
             {/* Availability status toggle button */}
             <button
@@ -894,14 +881,7 @@ export const DriverDashboard: React.FC = () => {
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-between gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setAbsentTimerSeconds(0)}
-                              className="text-[10px] text-slate-400 hover:text-amber-300 underline"
-                            >
-                              [Simuler fin du chrono 20 min]
-                            </button>
+                          <div className="flex items-center justify-end">
                             <span className="text-[10px] text-amber-400 font-medium">Alerte envoyée au client</span>
                           </div>
                         )}
@@ -1134,7 +1114,7 @@ export const DriverDashboard: React.FC = () => {
 
               {/* Vehicle filters */}
               <div className="flex gap-1">
-                {['Tous', 'moto', 'cargo'].map((v) => (
+                {['Tous', 'moto', 'voiture', 'cargo'].map((v) => (
                   <button
                     key={v}
                     id={`driver-vehicle-filter-${v}`}
@@ -1145,7 +1125,7 @@ export const DriverDashboard: React.FC = () => {
                         : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                   >
-                    {v === 'Tous' ? 'Tous' : (v === 'moto' ? '🏍️ Moto' : '🚚 Cargo')}
+                    {v === 'Tous' ? 'Tous' : (v === 'moto' ? '🏍️ Moto' : v === 'voiture' ? '🚗 Voiture' : '🚚 Cargo')}
                   </button>
                 ))}
               </div>
@@ -1347,7 +1327,7 @@ export const DriverDashboard: React.FC = () => {
                 <span className="text-slate-400">Statut KYC :</span>
                 <span className="text-emerald-400 font-bold flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Vérifié & Agrée Brad'CI</span>
+                  <span>Vérifié & Agrée BRAD'CI</span>
                 </span>
               </div>
 
@@ -1372,8 +1352,20 @@ export const DriverDashboard: React.FC = () => {
           <div className="p-6 rounded-3xl bg-[#0C121E] border border-slate-800 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
-                  <Bike className="w-5 h-5" />
+                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${
+                  currentUser.kycVehicleType === 'voiture' || currentUser.kycVehicleType === 'car'
+                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+                    : currentUser.kycVehicleType === 'cargo'
+                    ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                    : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                }`}>
+                  {currentUser.kycVehicleType === 'voiture' || currentUser.kycVehicleType === 'car' ? (
+                    <Car className="w-5 h-5" />
+                  ) : currentUser.kycVehicleType === 'cargo' ? (
+                    <Truck className="w-5 h-5" />
+                  ) : (
+                    <Bike className="w-5 h-5" />
+                  )}
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-white">Véhicule & Matériel Déclaré</h4>

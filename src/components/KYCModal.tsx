@@ -11,6 +11,7 @@ import {
   UserCheck, 
   Truck, 
   Bike,
+  Car,
   Palette,
   Sparkles, 
   RotateCw,
@@ -22,7 +23,9 @@ import {
   Check,
   HelpCircle,
   BookOpen,
-  ArrowRight
+  ArrowRight,
+  Zap,
+  Info
 } from 'lucide-react';
 import { UserRole, VehicleType } from '../types';
 import { getTranslation } from '../utils/translations';
@@ -45,11 +48,83 @@ const DEMO_KYC_PHOTOS = {
   vehicleReg: 'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&w=800&q=80'
 };
 
+// Popular vehicle models and presets used in Abidjan & Yango Delivery fleets
+interface VehiclePresetItem {
+  model: string;
+  brand: string;
+  tag: string;
+  badge?: string;
+  defaultColor?: string;
+}
+
+const POPULAR_DELIVERY_VEHICLES: Record<string, {
+  label: string;
+  shortDesc: string;
+  yangoService: string;
+  icon: any;
+  plateExample: string;
+  suggestions: VehiclePresetItem[];
+}> = {
+  moto: {
+    label: 'Moto / Scooter',
+    shortDesc: 'Livraison Express colis légers, plis & repas (max 15 kg)',
+    yangoService: 'Yango Delivery Moto & Flash',
+    icon: Bike,
+    plateExample: '4523 JJ 01',
+    suggestions: [
+      { model: 'Yamaha Crypton 110', brand: 'Yamaha', tag: 'Standard N°1 Abidjan', badge: 'Top Vente', defaultColor: 'Noir & Rouge' },
+      { model: 'Haojue 110cc Express', brand: 'Haojue', tag: 'Flotte Yango Moto', badge: 'Flotte Yango', defaultColor: 'Bleu' },
+      { model: 'TVS HLX 125 Plus', brand: 'TVS', tag: 'Robuste & Économique', badge: 'Recommandé', defaultColor: 'Rouge' },
+      { model: 'Bajaj Boxer CT 100', brand: 'Bajaj', tag: 'Tout-terrain & Endurant', badge: 'Indestructible', defaultColor: 'Noir' },
+      { model: 'Bajaj Boxer BM 150', brand: 'Bajaj', tag: 'Grande puissance', badge: 'Rapide', defaultColor: 'Bleu Nuit' },
+      { model: 'Aloba 110', brand: 'Aloba', tag: 'Maniable dans le trafic', badge: 'Populaire', defaultColor: 'Noir & Blanc' },
+      { model: 'Dayang DY 110', brand: 'Dayang', tag: 'Idéal courses quotidiennes', badge: 'Classique', defaultColor: 'Rouge' },
+      { model: 'Honda Ace 125', brand: 'Honda', tag: 'Faible consommation', badge: 'Endurance', defaultColor: 'Gris' },
+      { model: 'Suzuki Hayate 125', brand: 'Suzuki', tag: 'Scooter automatique', badge: 'Confort', defaultColor: 'Blanc' },
+      { model: 'KTM Duke 125', brand: 'KTM', tag: 'Course ultra-rapide', badge: 'Sport', defaultColor: 'Orange & Noir' }
+    ]
+  },
+  voiture: {
+    label: 'Voiture / Citadine / Berline',
+    shortDesc: 'Colis volumineux/sécurisés, écrans, pluie & haute valeur (max 80 kg)',
+    yangoService: 'Yango Delivery Auto & VTC Express',
+    icon: Car,
+    plateExample: '8912 KL 01',
+    suggestions: [
+      { model: 'Toyota Yaris', brand: 'Toyota', tag: 'Véhicule N°1 Yango Abidjan', badge: '⭐ Top 1 Yango', defaultColor: 'Blanc' },
+      { model: 'Hyundai Grand i10', brand: 'Hyundai', tag: 'Citadine économique', badge: 'Flotte Yango', defaultColor: 'Gris Argent' },
+      { model: 'Suzuki Swift / Dzire', brand: 'Suzuki', tag: 'Flottes récentes Abidjan', badge: 'Très Populaire', defaultColor: 'Blanc' },
+      { model: 'Suzuki Alto / S-Presso', brand: 'Suzuki', tag: 'Ultra maniable & Agile', badge: 'Compact', defaultColor: 'Bleu' },
+      { model: 'Toyota Corolla', brand: 'Toyota', tag: 'Grand coffre sécurisé', badge: 'Confort Pro', defaultColor: 'Gris Métal' },
+      { model: 'Toyota Starlet / Vitz', brand: 'Toyota', tag: 'Économique & Fiable', badge: 'Urbain', defaultColor: 'Noir' },
+      { model: 'Kia Picanto', brand: 'Kia', tag: 'Facile à garer au Plateau', badge: 'Maniable', defaultColor: 'Rouge' },
+      { model: 'Renault Logan / Sandero', brand: 'Renault', tag: 'Grand volume de malle', badge: 'Spacieux', defaultColor: 'Blanc' },
+      { model: 'Peugeot 208 / 301', brand: 'Peugeot', tag: 'Idéal livraisons pro', badge: 'Sécurisé', defaultColor: 'Gris' },
+      { model: 'Nissan Micra / Almera', brand: 'Nissan', tag: 'Moteur endurant', badge: 'Fiable', defaultColor: 'Blanc' }
+    ]
+  },
+  cargo: {
+    label: 'Cargo / Fourgon / Tricycle',
+    shortDesc: 'Électroménager lourd, palettes, mobilier & cartons B2B',
+    yangoService: 'Yango Cargo & Fret Lourd Urbain',
+    icon: Truck,
+    plateExample: 'CI-3920-AB',
+    suggestions: [
+      { model: 'Tricycle Haojue 200cc Cargo', brand: 'Haojue', tag: 'Benne renforcée Adjamé', badge: 'Standard Marché', defaultColor: 'Bleu' },
+      { model: 'Tricycle TVS King Cargo', brand: 'TVS', tag: 'Cabine fermée anti-pluie', badge: 'Sécurisé', defaultColor: 'Jaune' },
+      { model: 'Peugeot Partner Fourgon', brand: 'Peugeot', tag: 'Fourgonnette grand volume', badge: 'Pro Logistique', defaultColor: 'Blanc' },
+      { model: 'Renault Kangoo Express', brand: 'Renault', tag: 'Utilitaire urbain fermé', badge: 'Polyvalent', defaultColor: 'Blanc' },
+      { model: 'Toyota Hilux Pick-up', brand: 'Toyota', tag: 'Plateau tout-terrain', badge: 'Fret Lourd', defaultColor: 'Gris' },
+      { model: 'Hyundai H-100 Cargo', brand: 'Hyundai', tag: 'Camionnette gros volume', badge: 'Maxi Charge', defaultColor: 'Blanc' },
+      { model: 'Suzuki Super Carry', brand: 'Suzuki', tag: 'Mini-camionnette compacte', badge: 'Agile', defaultColor: 'Blanc' }
+    ]
+  }
+};
+
 export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose: propOnClose }) => {
   const { 
     currentUser, 
     submitKYC, 
-    adminInstantApproveMyKYC, 
     language, 
     translate,
     addToast,
@@ -241,28 +316,6 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     }
   };
 
-  const handleUseDemoPhoto = () => {
-    if (!isDriver) {
-      if (currentStep === 1) setDocPhoto(DEMO_KYC_PHOTOS.cni);
-      else if (currentStep === 2) setSelfiePhoto(DEMO_KYC_PHOTOS.selfie);
-      else if (currentStep === 3) setSelfieWithIdPhoto(DEMO_KYC_PHOTOS.selfieWithId);
-    } else {
-      if (currentStep === 1) setDocPhoto(DEMO_KYC_PHOTOS.cni);
-      else if (currentStep === 2) setSelfieWithIdPhoto(DEMO_KYC_PHOTOS.driverLicenseSelfie);
-      else if (currentStep === 3) {
-        setDriverLicensePhoto(DEMO_KYC_PHOTOS.driverLicense);
-        setDriverLicenseVersoPhoto(DEMO_KYC_PHOTOS.driverLicenseVerso);
-      }
-      else if (currentStep === 4) setVehicleRegPhoto(DEMO_KYC_PHOTOS.vehicleReg);
-    }
-    if (!docNumber) setDocNumber('CI003928174');
-    addToast(
-      translate('Photo démo chargée', 'Demo photo loaded'),
-      translate('Exemple officiel appliqué pour cette étape.', 'Official sample applied for this step.'),
-      'info'
-    );
-  };
-
   const getCurrentStepPhoto = () => {
     if (!isDriver) {
       if (currentStep === 1) return docPhoto;
@@ -357,7 +410,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     translate("1. Pièce d'Identité Officielle (CNI / Passeport)", "1. Official ID Document (CNI / Passport)"),
     translate("2. Selfie Tenant la Pièce d'Identité", "2. Live Selfie Holding ID Document"),
     translate("3. Permis de Conduire (Recto / Verso)", "3. Driver's License (Front / Back)"),
-    translate("4. Carte Grise du Véhicule (Moto / Fourgon)", "4. Vehicle Registration Certificate (Motorcycle / Cargo)")
+    translate("4. Carte Grise & Engin de Livraison (Moto / Voiture / Cargo)", "4. Vehicle Registration & Delivery Asset (Motorcycle / Car / Cargo)")
   ] : [
     translate("1. Pièce d'Identité Officielle (CNI / Passeport / Carte Consulaire)", "1. Official ID Document (CNI / Passport / Consular Card)"),
     translate("2. Selfie Simple en Direct", "2. Simple Live Selfie"),
@@ -367,8 +420,8 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
   const stepInstructions = isDriver ? [
     translate("Prenez en photo ou importez le recto de votre CNI ou Passeport.", "Take a photo or upload the front of your National ID or Passport."),
     translate("Prenez un selfie tenant votre pièce d'identité bien visible à côté de votre visage.", "Take a selfie holding your ID clearly visible next to your face."),
-    translate("Prenez en photo votre permis de conduire ivoirien valide.", "Take a photo of your valid Ivorian driver's license."),
-    translate("Prenez en photo la carte grise du véhicule utilisé pour vos livraisons.", "Take a photo of the registration certificate of your delivery vehicle.")
+    translate("Prenez en photo votre permis de conduire ivoirien valide (Catégorie A moto, B auto ou C cargo).", "Take a photo of your valid Ivorian driver's license (Cat A bike, B car or C cargo)."),
+    translate("Déclarez votre véhicule (suggestions Yango / Abidjan) et prenez en photo votre carte grise.", "Declare your vehicle (Yango / Abidjan presets) and photograph your registration certificate.")
   ] : [
     translate("Prenez en photo ou importez le recto de votre CNI, passeport ou carte consulaire.", "Take a photo or import the front of your ID card, passport or consular card."),
     translate("Prenez un selfie simple de face, bien éclairé, sans lunettes de soleil ni chapeau.", "Take a clear front-facing selfie in good lighting, without sunglasses or hat."),
@@ -415,7 +468,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
             className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all shadow-sm cursor-pointer hover:scale-105"
           >
             <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{translate("📸 Guide & Démo Visuelle de Prise en Photo", "📸 Visual Photo Guide & Demo")}</span>
+            <span>{translate("📸 Guide Visuel de Prise en Photo", "📸 Visual Photo Guide")}</span>
           </button>
         </div>
 
@@ -517,47 +570,177 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
           </div>
         )}
 
-        {/* Step 4 Specific for Driver: Vehicle Registration, Plate & Color Information */}
+        {/* Step 4 Specific for Driver: Vehicle Registration, Plate, Color & Yango Model Presets */}
         {isDriver && currentStep === 4 && (
-          <div className="space-y-3 mb-4 p-3 bg-slate-950/70 rounded-2xl border border-amber-500/30">
-            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold pb-2 border-b border-slate-800">
-              <Bike className="w-4 h-4" />
-              <span>{translate("Identification du Véhicule ou Moto de Livraison", "Delivery Vehicle / Motorcycle Identification")}</span>
+          <div className="space-y-4 mb-4 p-4 bg-slate-950/80 rounded-2xl border border-amber-500/30">
+            {/* Header with Title & Context */}
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-bold">
+                {vehicleType === 'voiture' || vehicleType === 'car' ? (
+                  <Car className="w-4 h-4 text-amber-400" />
+                ) : vehicleType === 'cargo' ? (
+                  <Truck className="w-4 h-4 text-purple-400" />
+                ) : (
+                  <Bike className="w-4 h-4 text-emerald-400" />
+                )}
+                <span>{translate("Déclaration & Matériel de Livraison (Yango / Abidjan)", "Delivery Vehicle & Asset Declaration (Yango / Abidjan)")}</span>
+              </div>
+              <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">
+                ✓ Conforme BRAD'CI
+              </span>
             </div>
 
-            {/* Vehicle Type Selection */}
+            {/* Vehicle Type Selection (3 Categories: Moto, Voiture, Cargo) */}
             <div>
-              <label className="text-xs text-slate-300 font-bold block mb-1.5">
-                {translate("Type d'engin :", "Vehicle type:")}
+              <label className="text-xs text-slate-300 font-bold block mb-1.5 flex items-center justify-between">
+                <span>{translate("Type d'engin de livraison :", "Delivery vehicle category:")}</span>
+                <span className="text-[10px] text-slate-400 font-normal">{translate("Sélectionnez pour charger les suggestions adaptées", "Select to load matching presets")}</span>
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
-                  { id: 'moto', label: 'Moto / Scooter', icon: Bike },
-                  { id: 'cargo', label: 'Cargo / Fourgon / Tricycle', icon: Truck }
+                  { 
+                    id: 'moto', 
+                    label: 'Moto / Scooter', 
+                    sub: 'Yango Moto & Flash (≤ 15 kg)', 
+                    icon: Bike,
+                    activeColor: 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                  },
+                  { 
+                    id: 'voiture', 
+                    label: 'Voiture / Citadine', 
+                    sub: 'Yango Auto & VTC (≤ 80 kg)', 
+                    icon: Car,
+                    activeColor: 'bg-amber-500/20 border-amber-500 text-amber-300'
+                  },
+                  { 
+                    id: 'cargo', 
+                    label: 'Cargo / Fourgon', 
+                    sub: 'Yango Cargo & Fret Lourd B2B', 
+                    icon: Truck,
+                    activeColor: 'bg-purple-500/20 border-purple-500 text-purple-300'
+                  }
                 ].map(item => (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setVehicleType(item.id as VehicleType)}
-                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
-                      vehicleType === item.id 
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-sm' 
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    onClick={() => {
+                      const newType = item.id as VehicleType;
+                      setVehicleType(newType);
+                      // Set a default representative model if currently matching previous type default
+                      const defaultSuggest = POPULAR_DELIVERY_VEHICLES[newType]?.suggestions[0];
+                      if (defaultSuggest) {
+                        setVehicleModel(defaultSuggest.model);
+                        if (!vehicleColor || vehicleColor === 'Noir & Rouge' || vehicleColor === 'Blanc') {
+                          if (defaultSuggest.defaultColor) setVehicleColor(defaultSuggest.defaultColor);
+                        }
+                      }
+                    }}
+                    className={`p-2.5 rounded-xl text-left border transition-all flex flex-col justify-between ${
+                      (vehicleType === item.id || (item.id === 'voiture' && vehicleType === 'car'))
+                        ? `${item.activeColor} shadow-md` 
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
                     }`}
                   >
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <item.icon className="w-4 h-4 shrink-0" />
+                      <span className="font-bold text-xs">{item.label}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-normal leading-tight">
+                      {item.sub}
+                    </span>
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Smart Suggestions of Popular Models for Yango & Abidjan */}
+            {POPULAR_DELIVERY_VEHICLES[vehicleType === 'car' ? 'voiture' : vehicleType] && (
+              <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>
+                      {translate("Modèles recommandés Yango & Abidjan (Cliquez pour appliquer) :", "Recommended Yango & Abidjan models (Click to apply):")}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    {POPULAR_DELIVERY_VEHICLES[vehicleType === 'car' ? 'voiture' : vehicleType].yangoService}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 pt-1 max-h-32 overflow-y-auto pr-1">
+                  {POPULAR_DELIVERY_VEHICLES[vehicleType === 'car' ? 'voiture' : vehicleType].suggestions.map(s => {
+                    const isSelected = vehicleModel.toLowerCase() === s.model.toLowerCase();
+                    return (
+                      <button
+                        key={s.model}
+                        type="button"
+                        onClick={() => {
+                          setVehicleModel(s.model);
+                          if (s.defaultColor && (!vehicleColor || vehicleColor.trim() === '')) {
+                            setVehicleColor(s.defaultColor);
+                          }
+                          addToast(
+                            translate('Modèle appliqué', 'Model applied'),
+                            `${s.model} (${s.tag})`,
+                            'info'
+                          );
+                        }}
+                        className={`text-xs px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 text-left ${
+                          isSelected
+                            ? 'bg-amber-500 text-slate-950 font-bold border-amber-400 shadow-sm'
+                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-amber-500/50 hover:text-white'
+                        }`}
+                      >
+                        <span>{s.model}</span>
+                        {s.badge && (
+                          <span className={`text-[9px] px-1 py-0.2 rounded font-bold ${
+                            isSelected 
+                              ? 'bg-slate-950/20 text-slate-950' 
+                              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          }`}>
+                            {s.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Model & Brand text input */}
+            <div>
+              <label className="text-xs text-slate-300 font-bold block mb-1">
+                {translate("Marque & Modèle de l'engin sélectionné * :", "Brand & Model of declared vehicle *:")}
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={vehicleModel}
+                  onChange={(e) => setVehicleModel(e.target.value)}
+                  placeholder="Ex: Yamaha Crypton 110, Toyota Yaris, TVS HLX 125..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-medium focus:border-amber-500 focus:outline-none"
+                />
+                {vehicleModel && (
+                  <span className="absolute right-3 top-2 text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    <span>Validé</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Plate (Matricule) & Color in 2 columns */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Plate / Matricule */}
               <div>
-                <label className="text-xs text-slate-300 font-bold block mb-1">
-                  {translate("Matricule / Plaque d'immatriculation * :", "License Plate / Registration *:")}
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-slate-300 font-bold">
+                    {translate("Plaque d'immatriculation * :", "License Plate / Registration *:")}
+                  </label>
+                  <span className="text-[10px] text-amber-400 font-mono">Format CI</span>
+                </div>
                 <div className="relative">
                   <input
                     type="text"
@@ -566,29 +749,41 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
                     placeholder="Ex: 4523 JJ 01 ou CI-3920-AB"
                     className="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-xs text-amber-300 uppercase font-mono font-bold tracking-wider focus:border-amber-400 focus:outline-none"
                   />
-                  <span className="absolute right-2.5 top-2.5 text-[10px] font-bold text-amber-500/60 bg-amber-500/10 px-1.5 py-0.5 rounded">
-                    CI
+                  <span className="absolute right-2.5 top-2.5 text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                    🇨🇮 CI
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {translate("Visible par le vendeur et l'acheteur lors des livraisons.", "Visible to buyer and seller during deliveries.")}
-                </p>
+                {/* Plate quick format presets */}
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <span className="text-[10px] text-slate-500">Exemples :</span>
+                  {['4523 JJ 01', '8912 KL 01', 'CI-3920-AB'].map(ex => (
+                    <button
+                      key={ex}
+                      type="button"
+                      onClick={() => setVehiclePlate(ex)}
+                      className="text-[10px] text-slate-400 hover:text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800"
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
               </div>
 
+              {/* Vehicle Color */}
               <div>
                 <label className="text-xs text-slate-300 font-bold block mb-1">
-                  {translate("Couleur du véhicule / moto * :", "Vehicle / Motorcycle Color *:")}
+                  {translate("Couleur de l'engin * :", "Vehicle Color *:")}
                 </label>
                 <input
                   type="text"
                   value={vehicleColor}
                   onChange={(e) => setVehicleColor(e.target.value)}
-                  placeholder="Ex: Noir & Rouge, Bleu Nuit, Blanc"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
+                  placeholder="Ex: Noir & Rouge, Blanc, Gris Argent"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
                 />
                 {/* Quick color chips */}
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {['Noir', 'Rouge', 'Bleu', 'Blanc', 'Gris', 'Noir & Rouge'].map(c => (
+                  {['Noir', 'Blanc', 'Rouge', 'Bleu', 'Gris', 'Jaune', 'Noir & Rouge'].map(c => (
                     <button
                       key={c}
                       type="button"
@@ -606,18 +801,25 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
               </div>
             </div>
 
-            {/* Model input */}
-            <div>
-              <label className="text-xs text-slate-300 font-bold block mb-1">
-                {translate("Marque / Modèle de l'engin :", "Brand / Model of vehicle:")}
-              </label>
-              <input
-                type="text"
-                value={vehicleModel}
-                onChange={(e) => setVehicleModel(e.target.value)}
-                placeholder="Ex: Yamaha Crypton 110, TVS HLX 150, Boxer BM 150"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-amber-500 focus:outline-none"
-              />
+            {/* Live Client Preview Badge */}
+            <div className="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{translate("Aperçu client :", "Client view:")}</span>
+                <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                  {vehicleType === 'voiture' || vehicleType === 'car' ? (
+                    <Car className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  ) : vehicleType === 'cargo' ? (
+                    <Truck className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  ) : (
+                    <Bike className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  )}
+                  <span className="text-white font-bold text-xs">{currentUser?.name || 'Livreur'}</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-emerald-400 font-semibold">{vehicleModel || 'Engin'}</span>
+                  <span className="text-amber-400 font-mono text-[11px]">({vehiclePlate || 'Immatriculé'})</span>
+                  <span className="text-slate-400 text-[11px]">• {vehicleColor || 'Couleur'}</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -731,15 +933,6 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
               >
                 <Upload className="w-3.5 h-3.5 text-blue-400" />
                 <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleUseDemoPhoto}
-                className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{translate("Photo Démo (1-Clic)", "Demo Photo (1-Click)")}</span>
               </button>
             </div>
           )}

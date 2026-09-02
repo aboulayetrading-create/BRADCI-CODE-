@@ -16,6 +16,7 @@ import {
   Headphones
 } from 'lucide-react';
 import { PaymentMethod } from '../types';
+import { nativeBridge } from '../utils/nativeBridge';
 import { 
   COMMUNE_NAMES_ABIDJAN, 
   COMMUNE_NAMES_ENVIRONS, 
@@ -65,36 +66,31 @@ export const BuyerDepositModal: React.FC = () => {
 
   const totalDeposit = itemPrice + deliveryFee;
 
-  const captureBuyerGPS = () => {
+  const captureBuyerGPS = async () => {
     setIsLocatingBuyer(true);
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          setBuyerCoords({ lat: latitude, lng: longitude });
-          setIsLocatingBuyer(false);
-          const nearest = findNearestCommune(latitude, longitude);
-          if (nearest) {
-            setBuyerCommune(nearest.name);
-            setBuyerAddress(prev => prev && !prev.includes('Abidjan') ? `${prev}, ${nearest.name}` : `${nearest.name}, Abidjan (Point GPS Livré)`);
-          }
-          addToast(
-            translate('📍 GPS Destinataire Validé', '📍 Delivery GPS Validated'),
-            translate(
-              `Position GPS enregistrée (${latitude.toFixed(4)}, ${longitude.toFixed(4)}). Frais de coursier actualisés : ${deliveryFee.toLocaleString()} FCFA (${distKm} km).`,
-              `GPS location saved (${latitude.toFixed(4)}, ${longitude.toFixed(4)}). Courier fee updated: ${deliveryFee.toLocaleString()} FCFA (${distKm} km).`
-            ),
-            'success'
-          );
-        },
-        () => {
-          setIsLocatingBuyer(false);
-          addToast('Géolocalisation', 'Veuillez sélectionner manuellement votre commune de réception.', 'info');
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
+    try {
+      const pos = await nativeBridge.getCurrentPosition({ enableHighAccuracy: true, timeout: 12000 });
+      const latitude = pos.latitude;
+      const longitude = pos.longitude;
+      setBuyerCoords({ lat: latitude, lng: longitude });
       setIsLocatingBuyer(false);
+      const nearest = findNearestCommune(latitude, longitude);
+      if (nearest) {
+        setBuyerCommune(nearest.name);
+        setBuyerAddress(prev => prev && !prev.includes('Abidjan') ? `${prev}, ${nearest.name}` : `${nearest.name}, Abidjan (Point GPS Livré)`);
+      }
+      addToast(
+        translate('📍 GPS Destinataire Validé', '📍 Delivery GPS Validated'),
+        translate(
+          `Position GPS enregistrée (${latitude.toFixed(4)}, ${longitude.toFixed(4)}). Frais de coursier actualisés : ${deliveryFee.toLocaleString()} FCFA (${distKm} km).`,
+          `GPS location saved (${latitude.toFixed(4)}, ${longitude.toFixed(4)}). Courier fee updated: ${deliveryFee.toLocaleString()} FCFA (${distKm} km).`
+        ),
+        'success'
+      );
+    } catch (err: any) {
+      setIsLocatingBuyer(false);
+      console.warn('Capacitor Geolocation error:', err?.message);
+      addToast('Géolocalisation', 'Veuillez sélectionner manuellement votre commune de réception.', 'info');
     }
   };
 

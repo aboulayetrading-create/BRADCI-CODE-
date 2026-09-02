@@ -1,5 +1,5 @@
 {
-  "name": "Brad'CI - Enchères Express & Déstockage",
+  "name": "BRAD'CI - Enchères Express & Déstockage",
   "description": "Plateforme d'enchères express de seconde main et déstockage sécurisé à Abidjan avec Paiement Direct à la Livraison (POD via API), RBAC strict, bourse de fret et forfaits vendeurs/livreurs.",
   "requestFramePermissions": ["geolocation", "camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

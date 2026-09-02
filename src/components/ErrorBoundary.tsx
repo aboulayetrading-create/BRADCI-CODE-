@@ -37,7 +37,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
     this.setState({ errorInfo });
 
-    // Broadcast error event for DemoDebugPanel
+    // Broadcast error event for logging
     try {
       window.dispatchEvent(new CustomEvent('bradci:runtime_error', {
         detail: {

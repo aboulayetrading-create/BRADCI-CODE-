@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { Product, ShopProfile, PaymentMethod, DeliveryJob } from '../types';
 import { ReferralDashboard } from './ReferralDashboard';
+import { nativeBridge } from '../utils/nativeBridge';
 
 export const ClientDashboard: React.FC = () => {
   const { 
@@ -124,6 +125,39 @@ export const ClientDashboard: React.FC = () => {
   const [docPhoto, setDocPhoto] = useState('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80');
   const [selfiePhoto, setSelfiePhoto] = useState(currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80');
   const [kycFeedback, setKycFeedback] = useState<{ isDuplicate?: boolean; message?: string } | null>(null);
+
+  // Native Mobile Photo Captures (Logo & Banner)
+  const handleCaptureLogo = async (source: 'camera' | 'photos') => {
+    try {
+      const res = await nativeBridge.capturePhoto({
+        source,
+        direction: 'user',
+        quality: 90
+      });
+      if (res?.dataUrl) {
+        setShopForm(prev => ({ ...prev, logo: res.dataUrl }));
+        addToast(translate('Logo mis à jour', 'Logo updated'), '', 'success');
+      }
+    } catch (e: any) {
+      console.warn('Capture logo cancelled or failed:', e?.message);
+    }
+  };
+
+  const handleCaptureBanner = async (source: 'camera' | 'photos') => {
+    try {
+      const res = await nativeBridge.capturePhoto({
+        source,
+        direction: 'environment',
+        quality: 85
+      });
+      if (res?.dataUrl) {
+        setShopForm(prev => ({ ...prev, banner: res.dataUrl }));
+        addToast(translate('Bannière mise à jour', 'Banner updated'), '', 'success');
+      }
+    } catch (e: any) {
+      console.warn('Capture banner cancelled or failed:', e?.message);
+    }
+  };
 
   if (!currentUser || currentUser.role !== 'client') {
     return (
@@ -1264,48 +1298,23 @@ export const ClientDashboard: React.FC = () => {
                   <div className="flex-1 space-y-1.5">
                     {/* Action buttons: Camera & Gallery */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[11px] font-bold flex items-center gap-1.5 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => handleCaptureLogo('camera')}
+                        className="cursor-pointer px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[11px] font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                      >
                         <Camera className="w-3.5 h-3.5" />
                         <span>{translate("Appareil Photo", "Camera")}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="user"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setShopForm(prev => ({ ...prev, logo: reader.result as string }));
-                                addToast(translate('Photo de profil capturée', 'Profile photo captured'), '', 'success');
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </label>
+                      </button>
 
-                      <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => handleCaptureLogo('photos')}
+                        className="cursor-pointer px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors"
+                      >
                         <Upload className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{translate("Importer Fichier", "Upload File")}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setShopForm(prev => ({ ...prev, logo: reader.result as string }));
-                                addToast(translate('Logo importé avec succès', 'Logo uploaded successfully'), '', 'success');
-                              };
-                              reader.readAsDataURL(file);
-                            }
-                          }}
-                        />
-                      </label>
+                        <span>{translate("Importer Galerie", "Choose Gallery")}</span>
+                      </button>
                     </div>
 
                     <input
@@ -1340,48 +1349,23 @@ export const ClientDashboard: React.FC = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[11px] font-bold flex items-center gap-1.5 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => handleCaptureBanner('camera')}
+                      className="cursor-pointer px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[11px] font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                    >
                       <Camera className="w-3.5 h-3.5" />
                       <span>{translate("Prendre Photo", "Take Photo")}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setShopForm(prev => ({ ...prev, banner: reader.result as string }));
-                              addToast(translate('Bannière capturée', 'Banner captured'), '', 'success');
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
+                    </button>
 
-                    <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => handleCaptureBanner('photos')}
+                      className="cursor-pointer px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition-colors"
+                    >
                       <Upload className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{translate("Importer Bannière", "Upload Banner")}</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            const reader = new FileReader();
-                            reader.onloadend = () => {
-                              setShopForm(prev => ({ ...prev, banner: reader.result as string }));
-                              addToast(translate('Bannière importée', 'Banner uploaded'), '', 'success');
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </label>
+                      <span>{translate("Importer Galerie", "Choose Gallery")}</span>
+                    </button>
 
                     <input
                       type="url"

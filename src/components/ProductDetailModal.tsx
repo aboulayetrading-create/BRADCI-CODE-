@@ -28,9 +28,11 @@ import {
   Wallet,
   Building2,
   FileText,
-  Boxes
+  Boxes,
+  ShoppingCart
 } from 'lucide-react';
 import { PaymentMethod, VehicleType } from '../types';
+import { nativeBridge } from '../utils/nativeBridge';
 import { 
   getCommuneBadgeInfo,
   COMMUNE_NAMES_ABIDJAN,
@@ -56,7 +58,6 @@ export const ProductDetailModal: React.FC = () => {
     buyerDeclineSelectedOffer,
     setSelectedShopForView,
     getShopBySellerId,
-    simulateFiveBids,
     translate,
     userLocation,
     applyReferralBalanceToPurchase,
@@ -123,46 +124,37 @@ export const ProductDetailModal: React.FC = () => {
   const shoppingDiscount = (useShoppingBalance && availableShoppingBalance > 0) ? Math.min(availableShoppingBalance, totalToPayBoutique) : 0;
   const finalToPayBoutique = Math.max(0, totalToPayBoutique - shoppingDiscount);
 
-  const captureBuyerGPS = () => {
+  const captureBuyerGPS = async () => {
     setIsLocatingBuyer(true);
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          const coords = { lat: latitude, lng: longitude };
-          setBuyerCoords(coords);
-          setBuyerGpsAccuracy(Math.round(accuracy));
-          setIsLocatingBuyer(false);
-          const nearest = findNearestCommune(latitude, longitude);
-          if (nearest) {
-            setBuyerCommune(nearest.name);
-            setBuyerAddress(prev => prev && !prev.includes('Abidjan') ? `${prev}, ${nearest.name}` : `${nearest.name}, Abidjan (Point GPS Destinataire)`);
-          }
-          addToast(
-            translate('📍 Position GPS Destinataire Validée', '📍 Delivery GPS Validated'),
-            translate(
-              `Position capturée (${latitude.toFixed(4)}, ${longitude.toFixed(4)}) • Précision ~${Math.round(accuracy)}m. Les frais de coursier ont été réajustés (${distKm} km).`,
-              `Position captured (${latitude.toFixed(4)}, ${longitude.toFixed(4)}) • Accuracy ~${Math.round(accuracy)}m. Courier delivery fee updated (${distKm} km).`
-            ),
-            'success'
-          );
-        },
-        (err) => {
-          setIsLocatingBuyer(false);
-          addToast(
-            translate('Géolocalisation', 'Geolocation'),
-            translate('Veuillez autoriser le GPS ou choisir votre commune manuellement.', 'Please allow GPS or select your commune manually.'),
-            'info'
-          );
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
+    try {
+      const pos = await nativeBridge.getCurrentPosition({ enableHighAccuracy: true, timeout: 12000 });
+      const latitude = pos.latitude;
+      const longitude = pos.longitude;
+      const accuracy = pos.accuracy;
+      const coords = { lat: latitude, lng: longitude };
+      setBuyerCoords(coords);
+      setBuyerGpsAccuracy(Math.round(accuracy));
       setIsLocatingBuyer(false);
+      const nearest = findNearestCommune(latitude, longitude);
+      if (nearest) {
+        setBuyerCommune(nearest.name);
+        setBuyerAddress(prev => prev && !prev.includes('Abidjan') ? `${prev}, ${nearest.name}` : `${nearest.name}, Abidjan (Point GPS Destinataire)`);
+      }
       addToast(
-        translate('GPS non supporté', 'GPS not supported'),
-        translate('Veuillez sélectionner votre commune de livraison.', 'Please select your delivery commune.'),
-        'warning'
+        translate('📍 Position GPS Destinataire Validée', '📍 Delivery GPS Validated'),
+        translate(
+          `Position capturée (${latitude.toFixed(4)}, ${longitude.toFixed(4)}) • Précision ~${Math.round(accuracy)}m. Les frais de coursier ont été réajustés (${distKm} km).`,
+          `Position captured (${latitude.toFixed(4)}, ${longitude.toFixed(4)}) • Accuracy ~${Math.round(accuracy)}m. Courier delivery fee updated (${distKm} km).`
+        ),
+        'success'
+      );
+    } catch (err: any) {
+      setIsLocatingBuyer(false);
+      console.warn('Capacitor Geolocation error:', err?.message);
+      addToast(
+        translate('Géolocalisation', 'Geolocation'),
+        translate('Veuillez autoriser le GPS ou choisir votre commune manuellement.', 'Please allow GPS or select your commune manually.'),
+        'info'
       );
     }
   };
@@ -395,7 +387,7 @@ export const ProductDetailModal: React.FC = () => {
                     </div>
                     <span className="text-[10px] px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                      <span>Commission Brad'CI : 5% par article</span>
+                      <span>Commission BRAD'CI : 5% par article</span>
                     </span>
                   </div>
 
@@ -631,19 +623,6 @@ export const ProductDetailModal: React.FC = () => {
                         );
                       })}
                     </div>
-
-                    {/* Quick Simulation Trigger for testing the 5-offer rule */}
-                    {currentBidCount < 5 && prod.status === 'active' && (
-                      <button
-                        type="button"
-                        onClick={() => simulateFiveBids(prod.id)}
-                        className="mt-2 w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-amber-500/30 to-amber-500/20 hover:from-amber-500/40 hover:to-amber-500/40 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
-                        title="Génère 5 enchères de démonstration à Abidjan pour déclencher l'arbitrage vendeur"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
-                        <span>⚡ Simuler 5 Offres Réelles (Test Règle des 5 Enchérisseurs)</span>
-                      </button>
-                    )}
                   </div>
                 )}
               </motion.div>
@@ -661,7 +640,7 @@ export const ProductDetailModal: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    Selon la règle métier Brad'CI, l'enchère est clôturée. Le vendeur examine les 5 propositions (montants, distances en km, paiements Wave) et choisit librement l'adjudicataire ou annule sans frais.
+                    Selon la règle métier BRAD'CI, l'enchère est clôturée. Le vendeur examine les 5 propositions (montants, distances en km, paiements Wave) et choisit librement l'adjudicataire ou annule sans frais.
                   </p>
                   <button
                     type="button"
@@ -721,7 +700,7 @@ export const ProductDetailModal: React.FC = () => {
                 <div className="mt-4 p-3.5 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2 text-xs">
                   <div className="font-bold text-white flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>Garanties Boutique Certifiée Brad'CI :</span>
+                    <span>Garanties Boutique Certifiée BRAD'CI :</span>
                   </div>
                   <ul className="text-[11px] text-slate-300 space-y-1.5 pl-1">
                     <li className="flex items-center gap-1.5">
@@ -779,7 +758,7 @@ export const ProductDetailModal: React.FC = () => {
                             Tous les exemplaires ont été vendus. Un nouveau stock sera disponible bientôt.
                           </p>
                           <p className="text-[10px] text-slate-500">
-                            (Règle Brad'CI : suppression automatique sous 14 jours si aucun réapprovisionnement)
+                            (Règle BRAD'CI : suppression automatique sous 14 jours si aucun réapprovisionnement)
                           </p>
                         </div>
 

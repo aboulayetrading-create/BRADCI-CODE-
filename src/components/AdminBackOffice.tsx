@@ -203,17 +203,6 @@ export const AdminBackOffice: React.FC = () => {
               <span>{translate("Déverrouiller l'Espace Admin", "Unlock Admin Back-Office")}</span>
             </button>
           </form>
-
-          {/* Quick Master Shortcut for Testing */}
-          <div className="pt-4 border-t border-slate-800/80 text-center">
-            <button
-              onClick={() => adminLogin('admin@bradci.com', 'admin123')}
-              className="text-[11px] text-slate-400 hover:text-amber-400 transition-colors flex items-center justify-center gap-1 mx-auto"
-            >
-              <span>{translate("Connexion Rapide (Admin Démo)", "Quick Demo Login (Admin)")}</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
         </div>
       </div>
     );

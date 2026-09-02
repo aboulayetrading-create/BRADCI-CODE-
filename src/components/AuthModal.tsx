@@ -646,15 +646,8 @@ export const AuthModal: React.FC = () => {
                     <span>{translate("Code pris en compte (+1 000 FCFA sous réserve de validation)", "Code registered (+1,000 FCFA upon validation)")}</span>
                   </span>
                 ) : (
-                  <div className="w-full flex items-center justify-between text-slate-400">
-                    <span>{translate("Vous avez un lien parrain ou un code ami ?", "Have a referral link or friend code?")}</span>
-                    <button
-                      type="button"
-                      onClick={() => setReferralCodeInput('BRAD-89A2')}
-                      className="text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
-                    >
-                      {translate("Tester BRAD-89A2", "Test BRAD-89A2")}
-                    </button>
+                  <div className="w-full text-slate-400">
+                    <span>{translate("Code parrain facultatif (+1 000 FCFA à la première commande livrée)", "Optional referral code (+1,000 FCFA on first delivered order)")}</span>
                   </div>
                 )}
               </div>

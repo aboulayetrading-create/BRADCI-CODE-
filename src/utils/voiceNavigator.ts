@@ -19,7 +19,6 @@ export interface RoutePlan {
   destinationCommune: string;
   steps: RouteStep[];
   googleMapsUrl: string;
-  yangoMapsUrl: string;
 }
 
 // Generate realistic Abidjan road corridors with iconic bridges and expressways
@@ -119,20 +118,13 @@ export function generateAbidjanRoute(
     destination + ', Abidjan, Côte d\'Ivoire'
   )}&travelmode=driving`;
 
-  const yangoUrl = `https://yango.com/maps/?from=${encodeURIComponent(
-    origin + ', Abidjan'
-  )}&to=${encodeURIComponent(
-    destination + ', Abidjan'
-  )}`;
-
   return {
     totalDistanceKm: totalDist,
     totalDurationMin: totalDur,
     originCommune: origin,
     destinationCommune: destination,
     steps,
-    googleMapsUrl: gmapsUrl,
-    yangoMapsUrl: yangoUrl
+    googleMapsUrl: gmapsUrl
   };
 }
 
@@ -393,11 +385,15 @@ class VoiceNavigatorService {
     playOrderAlertSound();
   }
 
-  public testVoice(lang: AppLanguage = 'fr') {
+  public announceVoiceActivated(lang: AppLanguage = 'fr') {
     const msg = lang === 'en'
       ? "Brad'CI Voice Assistance active. Ready for live order announcements, 5-bid arbitration, and escrow updates."
       : "Assistance vocale Brad'CI activée. Annonces en direct des enchères, livraisons, arbitrages des 5 offres et séquestre prêtes.";
     this.speak(msg, lang);
+  }
+
+  public testVoice(lang: AppLanguage = 'fr') {
+    this.announceVoiceActivated(lang);
   }
 }
 

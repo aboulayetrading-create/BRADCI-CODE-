@@ -39,6 +39,7 @@ import {
   getCommuneCoords,
   findNearestCommune
 } from '../data/communes';
+import { nativeBridge } from '../utils/nativeBridge';
 
 export const NewProductModal: React.FC = () => {
   const { 
@@ -87,50 +88,65 @@ export const NewProductModal: React.FC = () => {
   const [isBoosted, setIsBoosted] = useState<boolean>(false);
   const [boostPaymentMethod, setBoostPaymentMethod] = useState<'wave' | 'orange' | 'mtn' | 'moov'>('wave');
 
-  const captureDeviceGPS = () => {
+  const captureDeviceGPS = async () => {
     setIsLocatingGps(true);
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          const coords = { lat: latitude, lng: longitude };
-          setPickupCoords(coords);
-          setGpsAccuracy(Math.round(accuracy));
-          setIsLocatingGps(false);
-          const nearest = findNearestCommune(latitude, longitude);
-          if (nearest) {
-            setCommune(nearest.name);
-            setPickupAddress(prev => prev && !prev.includes('Abidjan') ? `${prev}, ${nearest.name}` : `${nearest.name}, Abidjan (Point GPS Validé)`);
-          }
-          addToast(
-            translate('📍 Position GPS Précise Enregistrée', '📍 Precise GPS Location Saved'),
-            translate(
-              `Coordonnées capturées (${latitude.toFixed(4)}, ${longitude.toFixed(4)}) avec une précision de ~${Math.round(accuracy)}m. Le livreur sera guidé directement chez vous.`,
-              `Coordinates captured (${latitude.toFixed(4)}, ${longitude.toFixed(4)}) with ~${Math.round(accuracy)}m accuracy. The courier will be guided directly to you.`
-            ),
-            'success'
-          );
-        },
-        (err) => {
-          setIsLocatingGps(false);
-          addToast(
-            translate('Géolocalisation', 'Geolocation'),
-            translate(
-              'Veuillez autoriser l\'accès GPS de votre téléphone ou choisir manuellement votre commune et adresse de retrait.',
-              'Please allow phone GPS access or manually choose your commune and pickup address.'
-            ),
-            'info'
-          );
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
+    try {
+      const pos = await nativeBridge.getCurrentPosition({ enableHighAccuracy: true, timeout: 12000 });
+      const latitude = pos.latitude;
+      const longitude = pos.longitude;
+      const accuracy = pos.accuracy;
+      const coords = { lat: latitude, lng: longitude };
+      setPickupCoords(coords);
+      setGpsAccuracy(Math.round(accuracy));
       setIsLocatingGps(false);
+      const nearest = findNearestCommune(latitude, longitude);
+      if (nearest) {
+        setCommune(nearest.name);
+        setPickupAddress(prev => prev && !prev.includes('Abidjan') ? `${prev}, ${nearest.name}` : `${nearest.name}, Abidjan (Point GPS Validé)`);
+      }
       addToast(
-        translate('GPS non disponible', 'GPS not available'),
-        translate('Veuillez saisir votre adresse exacte et sélectionner votre commune.', 'Please type your exact address and select your commune.'),
-        'warning'
+        translate('📍 Position GPS Précise Enregistrée', '📍 Precise GPS Location Saved'),
+        translate(
+          `Coordonnées capturées (${latitude.toFixed(4)}, ${longitude.toFixed(4)}) avec une précision de ~${Math.round(accuracy)}m. Le livreur sera guidé directement chez vous.`,
+          `Coordinates captured (${latitude.toFixed(4)}, ${longitude.toFixed(4)}) with ~${Math.round(accuracy)}m accuracy. The courier will be guided directly to you.`
+        ),
+        'success'
       );
+    } catch (err: any) {
+      setIsLocatingGps(false);
+      console.warn('Capacitor Geolocation error:', err?.message);
+      addToast(
+        translate('Géolocalisation', 'Geolocation'),
+        translate(
+          'Veuillez autoriser l\'accès GPS de votre téléphone ou choisir manuellement votre commune et adresse de retrait.',
+          'Please allow phone GPS access or manually choose your commune and pickup address.'
+        ),
+        'info'
+      );
+    }
+  };
+
+  // Native Capacitor Camera / Gallery Image Capture
+  const handleNativeCameraCapture = async (source: 'camera' | 'photos') => {
+    if (images.length >= 3) {
+      addToast('Limite atteinte', 'Vous avez déjà ajouté 3 photos (maximum autorisé).', 'warning');
+      return;
+    }
+    try {
+      const result = await nativeBridge.capturePhoto({
+        source,
+        direction: 'environment',
+        quality: 90
+      });
+      if (result && result.dataUrl) {
+        setImages(prev => [...prev, result.dataUrl].slice(0, 3));
+        addToast('Photo Ajoutée ✅', `Photo ${images.length + 1}/3 enregistrée avec succès.`, 'success');
+      }
+    } catch (err: any) {
+      console.warn('Native photo capture cancelled or failed:', err?.message);
+      if (!nativeBridge.isNative() && source === 'camera') {
+        startCamera();
+      }
     }
   };
 
@@ -941,11 +957,11 @@ export const NewProductModal: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Import / Camera Buttons */}
+                {/* Import / Camera Buttons (Capacitor Native + Web Fallback) */}
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={startCamera}
+                    onClick={() => handleNativeCameraCapture('camera')}
                     disabled={images.length >= 3}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                       images.length >= 3 
@@ -957,22 +973,19 @@ export const NewProductModal: React.FC = () => {
                     <span className="hidden sm:inline">Prendre</span> Photo
                   </button>
 
-                  <label className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
-                    images.length >= 3
-                      ? 'bg-slate-800/50 text-slate-500 border-slate-800 cursor-not-allowed'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
-                  }`}>
+                  <button
+                    type="button"
+                    onClick={() => handleNativeCameraCapture('photos')}
+                    disabled={images.length >= 3}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
+                      images.length >= 3
+                        ? 'bg-slate-800/50 text-slate-500 border-slate-800 cursor-not-allowed'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
+                    }`}
+                  >
                     <Upload className="w-3.5 h-3.5 text-blue-400" />
                     <span className="hidden sm:inline">Importer</span> Galerie
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      disabled={images.length >= 3}
-                      onChange={handleImageFilesUpload}
-                      className="hidden"
-                    />
-                  </label>
+                  </button>
                 </div>
               </div>
 

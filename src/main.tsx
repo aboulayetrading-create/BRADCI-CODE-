@@ -1,8 +1,14 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
+import { defineCustomElements } from '@ionic/pwa-elements/loader';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
+
+// Initialize Capacitor PWA elements (for web fallback camera dialogs)
+if (typeof window !== 'undefined') {
+  defineCustomElements(window);
+}
 
 // Global Unhandled Error & Promise Rejection Interceptors (Anti-White-Screen Shield)
 if (typeof window !== 'undefined') {

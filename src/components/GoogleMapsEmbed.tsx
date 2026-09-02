@@ -21,7 +21,9 @@ import {
   ShieldCheck, 
   CheckCircle2, 
   AlertCircle,
-  Radio
+  Radio,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { ALL_COMMUNES, ZoneCommune } from '../data/communes';
 import { generateAbidjanRoute, RouteStep, RoutePlan, voiceNavigator } from '../utils/voiceNavigator';
@@ -29,7 +31,7 @@ import { generateAbidjanRoute, RouteStep, RoutePlan, voiceNavigator } from '../u
 interface GoogleMapsEmbedProps {
   pickupCommune: string;
   dropoffCommune: string;
-  vehicleType?: 'moto' | 'cargo';
+  vehicleType?: 'moto' | 'voiture' | 'car' | 'cargo';
   isReturning?: boolean;
   courierName?: string;
   courierPhone?: string;
@@ -49,7 +51,8 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
   onProgressChange,
   className = ''
 }) => {
-  const [mapMode, setMapMode] = useState<'google_interactive' | 'yango_interactive' | 'telemetry_radar' | 'satellite'>('google_interactive');
+  const [mapLayer, setMapLayer] = useState<'roadmap' | 'satellite'>('roadmap');
+  const [navTheme, setNavTheme] = useState<'night' | 'day'>('night'); // Default to high-contrast night navigation
   const [isVoiceEnabled, setIsVoiceEnabled] = useState<boolean>(true);
   const [autoPlayVoice, setAutoPlayVoice] = useState<boolean>(true);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
@@ -97,7 +100,7 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
     setIsVoiceEnabled(nextState);
     voiceNavigator.setMuted(!nextState);
     if (nextState) {
-      voiceNavigator.testVoice();
+      voiceNavigator.announceVoiceActivated();
     }
   };
 
@@ -108,10 +111,6 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
       voiceNavigator.speak(step.instruction);
     }
   };
-
-  // Find commune coordinates
-  const originZone = ALL_COMMUNES.find(c => c.name.toLowerCase().includes(pickupCommune.toLowerCase())) || ALL_COMMUNES[0];
-  const destZone = ALL_COMMUNES.find(c => c.name.toLowerCase().includes(dropoffCommune.toLowerCase())) || ALL_COMMUNES[2];
 
   // Calculate remaining distance and ETA
   const remainingFraction = Math.max(0, 1 - (localProgress / 100));
@@ -138,26 +137,10 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
     }
   };
 
-  const getVehicleBadgeIcon = () => {
-    switch (vehicleType) {
-      case 'cargo':
-        return <Truck className="w-4 h-4 text-purple-400" />;
-      default:
-        return <Bike className="w-4 h-4 text-emerald-400" />;
-    }
-  };
-
   // Google Maps Embed Query URL
   const gmapsOrigin = encodeURIComponent(`${pickupCommune}, Abidjan, Côte d'Ivoire`);
   const gmapsDest = encodeURIComponent(`${dropoffCommune}, Abidjan, Côte d'Ivoire`);
-  const gmapsEmbedUrl = `https://maps.google.com/maps?q=${gmapsOrigin}+to+${gmapsDest}&t=${mapMode === 'satellite' ? 'k' : 'm'}&z=13&ie=UTF8&iwloc=&output=embed`;
-  
-  // Yango / Yandex Maps URL
-  const yangoOrigin = encodeURIComponent(`${pickupCommune}, Abidjan`);
-  const yangoDest = encodeURIComponent(`${dropoffCommune}, Abidjan`);
-  const yangoEmbedUrl = `https://yandex.com/map-widget/v1/?rtext=${originZone.coords.lat},${originZone.coords.lng}~${destZone.coords.lat},${destZone.coords.lng}&rtt=auto&z=13`;
-  const yangoAppUrl = `https://maps.yandex.com/?rtext=${originZone.coords.lat},${originZone.coords.lng}~${destZone.coords.lat},${destZone.coords.lng}&rtt=auto`;
-  const yangoDeepLink = `yango://route?start-lat=${originZone.coords.lat}&start-lon=${originZone.coords.lng}&end-lat=${destZone.coords.lat}&end-lon=${destZone.coords.lng}`;
+  const gmapsEmbedUrl = `https://maps.google.com/maps?q=${gmapsOrigin}+to+${gmapsDest}&t=${mapLayer === 'satellite' ? 'k' : 'm'}&z=13&ie=UTF8&iwloc=&output=embed`;
 
   return (
     <div id="google-maps-navigation-cockpit" className={`rounded-3xl bg-[#070B14] border border-slate-800 overflow-hidden shadow-2xl ${className}`}>
@@ -170,62 +153,70 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm text-white font-display">
-                GPS & Navigation Vocale Itinéraire
+                Google Maps Navigation Grand Abidjan
               </span>
               <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono-num font-bold text-[10px] flex items-center gap-1 border border-emerald-500/30">
                 <Radio className="w-2.5 h-2.5 animate-ping text-emerald-400" />
-                <span>LIVE 4G</span>
+                <span>GPS LIVE</span>
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Grand Abidjan • {routePlan.originCommune} → {routePlan.destinationCommune}
+              {routePlan.originCommune} → {routePlan.destinationCommune} ({routePlan.totalDistanceKm} km)
             </p>
           </div>
         </div>
 
-        {/* Action Controls: Map Mode + Voice Toggle + Google Maps / Yango Maps App Links */}
+        {/* Action Controls: Layer Switcher + Theme Switcher + Voice */}
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {/* Map Layer Switcher */}
+          {/* Layer Switcher: Native Google Maps Plan vs Satellite */}
           <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
             <button
-              onClick={() => setMapMode('google_interactive')}
+              onClick={() => setMapLayer('roadmap')}
               className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
-                mapMode === 'google_interactive'
+                mapLayer === 'roadmap'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <span>🗺️ Google Maps</span>
+              <span>🗺️ Plan</span>
             </button>
             <button
-              onClick={() => setMapMode('yango_interactive')}
+              onClick={() => setMapLayer('satellite')}
               className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
-                mapMode === 'yango_interactive'
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>🚕 Yango Maps</span>
-            </button>
-            <button
-              onClick={() => setMapMode('telemetry_radar')}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
-                mapMode === 'telemetry_radar'
-                  ? 'bg-amber-500 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>📡 Radar GPS</span>
-            </button>
-            <button
-              onClick={() => setMapMode('satellite')}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all hidden md:flex items-center gap-1 ${
-                mapMode === 'satellite'
-                  ? 'bg-slate-700 text-white shadow-sm'
+                mapLayer === 'satellite'
+                  ? 'bg-emerald-700 text-white shadow-sm'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <span>🛰️ Satellite</span>
+            </button>
+          </div>
+
+          {/* Day / Night Driver Theme Toggle */}
+          <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
+            <button
+              onClick={() => setNavTheme('night')}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
+                navTheme === 'night'
+                  ? 'bg-slate-800 text-amber-300 shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Mode Nuit (Lisibilité et contraste sombre)"
+            >
+              <Moon className="w-3 h-3" />
+              <span className="hidden sm:inline">Nuit</span>
+            </button>
+            <button
+              onClick={() => setNavTheme('day')}
+              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
+                navTheme === 'day'
+                  ? 'bg-amber-500 text-slate-950 shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Mode Jour (Plein soleil)"
+            >
+              <Sun className="w-3 h-3" />
+              <span className="hidden sm:inline">Jour</span>
             </button>
           </div>
 
@@ -255,18 +246,6 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
           >
             <ExternalLink className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Google Maps</span>
-          </a>
-
-          {/* External Yango Maps Button */}
-          <a
-            href={yangoAppUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-2 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 text-xs font-bold flex items-center gap-1.5 transition-all"
-            title="Ouvrir la course dans Yango Maps / Yango App"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Yango Maps</span>
           </a>
         </div>
       </div>
@@ -315,187 +294,85 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
         </div>
       </div>
 
-      {/* 3. Main Map Canvas Area */}
+      {/* 3. Main Map Canvas Area: 100% Native Google Maps */}
       <div className="relative w-full h-80 sm:h-96 bg-[#040812] overflow-hidden">
-        {mapMode === 'google_interactive' || mapMode === 'satellite' ? (
-          /* Google Maps Interactive IFrame */
-          <div className="w-full h-full relative">
-            <iframe
-              title="Google Maps Route Navigation"
-              src={gmapsEmbedUrl}
-              className="w-full h-full border-0 filter contrast-110"
-              loading="lazy"
-              allowFullScreen
-            />
-            {/* Live Telemetry Overlay Pill */}
-            <div className="absolute top-3 left-3 bg-[#0B111E]/90 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-1.5 text-blue-400 font-bold">
-                <Bike className="w-4 h-4 animate-bounce" />
-                <span>Google Maps • {courierName}</span>
-              </div>
-              <div className="w-px h-4 bg-slate-800" />
-              <span className="font-mono-num text-amber-400 font-black">
-                {speedKmh} km/h
+        <div className="w-full h-full relative">
+          <iframe
+            title="Google Maps Route Navigation"
+            src={gmapsEmbedUrl}
+            className={`w-full h-full border-0 ${navTheme === 'night' ? 'brightness-90 contrast-125' : ''}`}
+            loading="lazy"
+            allowFullScreen
+          />
+
+          {/* Live Telemetry Overlay Pill in Top Left (Dynamic Vehicle Icon like Yango) */}
+          <div className="absolute top-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1.5 text-blue-400 font-bold">
+              {vehicleType === 'voiture' || vehicleType === 'car' ? (
+                <Car className="w-4 h-4 animate-pulse text-amber-400" />
+              ) : vehicleType === 'cargo' ? (
+                <Truck className="w-4 h-4 animate-pulse text-purple-400" />
+              ) : (
+                <Bike className="w-4 h-4 animate-bounce text-emerald-400" />
+              )}
+              <span>
+                {vehicleType === 'voiture' || vehicleType === 'car' ? 'Voiture' : vehicleType === 'cargo' ? 'Camionnette' : 'Moto'} • {courierName}
+              </span>
+            </div>
+            <div className="w-px h-4 bg-slate-800" />
+            <span className="font-mono-num text-amber-400 font-black">
+              {speedKmh} km/h
+            </span>
+          </div>
+
+          {/* In-Map Top-Right Telemetry Card */}
+          <div className="absolute top-3 right-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-3 rounded-2xl shadow-2xl flex flex-col gap-1.5 text-right">
+            <div>
+              <span className="text-[10px] text-slate-400 block uppercase font-bold">Distance Restante</span>
+              <span className="text-sm font-mono-num font-black text-white">
+                {remainingDistKm} km ({remainingMin} min)
               </span>
             </div>
           </div>
-        ) : mapMode === 'yango_interactive' ? (
-          /* Yango Maps Interactive IFrame */
-          <div className="w-full h-full relative">
-            <iframe
-              title="Yango Maps Route Navigation"
-              src={yangoEmbedUrl}
-              className="w-full h-full border-0 filter contrast-105"
-              loading="lazy"
-              allowFullScreen
-            />
-            {/* Live Telemetry Overlay Pill for Yango */}
-            <div className="absolute top-3 left-3 bg-[#0B111E]/90 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-1.5 text-red-400 font-bold">
-                <Bike className="w-4 h-4 animate-bounce" />
-                <span>Yango Maps • {courierName}</span>
+
+          {/* In-Map Bottom-Left Origin & Destination Badges */}
+          <div className="absolute bottom-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-[10px]">
+                A
               </div>
-              <div className="w-px h-4 bg-slate-800" />
-              <span className="font-mono-num text-amber-400 font-black">
-                {speedKmh} km/h
-              </span>
-            </div>
-            {/* Yango Direct App Trigger */}
-            <div className="absolute bottom-3 right-3 bg-red-600/90 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-sm">
-              <span>🚕 Mode Navigation Yango Actif</span>
-            </div>
-          </div>
-        ) : (
-          /* High-Precision Grand Abidjan Vector Radar Map */
-          <div className="w-full h-full relative flex items-center justify-center fintech-grid">
-            {/* SVG Interactive Grand Abidjan Topology */}
-            <svg className="w-full h-full absolute inset-0" viewBox="0 0 600 320">
-              {/* Lagoon Ébrié Water Body with glowing reflections */}
-              <path
-                d="M 0 170 Q 150 130, 300 170 T 600 160 L 600 240 Q 400 270, 200 230 T 0 220 Z"
-                fill="#0D2235"
-                stroke="#0284C7"
-                strokeWidth="1.5"
-                strokeOpacity="0.4"
-              />
-              <text x="250" y="200" fill="#0284C7" fontSize="11" fontWeight="bold" opacity="0.6">
-                Lagune Ébrié
-              </text>
-
-              {/* Major Highway Artery & Iconic Bridges */}
-              {/* Pont Henri Konan Bédié (HKB) */}
-              <line x1="260" y1="120" x2="310" y2="220" stroke="#334155" strokeWidth="8" strokeLinecap="round" />
-              <line x1="260" y1="120" x2="310" y2="220" stroke="#38BDF8" strokeWidth="2" strokeDasharray="3 3" />
-              <text x="285" y="170" fill="#94A3B8" fontSize="8" fontWeight="bold" transform="rotate(63 285 170)">
-                Pont HKB
-              </text>
-
-              {/* Pont De Gaulle & Pont Houphouët-Boigny */}
-              <line x1="180" y1="130" x2="190" y2="220" stroke="#334155" strokeWidth="7" strokeLinecap="round" />
-              <line x1="140" y1="135" x2="150" y2="220" stroke="#334155" strokeWidth="7" strokeLinecap="round" />
-
-              {/* Road Corridors */}
-              <path
-                d="M 80 60 Q 200 80, 260 120 T 380 260"
-                fill="none"
-                stroke="#1E293B"
-                strokeWidth="10"
-                strokeLinecap="round"
-              />
-              
-              {/* Active Route Trajectory Polyline */}
-              <path
-                d="M 80 60 Q 200 80, 260 120 T 380 260"
-                fill="none"
-                stroke={isReturning ? '#EF4444' : '#F59E0B'}
-                strokeWidth="4"
-                strokeDasharray="8 6"
-                className="animate-pulse"
-              />
-
-              {/* Communes Landmarks Labels */}
-              <g className="text-slate-400 font-bold" fontSize="10">
-                {/* Cocody */}
-                <circle cx="80" cy="60" r="5" fill="#3B82F6" />
-                <text x="92" y="64" fill="#60A5FA" fontWeight="bold">Cocody (Angré / Riviera)</text>
-
-                {/* Plateau */}
-                <circle cx="190" cy="115" r="5" fill="#94A3B8" />
-                <text x="198" y="118" fill="#E2E8F0" fontWeight="bold">Le Plateau</text>
-
-                {/* Yopougon */}
-                <circle cx="50" cy="140" r="4" fill="#94A3B8" />
-                <text x="15" y="145" fill="#94A3B8">Yopougon</text>
-
-                {/* Marcory */}
-                <circle cx="310" cy="230" r="5" fill="#10B981" />
-                <text x="322" y="234" fill="#34D399" fontWeight="bold">Marcory (Zone 4)</text>
-
-                {/* Koumassi / Port-Bouët */}
-                <circle cx="440" cy="270" r="4" fill="#94A3B8" />
-                <text x="450" y="275" fill="#94A3B8">Koumassi / Port-Bouët</text>
-              </g>
-
-              {/* Animated Courier Position on Route */}
-              {(() => {
-                // Approximate coordinate interpolation along route (M 80 60 -> 260 120 -> 380 260)
-                const frac = localProgress / 100;
-                let curX = 80 + frac * (380 - 80);
-                let curY = 60 + frac * (260 - 60);
-
-                return (
-                  <g transform={`translate(${curX}, ${curY})`}>
-                    {/* Pulsing Radar Ring */}
-                    <circle cx="0" cy="0" r="22" fill={isReturning ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.25)'} className="animate-ping" />
-                    <circle cx="0" cy="0" r="14" fill={isReturning ? '#EF4444' : '#10B981'} stroke="#FFFFFF" strokeWidth="2.5" />
-                    <text x="0" y="3" textAnchor="middle" fill="#05101A" fontSize="9" fontWeight="900">
-                      🛵
-                    </text>
-                  </g>
-                );
-              })()}
-            </svg>
-
-            {/* In-Map Top-Right Telemetry Card */}
-            <div className="absolute top-3 right-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-3 rounded-2xl shadow-2xl flex flex-col gap-2 text-right">
               <div>
-                <span className="text-[10px] text-slate-400 block uppercase font-bold">Vitesse Réelle</span>
-                <span className="text-base font-mono-num font-black text-amber-400">
-                  {speedKmh} km/h
-                </span>
-              </div>
-              <div className="border-t border-slate-800/80 pt-1.5">
-                <span className="text-[10px] text-slate-400 block uppercase font-bold">Distance Restante</span>
-                <span className="text-sm font-mono-num font-black text-white">
-                  {remainingDistKm} km ({remainingMin} min)
-                </span>
+                <span className="text-[9px] text-slate-400 block">Départ</span>
+                <span className="font-bold text-white text-xs">{routePlan.originCommune}</span>
               </div>
             </div>
-
-            {/* In-Map Bottom-Left Origin & Destination Badges */}
-            <div className="absolute bottom-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-[10px]">
-                  A
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Départ</span>
-                  <span className="font-bold text-white text-xs">{routePlan.originCommune}</span>
-                </div>
+            <ArrowRight className="w-4 h-4 text-slate-500 shrink-0" />
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px]">
+                B
               </div>
-              <ArrowRight className="w-4 h-4 text-slate-500 shrink-0" />
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px]">
-                  B
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Arrivée</span>
-                  <span className="font-bold text-white text-xs">{routePlan.destinationCommune}</span>
-                </div>
+              <div>
+                <span className="text-[9px] text-slate-400 block">Arrivée</span>
+                <span className="font-bold text-white text-xs">{routePlan.destinationCommune}</span>
               </div>
             </div>
           </div>
-        )}
+
+          {/* Floating Recenter GPS Button in Bottom Right (Exact match from user screenshot) */}
+          <div className="absolute bottom-3 right-3 z-20">
+            <button
+              onClick={() => {
+                if (isVoiceEnabled) {
+                  voiceNavigator.speak(`Recentrage GPS sur l'itinéraire de ${routePlan.originCommune} vers ${routePlan.destinationCommune}.`);
+                }
+              }}
+              className="w-12 h-12 rounded-full bg-[#1A2524] hover:bg-[#253634] text-white border-2 border-slate-700/80 shadow-2xl flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer group"
+              title="Recentrer le GPS"
+            >
+              <Navigation className="w-5 h-5 text-white transition-transform group-hover:rotate-45" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 4. Interactive Route Steps List with Spoken Audio Previews */}

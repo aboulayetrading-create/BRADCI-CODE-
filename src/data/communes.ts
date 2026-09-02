@@ -15,6 +15,7 @@ export interface ZoneCommune {
   neighborhoods: string[];
   description: string;
   baseDeliveryFeeMoto: number; // Base rate in FCFA
+  zone?: string;
 }
 
 export const ALL_COMMUNES: ZoneCommune[] = [
@@ -412,6 +413,7 @@ export function calculateDeliveryFee(
 export const COMMUNE_NAMES_ABIDJAN = ALL_COMMUNES.filter(c => c.type === 'abidjan_intramuros').map(c => c.name);
 export const COMMUNE_NAMES_ENVIRONS = ALL_COMMUNES.filter(c => c.type === 'villes_environnantes').map(c => c.name);
 export const ALL_COMMUNE_NAMES = ALL_COMMUNES.map(c => c.name);
+export const ABIDJAN_COMMUNES = ALL_COMMUNES;
 
 // Get formatted badge styling for a commune
 export function getCommuneBadgeInfo(communeName: string) {

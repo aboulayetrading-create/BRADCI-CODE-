@@ -41,7 +41,7 @@ export interface ShopProfile {
 
 export type AppLanguage = 'fr' | 'en';
 export type AppTheme = 'dark' | 'light' | 'auto';
-export type MapProvider = 'google' | 'yango';
+export type MapProvider = 'google' | 'satellite' | 'radar';
 
 export interface User {
   id: string;
@@ -165,7 +165,7 @@ export interface ReferralRecord {
   firstTxType?: 'purchase' | 'sale';
 }
 
-export type VehicleType = 'moto' | 'cargo';
+export type VehicleType = 'moto' | 'voiture' | 'car' | 'cargo';
 
 export interface Bid {
   id: string;
@@ -359,6 +359,149 @@ export interface DeliveryJob {
   cancellationType?: 'buyer_absent_timeout' | 'buyer_refused_inspection' | 'buyer_cancelled';
   driverCompensationBonusFCFA?: number; // 15% of item value paid to driver wallet
   returnTripDirectionCommune?: string; // Direction of the seller for route matching
+  
+  // Cart & Multi-Pickup Grouped Delivery Fields
+  isCartConsolidated?: boolean;
+  cartOrderRecordId?: string;
+  masterDeliveryOtp?: string;
+  pickupStops?: CartPickupStop[];
+  cartItemsSummary?: {
+    totalItems: number;
+    uniqueSellers?: number;
+    items: {
+      productId: string;
+      title: string;
+      quantity: number;
+      price: number;
+      sellerName: string;
+      channel: CartItemChannel;
+      image: string;
+      pickupCode?: string;
+    }[];
+  };
+}
+
+export type CartItemChannel = 'boutique' | 'enchere' | 'destockage' | 'liquidation';
+
+export interface CartItem {
+  id: string; // unique item id in cart
+  productId: string;
+  productTitle: string;
+  productImage: string;
+  title?: string;
+  imageUrl?: string;
+  image?: string;
+  price?: number;
+  category: string;
+  channel: CartItemChannel;
+  unitPrice: number; // in FCFA
+  quantity: number;
+  maxAvailableStock: number; // e.g. stockQuantity or 1 for auction/unique lots
+  sellerId: string;
+  sellerName: string;
+  sellerPhone?: string;
+  shopId?: string;
+  shopName?: string;
+  sellerAvatar?: string;
+  commune: string;
+  pickupAddress: string;
+  pickupCoords?: { lat: number; lng: number };
+  requiredVehicle: VehicleType;
+  pickupCode: string; // 4-digit code for this seller
+  isB2BLot?: boolean;
+  b2bSaleKind?: B2BSaleKind;
+  b2bTotalUnitsCount?: number;
+  b2bCompanyName?: string;
+}
+
+export interface CartSellerGroup {
+  sellerId: string;
+  sellerName: string;
+  sellerPhone?: string;
+  shopId?: string;
+  shopName?: string;
+  sellerAvatar?: string;
+  commune: string;
+  sellerCommune?: string;
+  pickupAddress: string;
+  sellerAddress?: string;
+  pickupCoords?: { lat: number; lng: number };
+  pickupCode: string; // Individual pickup code for driver at this seller
+  sellerPickupCode?: string;
+  itemsCount?: number;
+  isPickedUp?: boolean;
+  pickedUpAt?: string;
+  items: CartItem[];
+  subtotal: number;
+  sellerSubtotal?: number;
+  requiredVehicle: VehicleType;
+}
+
+export interface CartPickupStop {
+  stopIndex: number; // 1, 2, 3...
+  stopId?: string;
+  sellerId: string;
+  sellerName: string;
+  sellerPhone: string;
+  commune: string;
+  address: string;
+  coords: { lat: number; lng: number };
+  pickupCode: string;
+  itemCount: number;
+  itemTitles: string[];
+  isCompleted: boolean;
+  completedAt?: string;
+}
+
+export interface CartDeliveryOptimization {
+  totalItemCount: number;
+  totalUniqueSellers: number;
+  totalUniqueCommunes: number;
+  dominantVehicle: VehicleType;
+  rawIndividualDeliveryFees: number; // If paid separately (e.g. 3 x 2000 = 6000 F)
+  optimizedDeliveryFee: number; // Grouped fee (e.g. 2500 F)
+  groupingSavingsFCFA: number; // Savings for buyer (e.g. 3500 F)
+  driverMultiPickupBonusFCFA: number; // Multi-stop incentive for driver
+  pickupStops: CartPickupStop[];
+  totalCostEstimate?: number;
+  uniqueSellersCount?: number;
+  totalDeliverySavings?: number;
+  sellerGroups?: CartSellerGroup[];
+  itemsSubtotal?: number;
+  rawDeliveryFeeSum?: number;
+  totalDistanceKm?: number;
+  estimatedMinutesTotal?: number;
+}
+
+export interface CartOrderRecord {
+  id: string; // e.g. "ORDER-CART-XXXX"
+  buyerId: string;
+  buyerName: string;
+  buyerPhone: string;
+  dropoffCommune: string;
+  dropoffAddress: string;
+  dropoffCoords: { lat: number; lng: number };
+  items: CartItem[];
+  sellerGroups: CartSellerGroup[];
+  itemsSubtotalFCFA: number;
+  rawDeliveryFeesFCFA: number;
+  optimizedDeliveryFeeFCFA: number;
+  deliverySavingsFCFA: number;
+  referralDiscountFCFA?: number;
+  totalAmountPaidFCFA: number;
+  paymentMethod: PaymentMethod;
+  paymentChoice: 'delivery' | 'direct';
+  paymentStatus?: 'PENDING' | 'PAYMENT_SUCCESS' | 'PAID' | 'COMPLETED';
+  status?: string;
+  totalItemsCount?: number;
+  appliedReferralDiscountFCFA?: number;
+  optimizationSummary?: any;
+  trackingTimeline?: any;
+  deliveryJobId?: string;
+  masterDeliveryOtp: string; // Unified 4-digit OTP for final client handover
+  createdAt: string;
+  completedAt?: string;
+  invoiceAuditId?: string;
 }
 
 export type OrderStatus = 'PENDING' | 'IN_TRANSIT' | 'ARRIVED' | 'PAYMENT_PENDING' | 'PAID' | 'COMPLETED' | 'CANCELLED';

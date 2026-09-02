@@ -19,8 +19,9 @@ export const TRANSLATIONS = {
     themeDark: "Mode Sombre",
     themeLight: "Mode Clair",
     themeAuto: "Thème Auto (Jour/Nuit)",
-    mapProviderGoogle: "Google Maps",
-    mapProviderYango: "Yango Maps (Afrique de l'Ouest)",
+    mapProviderGoogle: "Google Maps (Plan)",
+    mapProviderSatellite: "Google Maps (Satellite)",
+    mapProviderRadar: "Radar Topologique",
     
     // Navbar & Common
     sellBtn: "Vendre",
@@ -114,7 +115,6 @@ export const TRANSLATIONS = {
     kycBannerUnverified: "Votre compte nécessite une vérification d'identité pour débloquer les achats, ventes et livraisons.",
     kycBannerRejected: "Votre dossier KYC a été rejeté par l'administration. Veuillez soumettre à nouveau vos pièces conformes.",
     kycBannerBtn: "Soumettre mes Pièces d'Identité",
-    kycBannerAdminBypass: "⚡ Valider KYC Immédiatement (Mode Démo Admin / Testeur)",
     kycModalTitle: "Vérification d'Identité KYC (Know Your Customer)",
     kycModalSubtitle: "Protocole de sécurité anti-fraude et lutte contre l'usurpation d'identité",
     kycUploadOrCamera: "Prendre une photo avec la caméra ou importer un fichier",
@@ -244,8 +244,9 @@ export const TRANSLATIONS = {
     themeDark: "Dark Mode",
     themeLight: "Light Mode",
     themeAuto: "Auto Theme (Day/Night)",
-    mapProviderGoogle: "Google Maps",
-    mapProviderYango: "Yango Maps (West Africa)",
+    mapProviderGoogle: "Google Maps (Roadmap)",
+    mapProviderSatellite: "Google Maps (Satellite)",
+    mapProviderRadar: "Topological Radar",
     
     // Navbar & Common
     sellBtn: "Sell",
@@ -339,7 +340,6 @@ export const TRANSLATIONS = {
     kycBannerUnverified: "Your account requires identity verification to unlock bidding, selling, and delivery dispatch.",
     kycBannerRejected: "Your KYC file was rejected by the administration. Please re-submit your identity documents.",
     kycBannerBtn: "Submit Identity Documents",
-    kycBannerAdminBypass: "⚡ Instant KYC Approval (Admin / Tester Demo Mode)",
     kycModalTitle: "KYC Identity Verification (Know Your Customer)",
     kycModalSubtitle: "Anti-fraud security protocol & identity theft prevention",
     kycUploadOrCamera: "Take a photo with camera or upload a file",

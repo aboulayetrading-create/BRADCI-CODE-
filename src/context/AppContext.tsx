@@ -27,8 +27,20 @@ import {
   ReviewRecord,
   FraudIncidentRecord,
   ReferralRecord,
-  VehicleType
+  VehicleType,
+  CartItem,
+  CartItemChannel,
+  CartSellerGroup,
+  CartPickupStop,
+  CartDeliveryOptimization,
+  CartOrderRecord
 } from '../types';
+import { 
+  createCartItemFromProduct,
+  groupCartItemsBySeller,
+  calculateCartDeliveryOptimization,
+  generateCartInvoiceHTML
+} from '../utils/cartOptimizationEngine';
 import { 
   INITIAL_USERS, 
   INITIAL_PRODUCTS, 
@@ -57,6 +69,7 @@ import {
   PaymentAuditLog,
   getStoredAuditLogs
 } from '../utils/paymentAuditReceiptService';
+import { nativeBridge, NativePhotoSource, NativeCameraFacing } from '../utils/nativeBridge';
 
 interface ToastNotification {
   id: string;
@@ -128,6 +141,23 @@ interface AppContextType {
   setGpsModalOpen: (open: boolean) => void;
   requestGpsPermission: (forcePrompt?: boolean) => Promise<GPSLocation | null>;
   setUserManualLocation: (communeName: string, customAddress?: string) => void;
+
+  // Native Mobile Bridge & Permissions (Capacitor Geolocation & Camera)
+  isNativeApp: boolean;
+  nativePlatform: string;
+  cameraPermissionStatus: 'prompt' | 'granted' | 'denied';
+  requestCameraPermission: () => Promise<boolean>;
+  captureNativePhoto: (options?: {
+    source?: NativePhotoSource;
+    direction?: NativeCameraFacing;
+    quality?: number;
+  }) => Promise<{ dataUrl: string; format?: string }>;
+  nativePermissionPrompt: {
+    isOpen: boolean;
+    config: any;
+    openPrompt: (config: any) => void;
+    closePrompt: () => void;
+  };
 
   // Modals & UI States
   authModalOpen: boolean;
@@ -282,6 +312,27 @@ interface AppContextType {
   simulateNewRefereeRegistration: (sponsorCode?: string) => ReferralRecord | null;
   simulateRefereeKycApproved: (refereeId: string) => boolean;
   simulateRefereeFirstTransaction: (refereeId: string) => boolean;
+
+  // Shopping Cart & Multi-Item Orders Suite
+  cart: CartItem[];
+  cartModalOpen: boolean;
+  setCartModalOpen: (open: boolean) => void;
+  addToCart: (product: Product, quantity?: number, forcedChannel?: CartItemChannel) => boolean;
+  removeFromCart: (cartItemId: string) => void;
+  updateCartItemQuantity: (cartItemId: string, newQuantity: number) => void;
+  clearCart: () => void;
+  checkoutCart: (
+    dropoffAddress: string,
+    dropoffCommune: string,
+    dropoffCoords: { lat: number; lng: number },
+    paymentMethod: PaymentMethod,
+    paymentChoice: 'delivery' | 'direct',
+    useReferralDiscount?: boolean
+  ) => Promise<CartOrderRecord | null>;
+  cartOrders: CartOrderRecord[];
+  cartInvoiceModalOrder: CartOrderRecord | null;
+  setCartInvoiceModalOrder: (order: CartOrderRecord | null) => void;
+  driverConfirmStopPickup: (jobId: string, stopIndex: number, enteredCode: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -374,6 +425,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (saved as 'prompt' | 'granted' | 'denied') || 'granted';
   });
 
+  // Native Camera & Permission Prompt States
+  const [cameraPermissionStatus, setCameraPermissionStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+  const [permissionPromptConfig, setPermissionPromptConfig] = useState<any>(null);
+  const [permissionPromptOpen, setPermissionPromptOpen] = useState<boolean>(false);
+
+  const openPermissionPrompt = useCallback((config: any) => {
+    setPermissionPromptConfig(config);
+    setPermissionPromptOpen(true);
+  }, []);
+
+  const closePermissionPrompt = useCallback(() => {
+    setPermissionPromptOpen(false);
+    setPermissionPromptConfig(null);
+  }, []);
+
   const [gpsModalOpen, setGpsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('explore');
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -387,6 +453,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedShopForView, setSelectedShopForView] = useState<ShopProfile | null>(null);
   const [receiptModalData, setReceiptModalData] = useState<{ transactionData: TransactionAuditInput; auditLog: PaymentAuditLog } | null>(null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
+  // ================= SHOPPING CART & MULTI-ITEM ORDERS STATE =================
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    const saved = localStorage.getItem('bradci_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [cartOrders, setCartOrders] = useState<CartOrderRecord[]>(() => {
+    const saved = localStorage.getItem('bradci_cart_orders');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [cartModalOpen, setCartModalOpen] = useState(false);
+  const [cartInvoiceModalOrder, setCartInvoiceModalOrder] = useState<CartOrderRecord | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_cart', JSON.stringify(cart));
+  }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_cart_orders', JSON.stringify(cartOrders));
+  }, [cartOrders]);
 
   // ================= ADMIN SUITE & FINANCIAL STATES =================
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
@@ -642,7 +730,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('bradci_voice_enabled', String(next));
       voiceNavigator.setMuted(!next);
       if (next) {
-        voiceNavigator.testVoice(language);
+        voiceNavigator.announceVoiceActivated(language);
         addToast(
           language === 'en' ? 'Voice Assistance Enabled 🔊' : 'Assistance Vocale Activée 🔊',
           language === 'en' ? 'Live announcements for auctions, escrow, and deliveries active.' : 'Annonces en direct des enchères, du séquestre et de la bourse de fret.',
@@ -1038,75 +1126,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Request GPS Location (Navigator Geolocation)
+  // Request GPS Location (Capacitor Geolocation with Browser Fallback)
   const requestGpsPermission = useCallback(async (forcePrompt = false): Promise<GPSLocation | null> => {
-    if (typeof window === 'undefined' || !navigator.geolocation) {
+    try {
+      const pos = await nativeBridge.getCurrentPosition({ enableHighAccuracy: true, timeout: 12000 });
+      const lat = pos.latitude;
+      const lng = pos.longitude;
+      const accuracy = pos.accuracy;
+      const nearest = findNearestCommune(lat, lng);
+      const newLoc: GPSLocation = {
+        lat,
+        lng,
+        accuracy,
+        commune: nearest.name,
+        address: `${nearest.name} (${nearest.group}) - Position GPS Détectée`
+      };
+
+      setUserLocation(newLoc);
+      setGpsPermissionStatus('granted');
+      setGpsModalOpen(false);
+
+      if (currentUser) {
+        const updated = { ...currentUser, gpsLocation: newLoc };
+        setCurrentUser(updated);
+        setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
+      }
+
+      addToast(
+        '📍 GPS Activé avec Succès',
+        `Position détectée : ${nearest.name} (${lat.toFixed(4)}, ${lng.toFixed(4)}) [Précision ~${Math.round(accuracy)}m]`,
+        'success'
+      );
+      return newLoc;
+    } catch (error: any) {
+      console.warn('Capacitor / Browser Geolocation error:', error?.message);
+      setGpsPermissionStatus('denied');
+      if (forcePrompt) {
+        setGpsModalOpen(true);
+      }
+      const defaultCoords = getCommuneCoords(currentUser?.gpsLocation?.commune || 'Cocody');
       const fallbackLoc: GPSLocation = {
-        lat: 5.3599,
-        lng: -3.9875,
-        commune: 'Cocody',
-        address: 'Riviera 2, Abidjan (Position standard)',
-        accuracy: 15
+        ...defaultCoords,
+        commune: currentUser?.gpsLocation?.commune || 'Cocody',
+        address: `${currentUser?.gpsLocation?.commune || 'Cocody'}, Abidjan`,
+        accuracy: 50
       };
       setUserLocation(fallbackLoc);
-      setGpsPermissionStatus('granted');
       return fallbackLoc;
     }
-
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          const accuracy = position.coords.accuracy;
-          const nearest = findNearestCommune(lat, lng);
-          const newLoc: GPSLocation = {
-            lat,
-            lng,
-            accuracy,
-            commune: nearest.name,
-            address: `${nearest.name} (${nearest.group}) - Position GPS Détectée`
-          };
-
-          setUserLocation(newLoc);
-          setGpsPermissionStatus('granted');
-          setGpsModalOpen(false);
-
-          // Update current user's GPS
-          if (currentUser) {
-            const updated = { ...currentUser, gpsLocation: newLoc };
-            setCurrentUser(updated);
-            setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
-          }
-
-          addToast(
-            '📍 GPS Activé avec Succès',
-            `Position détectée : ${nearest.name} (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-            'success'
-          );
-          resolve(newLoc);
-        },
-        (error) => {
-          console.warn('Geolocation denied or unavailable:', error.message);
-          setGpsPermissionStatus('denied');
-          if (forcePrompt) {
-            setGpsModalOpen(true);
-          }
-          // Default to current user's profile commune coords
-          const defaultCoords = getCommuneCoords(currentUser?.gpsLocation?.commune || 'Cocody');
-          const fallbackLoc: GPSLocation = {
-            ...defaultCoords,
-            commune: currentUser?.gpsLocation?.commune || 'Cocody',
-            address: `${currentUser?.gpsLocation?.commune || 'Cocody'}, Abidjan`,
-            accuracy: 50
-          };
-          setUserLocation(fallbackLoc);
-          resolve(fallbackLoc);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-      );
-    });
   }, [currentUser]);
+
+  // Request Camera Permission (Capacitor Camera)
+  const requestCameraPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      const granted = await nativeBridge.requestCameraPermission();
+      setCameraPermissionStatus(granted ? 'granted' : 'denied');
+      return granted;
+    } catch {
+      setCameraPermissionStatus('denied');
+      return false;
+    }
+  }, []);
+
+  // Capture Photo via Capacitor Camera & Gallery
+  const captureNativePhoto = useCallback(async (options?: {
+    source?: NativePhotoSource;
+    direction?: NativeCameraFacing;
+    quality?: number;
+  }) => {
+    return nativeBridge.capturePhoto(options);
+  }, []);
 
   // Set Manual Location if GPS hardware is unavailable
   const setUserManualLocation = (communeName: string, customAddress?: string) => {
@@ -1476,6 +1565,310 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Achat de "${prod.title}" pour ${finalAmount.toLocaleString('fr-FR')} FCFA. Paiement Direct à la Livraison lors de la remise en main propre.`,
       'success'
     );
+    return true;
+  };
+
+  // ================= SHOPPING CART & MULTI-ITEM CHECKOUT ENGINE =================
+  const addToCart = (product: Product, quantity: number = 1, forcedChannel?: CartItemChannel): boolean => {
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return false;
+    }
+
+    if (product.status !== 'active') {
+      addToast('Article Indisponible', 'Cet article n\'est plus disponible à la vente.', 'error');
+      return false;
+    }
+
+    if (product.isOutOfStock || (product.stockQuantity !== undefined && product.stockQuantity <= 0)) {
+      addToast('Stock Épuisé', 'Cet article est en rupture de stock.', 'warning');
+      return false;
+    }
+
+    const availableStock = product.stockQuantity !== undefined ? product.stockQuantity : 99;
+    const existingIndex = cart.findIndex(item => item.productId === product.id);
+
+    if (existingIndex >= 0) {
+      const existing = cart[existingIndex];
+      const newQty = existing.quantity + quantity;
+      if (newQty > availableStock) {
+        addToast(
+          'Stock Maximum Atteint',
+          `Vous avez déjà ${existing.quantity} exemplaire(s) dans le panier. Stock restant : ${availableStock}.`,
+          'warning'
+        );
+        return false;
+      }
+      setCart(prev => prev.map((item, idx) => idx === existingIndex ? { ...item, quantity: newQty } : item));
+      addToast(
+        '🛒 Quantité Mise à Jour !',
+        `"${product.title}" (${newQty} exemplaires dans votre panier).`,
+        'success'
+      );
+    } else {
+      const newItem = createCartItemFromProduct(product, Math.min(quantity, availableStock), forcedChannel);
+      setCart(prev => [newItem, ...prev]);
+      addToast(
+        '🛒 Ajouté au Panier !',
+        `"${product.title}" (${newItem.unitPrice.toLocaleString('fr-FR')} FCFA) ajouté à votre panier.`,
+        'success'
+      );
+    }
+
+    return true;
+  };
+
+  const removeFromCart = (cartItemId: string) => {
+    const itemToRemove = cart.find(i => i.id === cartItemId);
+    setCart(prev => prev.filter(i => i.id !== cartItemId));
+    if (itemToRemove) {
+      addToast('Article Retiré', `"${itemToRemove.title}" a été retiré du panier.`, 'info');
+    }
+  };
+
+  const updateCartItemQuantity = (cartItemId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeFromCart(cartItemId);
+      return;
+    }
+    setCart(prev => prev.map(item => {
+      if (item.id === cartItemId) {
+        const validQty = item.maxAvailableStock ? Math.min(newQuantity, item.maxAvailableStock) : newQuantity;
+        return { ...item, quantity: validQty };
+      }
+      return item;
+    }));
+  };
+
+  const clearCart = () => {
+    setCart([]);
+    addToast('Panier Vidé', 'Tous les articles ont été retirés de votre panier.', 'info');
+  };
+
+  const checkoutCart = async (
+    dropoffAddress: string,
+    dropoffCommune: string,
+    dropoffCoords: { lat: number; lng: number },
+    paymentMethod: PaymentMethod = 'Wave',
+    paymentChoice: 'delivery' | 'direct' = 'delivery',
+    useReferralDiscount: boolean = false
+  ): Promise<CartOrderRecord | null> => {
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return null;
+    }
+
+    if (cart.length === 0) {
+      addToast('Panier Vide', 'Votre panier ne contient aucun article.', 'warning');
+      return null;
+    }
+
+    // Run smart delivery optimization
+    const optimization = calculateCartDeliveryOptimization(cart, dropoffCommune, dropoffCoords);
+
+    let referralDiscount = 0;
+    if (useReferralDiscount && (currentUser.referralBalance || 0) > 0) {
+      const maxDeduct = Math.min(currentUser.referralBalance || 0, optimization.totalCostEstimate);
+      const res = applyReferralBalanceToPurchase(maxDeduct);
+      if (res.success) {
+        referralDiscount = res.deducted;
+      }
+    }
+
+    const finalAmountToPay = Math.max(0, optimization.totalCostEstimate - referralDiscount);
+    const masterOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    const orderId = 'cart-order-' + Date.now();
+    const deliveryJobId = 'job-cart-' + Date.now();
+
+    const newCartOrder: CartOrderRecord = {
+      id: orderId,
+      buyerId: currentUser.id,
+      buyerName: currentUser.name,
+      buyerPhone: currentUser.phone,
+      items: [...cart],
+      sellerGroups: optimization.sellerGroups,
+      optimizationSummary: optimization,
+      totalItemsCount: optimization.totalItemCount,
+      itemsSubtotalFCFA: optimization.itemsSubtotal,
+      rawDeliveryFeesFCFA: optimization.rawDeliveryFeeSum,
+      optimizedDeliveryFeeFCFA: optimization.optimizedDeliveryFee,
+      deliverySavingsFCFA: optimization.totalDeliverySavings,
+      appliedReferralDiscountFCFA: referralDiscount,
+      totalAmountPaidFCFA: finalAmountToPay,
+      paymentMethod,
+      paymentChoice,
+      masterDeliveryOtp: masterOtp,
+      dropoffCommune,
+      dropoffAddress,
+      dropoffCoords,
+      status: 'AWAITING_COURIER',
+      deliveryJobId,
+      createdAt: new Date().toISOString(),
+      trackingTimeline: [
+        {
+          timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+          status: 'COMMANDE_CREEE',
+          title: 'Commande Panier Validée',
+          description: `Panier groupé de ${optimization.totalItemCount} article(s) auprès de ${optimization.uniqueSellersCount} vendeur(s) validé.`
+        }
+      ]
+    };
+
+    // Create Consolidated Delivery Job for Couriers
+    const newDeliveryJob: DeliveryJob = {
+      id: deliveryJobId,
+      productId: cart[0]?.productId || 'cart-group',
+      productTitle: `Panier Groupé (${optimization.totalItemCount} articles - ${optimization.uniqueSellersCount} arrêts)`,
+      productImage: cart[0]?.imageUrl || 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=500&auto=format&fit=crop&q=60',
+      sellerName: optimization.sellerGroups.map(g => g.sellerName).join(', '),
+      sellerPhone: '+225 07 00 00 00 00',
+      pickupCommune: optimization.pickupStops[0]?.commune || 'Abidjan',
+      pickupAddress: optimization.pickupStops[0]?.address || 'Arrêts multiples',
+      pickupCoords: optimization.pickupStops[0]?.coords || dropoffCoords,
+      buyerName: currentUser.name,
+      buyerPhone: currentUser.phone,
+      dropoffCommune,
+      dropoffAddress,
+      dropoffCoords,
+      requiredVehicle: optimization.dominantVehicle,
+      deliveryFee: optimization.optimizedDeliveryFee,
+      itemValue: optimization.itemsSubtotal,
+      status: 'available',
+      orderStatus: paymentChoice === 'direct' ? 'PAID' : 'PENDING',
+      paymentStatus: paymentChoice === 'direct' ? 'PAID' : 'PENDING',
+      pickupCode: optimization.pickupStops[0]?.pickupCode || '1234',
+      deliveryOtpCode: masterOtp,
+      masterDeliveryOtp: masterOtp,
+      distanceKm: Math.round(optimization.totalDistanceKm * 10) / 10,
+      etaMinutes: optimization.estimatedMinutesTotal,
+      isCartConsolidated: true,
+      cartOrderRecordId: orderId,
+      pickupStops: optimization.pickupStops,
+      cartItemsSummary: {
+        totalItems: optimization.totalItemCount,
+        uniqueSellers: optimization.uniqueSellersCount,
+        items: cart.map(i => ({
+          productId: i.productId,
+          title: i.title || i.productTitle,
+          quantity: i.quantity,
+          price: i.unitPrice,
+          unitPrice: i.unitPrice,
+          sellerName: i.sellerName,
+          channel: i.channel,
+          image: i.image || i.imageUrl || i.productImage || '',
+          pickupCode: i.pickupCode
+        }))
+      }
+    };
+
+    // Save states
+    setCartOrders(prev => [newCartOrder, ...prev]);
+    setFreightJobs(prev => [newDeliveryJob, ...prev]);
+
+    // Update stock & status for boutique products in cart
+    setProducts(prev => prev.map(p => {
+      const cartMatch = cart.find(c => c.productId === p.id);
+      if (cartMatch) {
+        const currentStock = p.stockQuantity !== undefined ? p.stockQuantity : 1;
+        const nextStock = Math.max(0, currentStock - cartMatch.quantity);
+        const nextSoldCount = (p.soldCount || 0) + cartMatch.quantity;
+        const isOutOfStock = nextStock === 0;
+        return {
+          ...p,
+          stockQuantity: nextStock,
+          soldCount: nextSoldCount,
+          isOutOfStock,
+          outOfStockSince: isOutOfStock ? new Date().toISOString() : undefined,
+          winnerId: currentUser.id,
+          winnerName: currentUser.name,
+          orderStatus: 'PENDING',
+          paymentStatus: paymentChoice === 'direct' ? 'PAID' : 'PENDING'
+        };
+      }
+      return p;
+    }));
+
+    // Notify each seller
+    optimization.sellerGroups.forEach(group => {
+      addNotification({
+        recipientRole: 'client',
+        recipientUserId: group.sellerId,
+        title: '📦 Nouvelle Vente dans une Commande Panier !',
+        message: `L'acheteur ${currentUser.name} a commandé ${group.itemsCount} article(s) (${group.sellerSubtotal.toLocaleString('fr-FR')} FCFA) dans sa commande groupée. Code d'enlèvement livreur : ${group.sellerPickupCode}.`,
+        type: 'delivery',
+        urgency: 'high'
+      });
+    });
+
+    // Notify drivers
+    addNotification({
+      recipientRole: 'driver',
+      recipientUserId: 'all_drivers',
+      title: '🛵 Nouvelle Course Panier Optimisée !',
+      message: `Course multi-arrêts disponible : ${optimization.pickupStops.length} point(s) d'enlèvement -> ${dropoffCommune}. Rémunération : ${optimization.optimizedDeliveryFee.toLocaleString('fr-FR')} FCFA.`,
+      type: 'delivery',
+      urgency: 'high'
+    });
+
+    // Clear cart
+    setCart([]);
+    setCartModalOpen(false);
+    setCartInvoiceModalOrder(newCartOrder);
+
+    // Audio chime & Confetti
+    playSuccessChime();
+    confetti({
+      particleCount: 120,
+      spread: 90,
+      origin: { y: 0.55 }
+    });
+
+    addToast(
+      '🎉 Panier Commandé avec Succès !',
+      `${optimization.totalItemCount} article(s) groupé(s) - Économie livraison : ${optimization.totalDeliverySavings.toLocaleString('fr-FR')} FCFA. Votre Code OTP Unique est : ${masterOtp}.`,
+      'success'
+    );
+
+    return newCartOrder;
+  };
+
+  const driverConfirmStopPickup = (jobId: string, stopIndex: number, enteredCode: string): boolean => {
+    const job = freightJobs.find(j => j.id === jobId);
+    if (!job || !job.pickupStops || !job.pickupStops[stopIndex]) {
+      addToast('Arrêt Inexistant', 'Impossible de localiser cet arrêt dans la tournée.', 'error');
+      return false;
+    }
+
+    const stop = job.pickupStops[stopIndex];
+    if (enteredCode.trim() !== stop.pickupCode) {
+      addToast('Code Vendeur Incorrect', `Le code à 4 chiffres fourni par ${stop.sellerName} ne correspond pas.`, 'error');
+      return false;
+    }
+
+    const updatedStops = job.pickupStops.map((s, idx) => 
+      idx === stopIndex ? { ...s, isCompleted: true, completedAt: new Date().toISOString() } : s
+    );
+
+    const allStopsDone = updatedStops.every(s => s.isCompleted);
+
+    const updatedJob: DeliveryJob = {
+      ...job,
+      pickupStops: updatedStops,
+      status: allStopsDone ? 'in_transit' : job.status,
+      orderStatus: allStopsDone ? 'IN_TRANSIT' : job.orderStatus,
+      etaMinutes: allStopsDone ? Math.max(8, Math.round((job.distanceKm || 6) * 1.5)) : job.etaMinutes
+    };
+
+    setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+
+    if (allStopsDone) {
+      voiceNavigator.announceDriverEnRoute(job.assignedDriverName || currentUser?.name || 'Le livreur', job.dropoffCommune, language);
+      addToast('🎉 Tous les Colis Enlevés !', `Tournée d'enlèvement terminée. En route vers l'acheteur à ${job.dropoffCommune} !`, 'success');
+    } else {
+      const remainingCount = updatedStops.filter(s => !s.isCompleted).length;
+      addToast('✅ Arrêt Enlevé !', `Colis de ${stop.sellerName} récupéré. Encore ${remainingCount} arrêt(s) avant la livraison finale.`, 'success');
+    }
+
     return true;
   };
 
@@ -2754,13 +3147,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const job = freightJobs.find(j => j.id === jobId);
     if (!job) return false;
 
-    if (!job.deliveryOtpCode || (job.orderStatus !== 'PAID' && job.paymentStatus !== 'PAID')) {
-      addToast('Paiement Non Confirmé', 'L\'acheteur doit d\'abord effectuer le paiement direct sur son application (bouton "Payer et Valider") pour débloquer son Code Secret OTP.', 'warning');
+    const validOtp = job.masterDeliveryOtp || job.deliveryOtpCode;
+    if (!validOtp) {
+      addToast('Code OTP Manquant', 'Le code de confirmation OTP n\'a pas encore été émis.', 'warning');
       return false;
     }
 
-    if (enteredOtp.trim() !== job.deliveryOtpCode) {
-      addToast('Code Secret OTP Incorrect', 'Demandez le code secret à 4 chiffres à l\'acheteur après vérification physique du colis et paiement direct.', 'error');
+    if (enteredOtp.trim() !== validOtp) {
+      addToast('Code Secret OTP Incorrect', 'Demandez le code secret à 4 chiffres à l\'acheteur après remise du colis.', 'error');
       return false;
     }
 
@@ -2770,12 +3164,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...job,
       status: 'delivered',
       orderStatus: 'COMPLETED',
+      paymentStatus: 'PAID',
       completedAt: nowIso,
       etaMinutes: 0
     };
     const oneHourLater = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
     setFreightJobs(prev => prev.map(j => j.id === jobId ? updatedJob : j));
+    
+    // Update Cart Order if consolidated
+    if (job.isCartConsolidated && job.cartOrderRecordId) {
+      setCartOrders(prev => prev.map(ord => ord.id === job.cartOrderRecordId ? {
+        ...ord,
+        status: 'DELIVERED',
+        trackingTimeline: [
+          ...(ord.trackingTimeline || []),
+          {
+            timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+            status: 'LIVRE',
+            title: 'Livraison Effectuée',
+            description: `Tous les colis du panier ont été livrés et validés par OTP auprès de ${ord.buyerName}.`
+          }
+        ]
+      } : ord));
+    }
+
     setProducts(prev => prev.map(p => p.id === job.productId ? {
       ...p,
       status: 'sold',
@@ -4488,6 +4901,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setGpsModalOpen,
         requestGpsPermission,
         setUserManualLocation,
+
+        // Native Mobile Bridge (Capacitor Geolocation & Camera)
+        isNativeApp: nativeBridge.isNative(),
+        nativePlatform: nativeBridge.getPlatform(),
+        cameraPermissionStatus,
+        requestCameraPermission,
+        captureNativePhoto,
+        nativePermissionPrompt: {
+          isOpen: permissionPromptOpen,
+          config: permissionPromptConfig,
+          openPrompt: openPermissionPrompt,
+          closePrompt: closePermissionPrompt
+        },
         activeTab,
         setActiveTab,
         authModalOpen,
@@ -4666,7 +5092,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         applyReferralBalanceToPurchase,
         simulateNewRefereeRegistration,
         simulateRefereeKycApproved,
-        simulateRefereeFirstTransaction
+        simulateRefereeFirstTransaction,
+
+        // Shopping Cart & Multi-Item Orders Suite
+        cart,
+        cartModalOpen,
+        setCartModalOpen,
+        addToCart,
+        removeFromCart,
+        updateCartItemQuantity,
+        clearCart,
+        checkoutCart,
+        cartOrders,
+        cartInvoiceModalOrder,
+        setCartInvoiceModalOrder,
+        driverConfirmStopPickup
       }}
     >
       {children}

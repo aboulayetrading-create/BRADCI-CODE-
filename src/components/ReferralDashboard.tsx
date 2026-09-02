@@ -32,11 +32,7 @@ export const ReferralDashboard: React.FC = () => {
     currentUser, 
     referrals, 
     addToast, 
-    translate,
-    simulateNewRefereeRegistration,
-    simulateRefereeKycApproved,
-    simulateRefereeFirstTransaction,
-    openRegisterWithReferral
+    translate
   } = useApp();
 
   const [copiedCode, setCopiedCode] = useState(false);
@@ -205,15 +201,6 @@ Mon code parrain : ${referralCode}`;
               >
                 <MessageCircle className="w-4 h-4 fill-slate-950" />
                 <span>{translate("Partager sur WhatsApp", "Share on WhatsApp")}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => openRegisterWithReferral(referralCode)}
-                className="w-full py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Gift className="w-3.5 h-3.5 text-amber-400" />
-                <span>{translate("Tester l'inscription filleul avec ce code", "Test referee signup with this code")}</span>
               </button>
             </div>
           </div>
@@ -562,90 +549,6 @@ Mon code parrain : ${referralCode}`;
           </div>
         )}
 
-      </div>
-
-      {/* 5. INTERACTIVE DEMO SIMULATION CONTROLS */}
-      <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-400" />
-            <h4 className="text-xs font-black text-amber-200 uppercase tracking-wider">
-              {translate("Bac à Sable Démo : Tester le Cycle de Parrainage", "Demo Sandbox: Test Referral Lifecycle")}
-            </h4>
-          </div>
-          <span className="text-[10px] text-amber-300/80 font-mono">
-            Mode Démo Live
-          </span>
-        </div>
-
-        <p className="text-xs text-slate-300">
-          {translate(
-            "Testez les 3 étapes en direct : simulez l'inscription d'un nouveau filleul avec votre code, validez son KYC pour passer le bonus en attente, puis validez sa 1ère livraison par code OTP pour débloquer définitivement vos 1 000 FCFA !",
-            "Test the 3 steps live: simulate a new referee signing up with your code, validate their KYC to set pending bonus, then validate their 1st OTP delivery to permanently unlock your 1,000 FCFA credit!"
-          )}
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              const res = simulateNewRefereeRegistration(referralCode);
-              if (res) {
-                addToast(
-                  "🎉 Étape 1 : Filleul Inscrit !",
-                  `Nouveau filleul (${res.refereeName}) enregistré avec le code [${referralCode}]. Statut : PENDING_KYC.`,
-                  "info"
-                );
-              }
-            }}
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Users className="w-3.5 h-3.5 text-blue-400" />
-            <span>1. Simuler Inscription Filleul</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              const pendingKycRef = myReferrals.find(r => r.status === 'PENDING_KYC');
-              if (!pendingKycRef) {
-                addToast("Aucun Filleul en Étape 1", "Cliquez d'abord sur '1. Simuler Inscription Filleul'.", "warning");
-                return;
-              }
-              simulateRefereeKycApproved(pendingKycRef.refereeId);
-              addToast(
-                "✅ Étape 2 : KYC Validé !",
-                `Le KYC de ${pendingKycRef.refereeName} a été approuvé. +1 000 FCFA placés en attente de 1ère livraison. Email et notification transmis au parrain !`,
-                "success"
-              );
-            }}
-            className="p-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>2. Valider KYC Filleul (+1000 F Attente)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              const pendingTxRef = myReferrals.find(r => r.status === 'PENDING_TRANSACTION');
-              if (!pendingTxRef) {
-                addToast("Aucun Filleul en Étape 2", "Validez d'abord le KYC d'un filleul à l'étape 2.", "warning");
-                return;
-              }
-              simulateRefereeFirstTransaction(pendingTxRef.refereeId);
-              addToast(
-                "🎉 Étape 3 : 1ère Livraison OTP Validée !",
-                `1ère commande clôturée sur le terrain par code OTP ! +1 000 FCFA transférés vers le solde utilisable et jauge incrémentée (${referralCount + 1}/${maxReferrals}) !`,
-                "success"
-              );
-            }}
-            className="p-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <Truck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>3. Valider Livraison OTP (+1000 F Gagné)</span>
-          </button>
-        </div>
       </div>
 
       {/* MODAL: PREVIEW OF PROFESSIONAL EMAIL SENT TO SPONSOR */}

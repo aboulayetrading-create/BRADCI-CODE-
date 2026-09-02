@@ -6,6 +6,7 @@
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
+import { RoleSwitcherBar } from './components/RoleSwitcherBar';
 import { VisitorFeed } from './components/VisitorFeed';
 import { ClientDashboard } from './components/ClientDashboard';
 import { DriverDashboard } from './components/DriverDashboard';
@@ -38,8 +39,10 @@ import { OrderDispatchModal } from './components/OrderDispatchModal';
 import { ReviewModal } from './components/ReviewModal';
 import { TermsAndConditionsModal } from './components/TermsAndConditionsModal';
 import { ReceiptModal } from './components/ReceiptModal';
-import { DemoDebugPanel } from './components/DemoDebugPanel';
 import { B2BLiquidationHub } from './components/B2BLiquidationHub';
+import { CartModal } from './components/CartModal';
+import { CartInvoiceModal } from './components/CartInvoiceModal';
+import { NativePermissionModal } from './components/NativePermissionModal';
 import { 
   ShieldCheck, 
   Lock, 
@@ -75,10 +78,15 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-200">
+    <div className="min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-200">
       {/* 1. Main Navigation Bar */}
       <ErrorBoundary fallbackTitle="Navigation">
         <Navbar />
+      </ErrorBoundary>
+
+      {/* Rôles & Parcours Acteurs (Acheteur, Vendeur Déstockage, Livreur Express) */}
+      <ErrorBoundary fallbackTitle="Parcours Acteurs">
+        <RoleSwitcherBar />
       </ErrorBoundary>
 
       {/* 2. Persistent Live Delivery Status Bar (Buyer, Seller & Driver Dispatch Notification) */}
@@ -252,11 +260,14 @@ const AppContent: React.FC = () => {
       <ErrorBoundary fallbackTitle="Reçu Officiel & Facture PDF">
         <ReceiptModal />
       </ErrorBoundary>
-
-      {/* 7. Diagnostic & Debug Floating Panel for Demo/Preview mode */}
-      <ErrorBoundary fallbackTitle="Panneau de Débogage">
-        <DemoDebugPanel />
+      <ErrorBoundary fallbackTitle="Panier & Commande Multi-Articles">
+        <CartModal />
+        <CartInvoiceModal />
       </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Autorisations Système & Permissions Android">
+        <NativePermissionModal />
+      </ErrorBoundary>
+
 
       <ToastContainer />
     </div>

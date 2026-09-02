@@ -64,12 +64,12 @@ export const KYCDemoGuideModal: React.FC<KYCDemoGuideModalProps> = ({
     {
       type: 'driverLicense' as const,
       title: translate("3. Permis de Conduire (Livreurs)", "3. Driving License (Couriers)"),
-      description: translate("Recto du permis de conduire ivoirien (Catégorie A moto ou C fourgon).", "Front of Ivorian driver's license (Category A bike or C cargo)."),
+      description: translate("Recto du permis de conduire ivoirien (Catégorie A moto, B auto ou C cargo).", "Front of Ivorian driver's license (Category A bike, B car or C cargo)."),
       demoUrl: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=600&auto=format&fit=crop&q=80',
       docNum: 'PC-ABJ-99201',
       validRules: [
         translate("✓ Date de validité en cours", "✓ Active validity date"),
-        translate("✓ Catégorie A / C bien lisible", "✓ Category A / C readable")
+        translate("✓ Catégorie A (Moto), B (Voiture) ou C (Cargo) bien lisible", "✓ Category A (Bike), B (Car) or C (Cargo) readable")
       ],
       invalidRules: [
         translate("✗ Permis expiré ou illisible", "✗ Expired or illegible license")
@@ -77,16 +77,16 @@ export const KYCDemoGuideModal: React.FC<KYCDemoGuideModalProps> = ({
     },
     {
       type: 'vehicleReg' as const,
-      title: translate("4. Carte Grise du Véhicule / Moto", "4. Vehicle / Motorcycle Registration"),
-      description: translate("Attestation d'immatriculation du moyen de transport utilisé pour le fret.", "Registration certificate for the transport vehicle used for courier jobs."),
+      title: translate("4. Carte Grise & Engin (Moto / Voiture / Cargo)", "4. Vehicle Registration & Asset (Moto / Car / Cargo)"),
+      description: translate("Attestation d'immatriculation et déclaration de l'engin (flottes Yango / Abidjan).", "Registration certificate & asset declaration (Yango / Abidjan delivery fleets)."),
       demoUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
       docNum: 'CG-8829-CI01',
       validRules: [
-        translate("✓ Numéro d'immatriculation conforme", "✓ Compliant license plate number"),
-        translate("✓ Document officiel complet", "✓ Complete official certificate")
+        translate("✓ Matricule conforme aux standards CI", "✓ License plate compliant with CI standards"),
+        translate("✓ Modèle déclaré conforme à l'engin utilisé", "✓ Declared model matching actual delivery asset")
       ],
       invalidRules: [
-        translate("✗ Document tronqué ou incomplet", "✗ Truncated or incomplete document")
+        translate("✗ Document tronqué ou illisible", "✗ Truncated or illegible document")
       ]
     }
   ];

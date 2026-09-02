@@ -1,23 +1,37 @@
 /**
  * BRAD'CI - Backend Controller & Business Logic for the Referral System
- * Technology: Node.js / Express / TypeScript (SQL Database Backend)
+ * Technology: Node.js / Express / TypeScript (MySQL / MariaDB via mysql2/promise)
+ * Hébergement : o2switch (cPanel / MySQL 8.0 / MariaDB 10.x)
  * 
- * Rules:
- * 1. Unique code (e.g. BRAD-89A2), link: https://bradci.com/invite?ref=BRAD-89A2
- * 2. Cap: Max 10 referees (Max 10 000 FCFA bonus)
- * 3. Reciprocal: +1000 FCFA for sponsor, +1000 FCFA for referee
- * 4. Non-withdrawable to cash, usable only for BRAD'CI purchases
- * 5. Lifecycle: PENDING_KYC -> PENDING_TRANSACTION -> COMPLETED
+ * Règles Métier BRAD'CI :
+ * 1. Code unique généré (ex: BRAD-89A2), lien de partage : https://bradci.com/invite?ref=BRAD-89A2
+ * 2. Plafond : Max 10 filleuls complétés par parrain (Gain max : 10 000 FCFA)
+ * 3. Réciprocité : +1 000 FCFA pour le parrain ET +1 000 FCFA pour le filleul
+ * 4. Non-retirable en Mobile Money / Cash, utilisable exclusivement pour les achats sur BRAD'CI
+ * 5. Cycle de vie : PENDING_KYC -> PENDING_TRANSACTION -> COMPLETED
  */
 
 import { Request, Response } from 'express';
+import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { generateReferralKycApprovedEmailHtml, generateReferralKycApprovedPushMessage } from '../src/utils/referralEmailTemplate';
 
 export const REFERRAL_BONUS_PER_USER_FCFA = 1000;
 export const MAX_REFERRALS_PER_SPONSOR = 10;
 export const MAX_TOTAL_REFERRAL_BONUS_FCFA = 10000;
 
-// Helper to generate a unique random referral code (e.g. BRAD-89A2)
+// Type helper acceptant soit un Pool, soit une PoolConnection existante
+export type MySQLDatabase = Pool | PoolConnection;
+
+// Helper interne pour obtenir une connexion active et gérer la libération
+async function acquireConnection(db: MySQLDatabase): Promise<{ connection: PoolConnection; shouldRelease: boolean }> {
+  if ('getConnection' in db && typeof (db as Pool).getConnection === 'function') {
+    const conn = await (db as Pool).getConnection();
+    return { connection: conn, shouldRelease: true };
+  }
+  return { connection: db as PoolConnection, shouldRelease: false };
+}
+
+// Helper pour générer un code de parrainage alphanumérique unique (ex: BRAD-89A2)
 export function generateUniqueReferralCode(customPrefix: string = 'BRAD'): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let rand = '';
@@ -28,11 +42,11 @@ export function generateUniqueReferralCode(customPrefix: string = 'BRAD'): strin
 }
 
 /**
- * 1. REGISTRATION CONTROLLER:
- * Handles new user sign-up with optional referral code
+ * 1. REGISTRATION CONTROLLER (MySQL / MariaDB):
+ * Inscription d'un nouvel utilisateur avec code de parrainage optionnel
  */
 export async function handleRegisterWithReferral(
-  db: any, // Database Pool / ORM
+  db: MySQLDatabase,
   userData: {
     firstName: string;
     lastName: string;
@@ -43,39 +57,40 @@ export async function handleRegisterWithReferral(
     referralCodeInput?: string; // Saisi manuellement ou extrait de l'URL ?ref=
   }
 ) {
-  const client = await db.connect();
+  const { connection, shouldRelease } = await acquireConnection(db);
   try {
-    await client.query('BEGIN');
+    await connection.beginTransaction();
 
     const cleanReferralInput = userData.referralCodeInput?.trim().toUpperCase();
-    let sponsor = null;
+    let sponsor: any = null;
 
-    // Check if sponsor referral code exists
+    // Vérification de l'existence du code parrain
     if (cleanReferralInput) {
-      const sponsorRes = await client.query(
-        'SELECT id, name, email, phone, referral_code, referral_count, pending_bonus, available_bonus FROM users WHERE referral_code = $1',
+      const [sponsorRows] = await connection.query<RowDataPacket[]>(
+        'SELECT id, name, email, phone, referral_code, referral_count, pending_bonus, available_bonus FROM users WHERE referral_code = ? LIMIT 1',
         [cleanReferralInput]
       );
-      if (sponsorRes.rows.length > 0) {
-        sponsor = sponsorRes.rows[0];
+      if (sponsorRows.length > 0) {
+        sponsor = sponsorRows[0];
       }
     }
 
-    // Generate unique code for new user
+    // Génération de l'identifiant et du code unique pour le nouveau membre
     const newReferralCode = generateUniqueReferralCode('BRAD');
     const newUserId = 'usr_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    const fullName = `${userData.firstName} ${userData.lastName}`.trim();
+    const referredByCode = sponsor ? sponsor.referral_code : null;
 
-    // Insert new user
-    const insertUserRes = await client.query(
+    // Insertion du nouvel utilisateur dans MySQL (compatible MariaDB/MySQL sans clause RETURNING)
+    await connection.query<ResultSetHeader>(
       `INSERT INTO users (
         id, name, first_name, last_name, email, phone, city, password_hash,
         referral_code, referred_by, referral_count, pending_bonus, available_bonus,
         is_kyc_verified, is_first_tx_done, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, 0, 0, false, false, NOW())
-      RETURNING id, name, email, phone, referral_code, referred_by`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, NOW())`,
       [
         newUserId,
-        `${userData.firstName} ${userData.lastName}`,
+        fullName,
         userData.firstName,
         userData.lastName,
         userData.email,
@@ -83,24 +98,34 @@ export async function handleRegisterWithReferral(
         userData.city,
         userData.passwordHash,
         newReferralCode,
-        sponsor ? sponsor.referral_code : null
+        referredByCode
       ]
     );
 
-    const newUser = insertUserRes.rows[0];
+    const newUser = {
+      id: newUserId,
+      name: fullName,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
+      email: userData.email,
+      phone: userData.phone,
+      city: userData.city,
+      referral_code: newReferralCode,
+      referred_by: referredByCode
+    };
 
-    // If sponsored, create referral record in PENDING_KYC status
+    // Si parrainé, création du dossier de parrainage avec le statut initial PENDING_KYC
     if (sponsor) {
-      const referralId = 'ref_' + Date.now();
-      await client.query(
+      const referralId = 'ref_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+      await connection.query<ResultSetHeader>(
         `INSERT INTO referrals (
           id, sponsor_id, referee_id, referral_code, status,
           sponsor_bonus_amount, referee_bonus_amount, created_at
-        ) VALUES ($1, $2, $3, $4, 'PENDING_KYC', $5, $6, NOW())`,
+        ) VALUES (?, ?, ?, ?, 'PENDING_KYC', ?, ?, NOW())`,
         [
           referralId,
           sponsor.id,
-          newUser.id,
+          newUserId,
           sponsor.referral_code,
           REFERRAL_BONUS_PER_USER_FCFA,
           REFERRAL_BONUS_PER_USER_FCFA
@@ -108,72 +133,75 @@ export async function handleRegisterWithReferral(
       );
     }
 
-    await client.query('COMMIT');
+    await connection.commit();
     return { success: true, user: newUser, sponsored: !!sponsor };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await connection.rollback();
     throw error;
   } finally {
-    client.release();
+    if (shouldRelease) {
+      connection.release();
+    }
   }
 }
 
 /**
- * 2. KYC VALIDATION CONTROLLER:
- * Called when moderation approves the referee's KYC
- * Moves referral to 'PENDING_TRANSACTION', credits +1000 FCFA pending bonus, sends notifications.
+ * 2. KYC VALIDATION CONTROLLER (MySQL / MariaDB):
+ * Déclenché dès que la modération ou le contrôle biométrique valide le KYC du filleul.
+ * Fait passer le parrainage à 'PENDING_TRANSACTION', crédite +1 000 FCFA en attente (pending) et notifie.
  */
 export async function handleApproveKYCAndTriggerReferralBonus(
-  db: any,
+  db: MySQLDatabase,
   emailService: any,
   notificationService: any,
   refereeUserId: string
 ) {
-  const client = await db.connect();
+  const { connection, shouldRelease } = await acquireConnection(db);
   try {
-    await client.query('BEGIN');
+    await connection.beginTransaction();
 
-    // 1. Update referee's KYC flag
-    await client.query(
-      'UPDATE users SET is_kyc_verified = true, kyc_status = $1 WHERE id = $2',
+    // 1. Mise à jour de l'état KYC du filleul
+    await connection.query<ResultSetHeader>(
+      'UPDATE users SET is_kyc_verified = 1, kyc_status = ? WHERE id = ?',
       ['verified', refereeUserId]
     );
 
-    // 2. Check if this user was referred by someone
-    const referralRes = await client.query(
+    // 2. Recherche si cet utilisateur a été parrainé (statut PENDING_KYC)
+    const [referralRows] = await connection.query<RowDataPacket[]>(
       `SELECT r.*, s.name as sponsor_name, s.email as sponsor_email, s.referral_count as sponsor_count,
               u.name as referee_name, u.phone as referee_phone, u.city as referee_city
        FROM referrals r
        JOIN users s ON r.sponsor_id = s.id
        JOIN users u ON r.referee_id = u.id
-       WHERE r.referee_id = $1 AND r.status = 'PENDING_KYC'`,
+       WHERE r.referee_id = ? AND r.status = 'PENDING_KYC'
+       LIMIT 1`,
       [refereeUserId]
     );
 
-    if (referralRes.rows.length > 0) {
-      const ref = referralRes.rows[0];
+    if (referralRows.length > 0) {
+      const ref = referralRows[0];
 
-      // Update referral status to PENDING_TRANSACTION
-      await client.query(
-        'UPDATE referrals SET status = $1, kyc_validated_at = NOW() WHERE id = $2',
+      // Passage du statut à PENDING_TRANSACTION
+      await connection.query<ResultSetHeader>(
+        'UPDATE referrals SET status = ?, kyc_validated_at = NOW() WHERE id = ?',
         ['PENDING_TRANSACTION', ref.id]
       );
 
-      // Increment pending bonus for referee (+1 000 FCFA)
-      await client.query(
-        'UPDATE users SET pending_bonus = pending_bonus + $1 WHERE id = $2',
+      // Crédit du bonus en attente pour le filleul (+1 000 FCFA)
+      await connection.query<ResultSetHeader>(
+        'UPDATE users SET pending_bonus = pending_bonus + ? WHERE id = ?',
         [REFERRAL_BONUS_PER_USER_FCFA, ref.referee_id]
       );
 
-      // Increment pending bonus for sponsor (+1 000 FCFA) if sponsor hasn't already reached max 10 completed
-      if (ref.sponsor_count < MAX_REFERRALS_PER_SPONSOR) {
-        await client.query(
-          'UPDATE users SET pending_bonus = pending_bonus + $1 WHERE id = $2',
+      // Crédit du bonus en attente pour le parrain (+1 000 FCFA) si le parrain n'a pas atteint la limite de 10
+      if (Number(ref.sponsor_count) < MAX_REFERRALS_PER_SPONSOR) {
+        await connection.query<ResultSetHeader>(
+          'UPDATE users SET pending_bonus = pending_bonus + ? WHERE id = ?',
           [REFERRAL_BONUS_PER_USER_FCFA, ref.sponsor_id]
         );
       }
 
-      // 3. Send Email and Push Notifications to the sponsor
+      // 3. Préparation et envoi des notifications Email & Push au parrain
       const emailPayload = {
         sponsorName: ref.sponsor_name,
         sponsorEmail: ref.sponsor_email,
@@ -181,96 +209,104 @@ export async function handleApproveKYCAndTriggerReferralBonus(
         refereePhone: ref.referee_phone,
         refereeCommune: ref.referee_city,
         referralCode: ref.referral_code,
-        sponsorCurrentCount: ref.sponsor_count,
+        sponsorCurrentCount: Number(ref.sponsor_count),
         sponsorMaxCount: MAX_REFERRALS_PER_SPONSOR,
         pendingBonusFCFA: REFERRAL_BONUS_PER_USER_FCFA,
-        totalPendingBonusFCFA: (ref.sponsor_count + 1) * REFERRAL_BONUS_PER_USER_FCFA,
-        totalAvailableBonusFCFA: ref.sponsor_count * REFERRAL_BONUS_PER_USER_FCFA
+        totalPendingBonusFCFA: (Number(ref.sponsor_count) + 1) * REFERRAL_BONUS_PER_USER_FCFA,
+        totalAvailableBonusFCFA: Number(ref.sponsor_count) * REFERRAL_BONUS_PER_USER_FCFA
       };
 
       const emailHtml = generateReferralKycApprovedEmailHtml(emailPayload);
       const pushMsg = generateReferralKycApprovedPushMessage(emailPayload);
 
-      // Asynchronously deliver notifications
-      if (emailService) {
-        await emailService.sendMail({
-          to: ref.sponsor_email,
-          subject: `🎁 +1 000 FCFA en attente ! KYC validé pour votre filleul ${ref.referee_name}`,
-          html: emailHtml
-        });
+      if (emailService && typeof emailService.sendMail === 'function') {
+        try {
+          await emailService.sendMail({
+            to: ref.sponsor_email,
+            subject: `🎁 +1 000 FCFA en attente ! KYC validé pour votre filleul ${ref.referee_name}`,
+            html: emailHtml
+          });
+        } catch (e) {
+          console.warn('[Referral Email Error]', e);
+        }
       }
 
-      if (notificationService) {
-        await notificationService.sendPushToUser(ref.sponsor_id, {
-          title: pushMsg.title,
-          body: pushMsg.body,
-          type: 'referral'
-        });
+      if (notificationService && typeof notificationService.sendPushToUser === 'function') {
+        try {
+          await notificationService.sendPushToUser(ref.sponsor_id, {
+            title: pushMsg.title,
+            body: pushMsg.body,
+            type: 'referral'
+          });
+        } catch (e) {
+          console.warn('[Referral Push Error]', e);
+        }
       }
     }
 
-    await client.query('COMMIT');
+    await connection.commit();
     return { success: true };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await connection.rollback();
     throw error;
   } finally {
-    client.release();
+    if (shouldRelease) {
+      connection.release();
+    }
   }
 }
 
 /**
- * 3. DELIVERY OTP VALIDATION CONTROLLER:
- * Called by the driver on the ground when buyer gives the 4-digit OTP.
- * Closes the order, releases escrow, and checks if buyer or seller is completing their first transaction.
- * If so, unlocks 1 000 FCFA available bonus for referee and sponsor (capped at 10).
+ * 3. DELIVERY OTP VALIDATION CONTROLLER (MySQL / MariaDB):
+ * Déclenché par le livreur lors de la saisie du code OTP à 4 chiffres à la remise du colis.
+ * Clôture la livraison, libère l'Escrow et débloque le bonus de 1 000 FCFA si c'est la 1ère transaction.
  */
 export async function validateDeliveryOTP(
-  db: any,
+  db: MySQLDatabase,
   notificationService: any,
   jobId: string,
   enteredOtp: string,
   driverId: string
 ) {
-  const client = await db.connect();
+  const { connection, shouldRelease } = await acquireConnection(db);
   try {
-    await client.query('BEGIN');
+    await connection.beginTransaction();
 
-    // 1. Fetch delivery job
-    const jobRes = await client.query(
-      'SELECT * FROM delivery_jobs WHERE id = $1',
+    // 1. Récupération de la course de livraison avec verrouillage FOR UPDATE
+    const [jobRows] = await connection.query<RowDataPacket[]>(
+      'SELECT * FROM delivery_jobs WHERE id = ? FOR UPDATE',
       [jobId]
     );
 
-    if (jobRes.rows.length === 0) {
+    if (jobRows.length === 0) {
       throw new Error('Course de livraison introuvable');
     }
 
-    const job = jobRes.rows[0];
+    const job = jobRows[0];
 
-    if (job.delivery_otp_code !== enteredOtp.trim()) {
+    if (String(job.delivery_otp_code).trim() !== enteredOtp.trim()) {
       throw new Error('Code secret OTP incorrect');
     }
 
-    // 2. Mark delivery job as completed
-    await client.query(
-      'UPDATE delivery_jobs SET status = $1, delivered_at = NOW() WHERE id = $2',
+    // 2. Marquer la livraison comme terminée
+    await connection.query<ResultSetHeader>(
+      'UPDATE delivery_jobs SET status = ?, delivered_at = NOW() WHERE id = ?',
       ['delivered', jobId]
     );
 
-    // 3. Mark product as sold
-    await client.query(
-      'UPDATE products SET status = $1, sold_at = NOW() WHERE id = $2',
+    // 3. Marquer le produit comme vendu
+    await connection.query<ResultSetHeader>(
+      'UPDATE products SET status = ?, sold_at = NOW() WHERE id = ?',
       ['sold', job.product_id]
     );
 
-    // 4. Release Escrow to Seller & Driver
-    await client.query(
-      'UPDATE escrow_records SET status = $1, released_at = NOW() WHERE product_id = $2',
+    // 4. Libération des fonds sous séquestre (Escrow)
+    await connection.query<ResultSetHeader>(
+      'UPDATE escrow_records SET status = ?, released_at = NOW() WHERE product_id = ?',
       ['released', job.product_id]
     );
 
-    // Check participants (buyer and seller) for 1st transaction referral bonus trigger
+    // 5. Vérification des participants (acheteur et vendeur) pour l'attribution du bonus de 1ère transaction
     const participants = [
       { userId: job.buyer_id, type: 'purchase' as const },
       { userId: job.seller_id, type: 'sale' as const }
@@ -279,159 +315,169 @@ export async function validateDeliveryOTP(
     for (const p of participants) {
       if (!p.userId) continue;
 
-      const userRes = await client.query(
-        'SELECT id, name, is_first_tx_done, pending_bonus, available_bonus FROM users WHERE id = $1',
+      const [userRows] = await connection.query<RowDataPacket[]>(
+        'SELECT id, name, is_first_tx_done, pending_bonus, available_bonus FROM users WHERE id = ? FOR UPDATE',
         [p.userId]
       );
 
-      if (userRes.rows.length > 0) {
-        const u = userRes.rows[0];
+      if (userRows.length > 0) {
+        const u = userRows[0];
 
-        // If this user has never done their 1st transaction:
+        // Si l'utilisateur n'avait pas encore réalisé sa première transaction
         if (!u.is_first_tx_done) {
-          // Mark 1st tx done
-          await client.query(
-            'UPDATE users SET is_first_tx_done = true WHERE id = $1',
+          await connection.query<ResultSetHeader>(
+            'UPDATE users SET is_first_tx_done = 1 WHERE id = ?',
             [u.id]
           );
 
-          // Find if there is a pending referral for this referee
-          const refRes = await client.query(
+          // Recherche d'un parrainage en attente (statut PENDING_TRANSACTION)
+          const [refRows] = await connection.query<RowDataPacket[]>(
             `SELECT r.*, s.referral_count as sponsor_count, s.id as sponsor_user_id
              FROM referrals r
              JOIN users s ON r.sponsor_id = s.id
-             WHERE r.referee_id = $1 AND r.status = 'PENDING_TRANSACTION'`,
+             WHERE r.referee_id = ? AND r.status = 'PENDING_TRANSACTION'
+             LIMIT 1`,
             [u.id]
           );
 
-          if (refRes.rows.length > 0) {
-            const referral = refRes.rows[0];
+          if (refRows.length > 0) {
+            const referral = refRows[0];
+            const sponsorCount = Number(referral.sponsor_count);
 
-            // 1. Move Referee bonus from pending to available
-            await client.query(
+            // A. Déblocage du bonus du filleul : passage de pending_bonus à available_bonus
+            await connection.query<ResultSetHeader>(
               `UPDATE users 
-               SET pending_bonus = GREATEST(0, pending_bonus - $1),
-                   available_bonus = available_bonus + $1
-               WHERE id = $2`,
-              [REFERRAL_BONUS_PER_USER_FCFA, u.id]
+               SET pending_bonus = GREATEST(0, CAST(pending_bonus AS SIGNED) - ?),
+                   available_bonus = available_bonus + ?
+               WHERE id = ?`,
+              [REFERRAL_BONUS_PER_USER_FCFA, REFERRAL_BONUS_PER_USER_FCFA, u.id]
             );
 
-            // 2. Move Sponsor bonus from pending to available IF count < 10
-            if (referral.sponsor_count < MAX_REFERRALS_PER_SPONSOR) {
-              await client.query(
+            // B. Déblocage du bonus du parrain si sous la limite de 10 filleuls complétés
+            if (sponsorCount < MAX_REFERRALS_PER_SPONSOR) {
+              await connection.query<ResultSetHeader>(
                 `UPDATE users 
-                 SET pending_bonus = GREATEST(0, pending_bonus - $1),
-                     available_bonus = available_bonus + $1,
+                 SET pending_bonus = GREATEST(0, CAST(pending_bonus AS SIGNED) - ?),
+                     available_bonus = available_bonus + ?,
                      referral_count = referral_count + 1
-                 WHERE id = $2`,
-                [REFERRAL_BONUS_PER_USER_FCFA, referral.sponsor_user_id]
+                 WHERE id = ?`,
+                [REFERRAL_BONUS_PER_USER_FCFA, REFERRAL_BONUS_PER_USER_FCFA, referral.sponsor_user_id]
               );
             } else {
-              // Sponsor already maxed out at 10, clear pending
-              await client.query(
+              // Plafond déjà atteint : apuration du pending sans augmentation de available
+              await connection.query<ResultSetHeader>(
                 `UPDATE users 
-                 SET pending_bonus = GREATEST(0, pending_bonus - $1)
-                 WHERE id = $2`,
+                 SET pending_bonus = GREATEST(0, CAST(pending_bonus AS SIGNED) - ?)
+                 WHERE id = ?`,
                 [REFERRAL_BONUS_PER_USER_FCFA, referral.sponsor_user_id]
               );
             }
 
-            // 3. Mark referral as COMPLETED
-            await client.query(
+            // C. Finalisation du dossier de parrainage -> COMPLETED
+            await connection.query<ResultSetHeader>(
               `UPDATE referrals 
                SET status = 'COMPLETED',
                    completed_at = NOW(),
-                   first_tx_order_id = $1,
-                   first_tx_type = $2
-               WHERE id = $3`,
+                   first_tx_order_id = ?,
+                   first_tx_type = ?
+               WHERE id = ?`,
               [jobId, p.type, referral.id]
             );
 
-            // Send celebration notifications
-            if (notificationService) {
-              await notificationService.sendPushToUser(u.id, {
-                title: '🎁 Bonus de Parrainage Débloqué !',
-                body: 'Vos 1 000 FCFA de bienvenue sont désormais disponibles pour vos achats sur BRAD\'CI !',
-                type: 'referral'
-              });
+            // Notifications de félicitations
+            if (notificationService && typeof notificationService.sendPushToUser === 'function') {
+              try {
+                await notificationService.sendPushToUser(u.id, {
+                  title: '🎁 Bonus de Parrainage Débloqué !',
+                  body: "Vos 1 000 FCFA de bienvenue sont désormais disponibles pour vos achats sur BRAD'CI !",
+                  type: 'referral'
+                });
 
-              await notificationService.sendPushToUser(referral.sponsor_user_id, {
-                title: '🎉 +1 000 FCFA Débloqués !',
-                body: `Votre filleul ${u.name} a validé sa 1ère livraison. Vos 1 000 FCFA sont disponibles !`,
-                type: 'referral'
-              });
+                await notificationService.sendPushToUser(referral.sponsor_user_id, {
+                  title: '🎉 +1 000 FCFA Débloqués !',
+                  body: `Votre filleul ${u.name} a validé sa 1ère livraison. Vos 1 000 FCFA sont disponibles !`,
+                  type: 'referral'
+                });
+              } catch (e) {
+                console.warn('[Referral Push Notification Error]', e);
+              }
             }
           }
         }
       }
     }
 
-    await client.query('COMMIT');
+    await connection.commit();
     return { success: true, message: 'Livraison validée par code OTP et bonus de parrainage débloqués avec succès' };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await connection.rollback();
     throw error;
   } finally {
-    client.release();
+    if (shouldRelease) {
+      connection.release();
+    }
   }
 }
 
 /**
- * 4. PURCHASE WITH REFERRAL BALANCE CONTROLLER:
- * Allows user to spend their available referral balance to buy an item.
- * Strictly non-withdrawable to Mobile Money.
+ * 4. PURCHASE WITH REFERRAL BALANCE CONTROLLER (MySQL / MariaDB):
+ * Déduit le montant depuis le solde parrainage disponible (available_bonus).
+ * Strictement non-retirable en cash / Mobile Money, réservé aux achats.
  */
 export async function payWithReferralBalance(
-  db: any,
+  db: MySQLDatabase,
   userId: string,
   orderId: string,
   amountToDeduct: number
 ) {
-  const client = await db.connect();
+  const { connection, shouldRelease } = await acquireConnection(db);
   try {
-    await client.query('BEGIN');
+    await connection.beginTransaction();
 
-    const userRes = await client.query(
-      'SELECT id, name, available_bonus FROM users WHERE id = $1 FOR UPDATE',
+    const [userRows] = await connection.query<RowDataPacket[]>(
+      'SELECT id, name, available_bonus FROM users WHERE id = ? FOR UPDATE',
       [userId]
     );
 
-    if (userRes.rows.length === 0) {
+    if (userRows.length === 0) {
       throw new Error('Utilisateur introuvable');
     }
 
-    const user = userRes.rows[0];
+    const user = userRows[0];
+    const currentBalance = Number(user.available_bonus || 0);
 
-    if (user.available_bonus < amountToDeduct) {
-      throw new Error(`Solde parrainage insuffisant. Disponible: ${user.available_bonus} FCFA, Demandé: ${amountToDeduct} FCFA`);
+    if (currentBalance < amountToDeduct) {
+      throw new Error(`Solde parrainage insuffisant. Disponible: ${currentBalance} FCFA, Demandé: ${amountToDeduct} FCFA`);
     }
 
-    // Deduct from available referral balance
-    const newBalance = user.available_bonus - amountToDeduct;
-    await client.query(
-      'UPDATE users SET available_bonus = $1 WHERE id = $2',
+    // Déduction du solde de parrainage disponible
+    const newBalance = currentBalance - amountToDeduct;
+    await connection.query<ResultSetHeader>(
+      'UPDATE users SET available_bonus = ? WHERE id = ?',
       [newBalance, userId]
     );
 
-    // Record transaction
-    const txId = 'ref_tx_' + Date.now();
-    await client.query(
+    // Enregistrement dans le journal d'audit des transactions de parrainage
+    const txId = 'ref_tx_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    await connection.query<ResultSetHeader>(
       `INSERT INTO referral_transactions (
         id, user_id, order_id, amount_spent, balance_before, balance_after, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-      [txId, userId, orderId, amountToDeduct, user.available_bonus, newBalance]
+      ) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+      [txId, userId, orderId, amountToDeduct, currentBalance, newBalance]
     );
 
-    await client.query('COMMIT');
+    await connection.commit();
     return {
       success: true,
       deductedAmount: amountToDeduct,
       remainingReferralBalance: newBalance
     };
   } catch (error) {
-    await client.query('ROLLBACK');
+    await connection.rollback();
     throw error;
   } finally {
-    client.release();
+    if (shouldRelease) {
+      connection.release();
+    }
   }
 }

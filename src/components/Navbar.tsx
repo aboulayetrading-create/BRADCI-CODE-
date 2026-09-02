@@ -25,7 +25,8 @@ import {
   Volume2,
   VolumeX,
   Laptop,
-  Building2
+  Building2,
+  ShoppingCart
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -53,7 +54,9 @@ export const Navbar: React.FC = () => {
     voiceEnabled,
     toggleVoice,
     readCurrentScreenAloud,
-    setKycModalOpen
+    setKycModalOpen,
+    cart,
+    setCartModalOpen
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -218,16 +221,19 @@ export const Navbar: React.FC = () => {
             </button>
           </nav>
 
-          {/* Right Action Bar - Proportional and fully visible across mobile, tablet, and desktop */}
-          <div className="flex items-center gap-0.5 xs:gap-1 sm:gap-1.5 md:gap-2 shrink-0">
+          {/* Right Action Bar - Fully responsive, properly sized, and accessible on all device formats */}
+          <div 
+            id="navbar-actions-bar" 
+            className="flex items-center gap-1 sm:gap-1.5 md:gap-2 min-w-0 flex-1 justify-end overflow-x-auto md:overflow-visible scrollbar-none py-1 pl-1"
+          >
             {/* Language Toggle (FR / EN) */}
             <button
               id="btn-toggle-language"
               onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')}
-              className="px-1.5 py-1 sm:px-2 sm:py-1 rounded-md sm:rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-800 transition-all text-[10px] sm:text-xs font-bold font-mono-num flex items-center gap-0.5 sm:gap-1 shrink-0"
+              className="h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 transition-all text-[11px] sm:text-xs font-bold font-mono-num flex items-center gap-1 shrink-0"
               title={translate("Changer de langue (FR / EN)", "Switch language (FR / EN)")}
             >
-              <Globe className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" />
+              <Globe className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span>{language.toUpperCase()}</span>
             </button>
 
@@ -235,35 +241,35 @@ export const Navbar: React.FC = () => {
             <button
               id="btn-toggle-theme"
               onClick={toggleTheme}
-              className="p-1 sm:p-1.5 rounded-md sm:rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-800 transition-all text-xs shrink-0 flex items-center gap-1"
+              className="h-8 sm:h-9 w-8 sm:w-9 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 transition-all text-xs shrink-0 flex items-center justify-center"
               title={getThemeTitle()}
             >
               {getThemeIcon()}
-              <span className="hidden xl:inline text-[10px] font-mono-num font-semibold text-slate-400">
+              <span className="hidden xl:inline text-[10px] font-mono-num font-semibold text-slate-400 ml-1">
                 {getThemeLabel()}
               </span>
             </button>
 
             {/* Voice Assistant Toggle & Live Screen Reader */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 id="btn-toggle-voice"
                 onClick={toggleVoice}
-                className={`p-1 sm:p-1.5 rounded-md sm:rounded-lg border transition-all text-xs shrink-0 flex items-center gap-1 ${
+                className={`h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border transition-all text-xs shrink-0 flex items-center gap-1 ${
                   voiceEnabled 
                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25 shadow-sm shadow-emerald-500/20' 
-                    : 'bg-slate-900/80 border-slate-800 text-slate-500 hover:text-slate-300'
+                    : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
                 title={voiceEnabled ? translate("Assistance Vocale Active (Cliquez pour couper)", "Voice Guidance Active (Click to mute)") : translate("Assistance Vocale Coupée (Cliquez pour activer)", "Voice Guidance Muted (Click to activate)")}
               >
                 {voiceEnabled ? (
                   <>
-                    <Volume2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-pulse" />
+                    <Volume2 className="w-3.5 h-3.5 animate-pulse" />
                     <span className="hidden xl:inline text-[9px] font-bold text-emerald-400">{translate("VOIX ON", "VOICE ON")}</span>
                   </>
                 ) : (
                   <>
-                    <VolumeX className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    <VolumeX className="w-3.5 h-3.5" />
                     <span className="hidden xl:inline text-[9px] font-medium text-slate-500">{translate("VOIX OFF", "VOICE OFF")}</span>
                   </>
                 )}
@@ -273,25 +279,41 @@ export const Navbar: React.FC = () => {
                 <button
                   id="btn-read-screen-aloud"
                   onClick={readCurrentScreenAloud}
-                  className="hidden xl:flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold transition-all"
+                  className="hidden xl:flex items-center gap-1 h-8 sm:h-9 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold transition-all"
                   title={translate("Lire la synthèse audio des données de la page", "Read current page audio summary aloud")}
                 >
-                  <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
+                  <Sparkles className="w-3 h-3 text-emerald-400" />
                   <span>{translate("Lire l'écran", "Read screen")}</span>
                 </button>
               )}
             </div>
 
+            {/* Shopping Cart Button */}
+            <button
+              id="btn-navbar-cart"
+              onClick={() => setCartModalOpen(true)}
+              className="relative h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 flex items-center gap-1.5"
+              title={translate("Mon Panier Multi-Articles", "My Multi-Item Cart")}
+            >
+              <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+              <span className="text-xs font-bold hidden sm:inline">{translate("Panier", "Cart")}</span>
+              {cart.length > 0 && (
+                <span className="min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[9px] sm:text-[10px] flex items-center justify-center animate-bounce shrink-0">
+                  {cart.reduce((s, i) => s + i.quantity, 0)}
+                </span>
+              )}
+            </button>
+
             {/* Notification Bell Button */}
             <button
               id="btn-navbar-notifications"
               onClick={() => setNotificationsModalOpen(true)}
-              className="relative p-1 sm:p-1.5 rounded-md sm:rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0"
+              className="relative h-8 sm:h-9 w-8 sm:w-9 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 flex items-center justify-center"
               title={translate("Notifications", "Notifications")}
             >
-              <Bell className="w-3 h-3 sm:w-3.5 sm:h-4" />
+              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               {unreadNotificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[13px] h-[13px] sm:min-w-[15px] sm:h-[15px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[7.5px] sm:text-[9px] flex items-center justify-center border border-[#080C14]">
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[8px] sm:text-[9px] flex items-center justify-center border border-[#080C14] animate-pulse">
                   {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
                 </span>
               )}
@@ -301,15 +323,15 @@ export const Navbar: React.FC = () => {
             <button
               id="btn-navbar-gps"
               onClick={() => setGpsModalOpen(true)}
-              className={`flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2 py-1 sm:py-1 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-bold border transition-all shrink-0 ${
+              className={`h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg text-[11px] sm:text-xs font-bold border transition-all shrink-0 flex items-center gap-1 ${
                 gpsPermissionStatus === 'granted' && userLocation
                   ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
                   : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20 animate-pulse'
               }`}
-              title={translate("Position GPS", "GPS Position")}
+              title={translate("Position GPS (Abidjan & Banlieue)", "GPS Position (Abidjan & Suburbs)")}
             >
-              <Navigation className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
-              <span className="truncate max-w-[36px] xs:max-w-[50px] sm:max-w-[80px]">
+              <Navigation className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate max-w-[50px] xs:max-w-[65px] sm:max-w-[85px] font-mono-num">
                 {userLocation ? userLocation.commune.split(' ')[0] : 'Abidjan'}
               </span>
             </button>
@@ -318,12 +340,12 @@ export const Navbar: React.FC = () => {
             <button
               id="btn-publish-product"
               onClick={handleSellClick}
-              className="relative group bg-[#FF5B00] hover:bg-[#E05000] text-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-md sm:rounded-lg font-black text-[10px] sm:text-xs flex items-center gap-1.5 shadow-md shadow-[#FF5B00]/30 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
+              className="h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-lg bg-[#FF5B00] hover:bg-[#E05000] text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[#FF5B00]/30 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
               title={translate("Mettre un article en vente (Gratuit & Illimité)", "Post item for sale (Free & Unlimited)")}
             >
               <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
-              <span>{translate("Vendre", "Sell")}</span>
-              <span className="bg-black/25 text-white text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-mono-num font-black">
+              <span className="font-bold">{translate("Vendre", "Sell")}</span>
+              <span className="bg-black/25 text-white text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-mono-num font-black hidden xs:inline">
                 Gratuit
               </span>
             </button>
@@ -334,7 +356,7 @@ export const Navbar: React.FC = () => {
                 <button
                   id="user-profile-menu-btn"
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center gap-1 sm:gap-1.5 p-0.5 sm:p-1 md:p-1.5 rounded-lg sm:rounded-xl hover:bg-slate-800 border-2 border-amber-400/80 hover:border-amber-400 transition-all bg-slate-900/90 shadow-md shadow-amber-500/10 shrink-0 group"
+                  className="h-8 sm:h-9 flex items-center gap-1.5 px-1.5 sm:px-2 rounded-lg hover:bg-slate-800 border-2 border-amber-400/80 hover:border-amber-400 transition-all bg-slate-900/90 shadow-sm shadow-amber-500/10 shrink-0 group"
                   title={`${translate("Connecté :", "Logged in:")} ${currentUser.name}`}
                 >
                   <div className="relative shrink-0 flex items-center justify-center">
@@ -342,9 +364,9 @@ export const Navbar: React.FC = () => {
                       src={currentUser.avatar}
                       alt={currentUser.name}
                       referrerPolicy="no-referrer"
-                      className="w-6.5 h-6.5 sm:w-7.5 sm:h-7.5 md:w-8.5 md:h-8.5 rounded-full object-cover border border-amber-300 shadow-sm shrink-0 block group-hover:scale-105 transition-transform"
+                      className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full object-cover border border-amber-300 shadow-sm shrink-0 block group-hover:scale-105 transition-transform"
                     />
-                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500 border-2 border-[#080C14]" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border-2 border-[#080C14]" />
                   </div>
                   <div className="hidden lg:block text-left text-xs pr-1">
                     <div className="font-bold text-slate-100 truncate max-w-[95px] flex items-center gap-1">
@@ -471,7 +493,7 @@ export const Navbar: React.FC = () => {
               <button
                 id="btn-navbar-auth"
                 onClick={() => setAuthModalOpen(true)}
-                className="bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 px-2 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm shrink-0"
+                className="h-8 sm:h-9 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 px-2.5 sm:px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm shrink-0"
               >
                 <User className="w-3.5 h-3.5 text-slate-400" />
                 <span>{translate("Connexion", "Sign In")}</span>
@@ -482,10 +504,10 @@ export const Navbar: React.FC = () => {
             <button
               id="btn-toggle-mobile-menu"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/80 md:hidden shrink-0 border border-slate-800"
+              className="h-8 sm:h-9 w-8 sm:w-9 flex items-center justify-center text-slate-300 hover:text-white rounded-lg bg-slate-900/90 hover:bg-slate-800 md:hidden shrink-0 border border-slate-800 transition-colors"
               title={translate("Menu Mobile", "Mobile Menu")}
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
           </div>
         </div>

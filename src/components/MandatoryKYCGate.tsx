@@ -23,6 +23,7 @@ import {
   Info
 } from 'lucide-react';
 import { verifyFacialBiometrics, BiometricCheckResult } from '../utils/biometricVerification';
+import { nativeBridge } from '../utils/nativeBridge';
 
 const DEMO_KYC_PHOTOS = {
   cni: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80',
@@ -38,7 +39,6 @@ export const MandatoryKYCGate: React.FC = () => {
   const { 
     currentUser, 
     submitKYC, 
-    adminInstantApproveMyKYC, 
     logoutUser, 
     translate, 
     language, 
@@ -88,6 +88,35 @@ export const MandatoryKYCGate: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Native Capacitor Camera & Gallery capture with automatic web fallback
+  const captureWithNativeCamera = async (source: 'camera' | 'photos') => {
+    try {
+      const isSelfie = currentStep === 2;
+      const result = await nativeBridge.capturePhoto({
+        source,
+        direction: isSelfie ? 'user' : 'environment',
+        quality: 90
+      });
+      if (result && result.dataUrl) {
+        assignPhotoForCurrentStep(result.dataUrl);
+        addToast(
+          translate('Photo capturée avec succès', 'Photo captured successfully'),
+          translate('Votre photo a été enregistrée pour cette étape.', 'Your photo has been saved for this step.'),
+          'success'
+        );
+      }
+    } catch (err: any) {
+      console.warn('Native photo capture cancelled or failed:', err?.message);
+      if (!nativeBridge.isNative()) {
+        if (source === 'camera') {
+          startCamera(currentStep === 2 ? 'user' : 'environment');
+        } else {
+          fileInputRef.current?.click();
+        }
+      }
+    }
+  };
 
   // Stop camera
   const stopCamera = () => {
@@ -417,71 +446,21 @@ export const MandatoryKYCGate: React.FC = () => {
                 </div>
               </div>
             </div>
-
-            {/* Instant Admin/Tester Approval Action */}
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="text-left">
-                <p className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-emerald-400" />
-                  <span>{translate("Mode Démo & Évaluation Rapide", "Demo Mode & Fast Evaluation")}</span>
-                </p>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {translate("Validez instantanément ce dossier KYC pour tester immédiatement l'ensemble des modules.", "Instantly approve this KYC file to test all platform modules immediately.")}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={adminInstantApproveMyKYC}
-                className="w-full sm:w-auto shrink-0 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black shadow-lg shadow-emerald-900/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:scale-105"
-              >
-                <Check className="w-4 h-4" />
-                <span>{translate("⚡ Valider KYC Immédiatement", "⚡ Approve KYC Instantly")}</span>
-              </button>
-            </div>
           </div>
         ) : (
           /* KYC SUBMISSION FORM */
           <div className="space-y-5 animate-in fade-in">
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 text-xs text-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-start gap-2.5">
-                <Lock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-amber-200">
-                    {translate("Vérification obligatoire immédiatement après inscription :", "Mandatory verification immediately post-registration:")}
-                  </p>
-                  <p className="mt-0.5 text-slate-300">
-                    {isDriver 
-                      ? translate("Livreurs : CNI/Passeport, Selfie avec pièce, Permis et Carte grise requis.", "Couriers: ID, Selfie with ID, License and Vehicle registration required.")
-                      : translate("Acheteurs & Vendeurs : Pièce d'identité, Selfie simple et Selfie avec pièce requis.", "Buyers & Sellers: ID document, Simple selfie and Selfie with ID required.")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDocPhoto(DEMO_KYC_PHOTOS.cni);
-                    setSelfiePhoto(DEMO_KYC_PHOTOS.selfie);
-                    setSelfieWithIdPhoto(DEMO_KYC_PHOTOS.selfieWithId);
-                    if (isDriver) {
-                      setDriverLicensePhoto(DEMO_KYC_PHOTOS.driverLicense);
-                      setDriverLicenseVersoPhoto(DEMO_KYC_PHOTOS.driverLicenseVerso);
-                      setVehicleRegPhoto(DEMO_KYC_PHOTOS.vehicleReg);
-                    }
-                    adminInstantApproveMyKYC();
-                    addToast(
-                      translate("KYC Démo Validé", "Demo KYC Approved"),
-                      translate("Compte certifié instantanément pour les tests.", "Account instantly certified for preview."),
-                      "success"
-                    );
-                  }}
-                  className="w-full sm:w-auto px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{translate("⚡ Bypass / Valider Démo", "⚡ Bypass / Approve Demo")}</span>
-                </button>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3.5 text-xs text-amber-300 flex items-center gap-2.5">
+              <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <p className="font-bold text-amber-200">
+                  {translate("Vérification obligatoire immédiatement après inscription :", "Mandatory verification immediately post-registration:")}
+                </p>
+                <p className="mt-0.5 text-slate-300">
+                  {isDriver 
+                    ? translate("Livreurs : CNI/Passeport, Selfie avec pièce, Permis et Carte grise requis.", "Couriers: ID, Selfie with ID, License and Vehicle registration required.")
+                    : translate("Acheteurs & Vendeurs : Pièce d'identité, Selfie simple et Selfie avec pièce requis.", "Buyers & Sellers: ID document, Simple selfie and Selfie with ID required.")}
+                </p>
               </div>
             </div>
 
@@ -654,13 +633,13 @@ export const MandatoryKYCGate: React.FC = () => {
                   </div>
                 )}
 
-                {/* Photo Input Triggers */}
+                {/* Photo Input Triggers (Capacitor Native Android + Browser Fallback) */}
                 {!isCameraActive && (
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
-                      onClick={() => startCamera('user')}
-                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+                      onClick={() => captureWithNativeCamera('camera')}
+                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
                     >
                       <Camera className="w-4 h-4 text-amber-400" />
                       <span>{translate("Prendre une Photo (Caméra)", "Take Photo (Camera)")}</span>
@@ -668,8 +647,8 @@ export const MandatoryKYCGate: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5"
+                      onClick={() => captureWithNativeCamera('photos')}
+                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                     >
                       <Upload className="w-4 h-4 text-blue-400" />
                       <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>

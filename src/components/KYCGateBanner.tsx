@@ -14,10 +14,7 @@ import { getTranslation } from '../utils/translations';
 export const KYCGateBanner: React.FC = () => {
   const { 
     currentUser, 
-    setKycModalOpen, 
-    adminInstantApproveMyKYC, 
-    language,
-    addToast 
+    setKycModalOpen
   } = useApp();
 
   if (!currentUser || currentUser.role === 'admin' || currentUser.kycStatus === 'verified') {
@@ -82,20 +79,6 @@ export const KYCGateBanner: React.FC = () => {
           >
             <span>{isPending ? 'Voir mon Dossier' : 'Soumettre mes Pièces'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Quick Demo Bypass for Instant Testing */}
-          <button
-            id="kyc-banner-btn-demo-approve"
-            onClick={() => {
-              adminInstantApproveMyKYC();
-              addToast('⚡ KYC Validé (Démo)', 'Compte vérifié instantanément pour les tests.', 'success');
-            }}
-            title="Bypass d'évaluation pour tester l'application sans attendre 24h"
-            className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-[11px] font-bold text-amber-300 border border-amber-500/30 flex items-center gap-1 transition-all"
-          >
-            <Sparkles className="w-3 h-3 text-amber-400" />
-            <span className="hidden sm:inline">Valider Instantanément (Démo)</span>
           </button>
         </div>
       </div>

@@ -46,7 +46,6 @@ export const VisitorFeed: React.FC = () => {
     getShopBySellerId,
     setActiveTab,
     toggleDriverAvailability,
-    switchDriverAccount,
     driverAcceptJob,
     language,
     translate,
@@ -65,7 +64,6 @@ export const VisitorFeed: React.FC = () => {
   const isOnline = currentUser?.driverAvailability !== 'offline';
   const remainingTrial = currentUser?.trialDeliveriesRemaining ?? 0;
   const isTrial = currentUser?.driverPlan === 'trial';
-  const availableDriverAccounts = users.filter(u => u.role === 'driver');
   const availableDeliveriesCount = freightJobs.filter(j => j.status === 'available').length;
 
   const categories = [
@@ -171,29 +169,6 @@ export const VisitorFeed: React.FC = () => {
                 <span>{translate(`Voir les ${availableDeliveriesCount} Commandes Bourse`, `View ${availableDeliveriesCount} Orders`)}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            </div>
-          </div>
-
-          {/* Account switcher row for quick testing */}
-          <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span className="text-slate-400 text-[11px] flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{translate("Changer de compte livreur :", "Switch courier account:")}</span>
-            </span>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {availableDriverAccounts.map(acc => (
-                <button
-                  key={acc.id}
-                  onClick={() => switchDriverAccount(acc.id)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
-                    acc.id === currentUser?.id
-                      ? 'bg-emerald-500 text-slate-950 font-bold shadow'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                  }`}
-                >
-                  {acc.name.split(' ')[0]} ({acc.driverPlan === 'vip_pass' ? 'VIP' : `${acc.trialDeliveriesRemaining || 0}/5`})
-                </button>
-              ))}
             </div>
           </div>
         </section>

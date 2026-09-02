@@ -1,100 +1,143 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { UserCheck, Bike, Crown, Sparkles } from 'lucide-react';
+import { 
+  ShoppingBag, 
+  Store, 
+  Bike, 
+  ShieldCheck, 
+  MapPin, 
+  UserCheck, 
+  Building2,
+  Sparkles,
+  ChevronRight
+} from 'lucide-react';
 
 export const RoleSwitcherBar: React.FC = () => {
-  const { currentUser, loginAsUser, logout } = useApp();
+  const { 
+    currentUser, 
+    loginAsUser, 
+    setActiveTab, 
+    setGpsModalOpen, 
+    setKycModalOpen, 
+    userLocation,
+    translate 
+  } = useApp();
+
+  const isClientBuyer = currentUser?.role === 'client' && currentUser?.id === 'user-kouassi';
+  const isClientSeller = currentUser?.role === 'client' && (currentUser?.id === 'user-awa' || currentUser?.sellerPlan === 'pro');
+  const isDriver = currentUser?.role === 'driver';
+
+  const handleSelectBuyer = () => {
+    loginAsUser('user-kouassi');
+    setActiveTab('explore');
+  };
+
+  const handleSelectSeller = () => {
+    loginAsUser('user-awa');
+    setActiveTab('dashboard_client');
+  };
+
+  const handleSelectDriver = () => {
+    loginAsUser('user-bakary-driver');
+    setActiveTab('dashboard_driver');
+  };
 
   return (
-    <div id="role-switcher-bar" className="bg-[#05080E] border-b border-amber-500/20 px-3 py-2 text-xs">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-2">
-        {/* Left: Indicator of active test persona & RBAC */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-full font-semibold border border-amber-500/30 text-[11px] sm:text-xs">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span>Simulateur RBAC</span>
+    <nav 
+      id="role-switcher-bar" 
+      aria-label="Sélecteur d'espace acteur"
+      className="bg-[#070B18] border-b border-slate-800/80 px-2 sm:px-4 py-1.5 text-xs select-none sticky top-13 sm:top-15 lg:top-[68px] z-30 backdrop-blur-md"
+    >
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 overflow-x-auto scrollbar-none py-0.5">
+        {/* Left: Role indicator label */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 text-[10px] sm:text-[11px] font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="tracking-tight uppercase">{translate("Espace Acteur", "Actor Space")}:</span>
           </div>
-          <span className="text-slate-400 text-[11px] hidden lg:inline">
-            Tester les 4 règles (3 articles offerts, Pass 5000F, Livreur 5 courses, KYC) :
-          </span>
         </div>
 
-        {/* Right: Quick switcher buttons with smooth horizontal scroll on mobile/tablet */}
-        <div className="w-full md:w-auto flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-          {/* Visitor */}
+        {/* Center: The 3 Main Personas (Client/Acheteur, Vendeur Déstockage, Livreur) */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* 1. Client / Acheteur */}
           <button
-            id="role-btn-visitor"
-            onClick={logout}
-            className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 font-medium text-[11px] shrink-0 ${
-              !currentUser 
-                ? 'bg-slate-700 text-white shadow' 
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+            id="role-btn-actor-buyer"
+            onClick={handleSelectBuyer}
+            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 font-medium text-[11px] sm:text-xs shrink-0 cursor-pointer ${
+              isClientBuyer
+                ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-500/25 border border-blue-400'
+                : 'bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800'
             }`}
+            title={translate("Parcours Acheteur / Client : Enchères, Panier & POD", "Buyer / Client Flow: Auctions, Cart & POD")}
           >
-            <span>👤 Visiteur</span>
+            <ShoppingBag className={`w-3.5 h-3.5 ${isClientBuyer ? 'text-white' : 'text-blue-400'} shrink-0`} />
+            <span>{translate("Acheteur / Client", "Buyer / Client")}</span>
           </button>
 
-          {/* Client Basic: Kouassi (2/3 products) */}
+          {/* 2. Vendeur de Déstockage */}
           <button
-            id="role-btn-kouassi"
-            onClick={() => loginAsUser('user-kouassi')}
-            className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 font-medium text-[11px] shrink-0 ${
-              currentUser?.id === 'user-kouassi'
-                ? 'bg-blue-600 text-white shadow'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+            id="role-btn-actor-seller"
+            onClick={handleSelectSeller}
+            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 font-medium text-[11px] sm:text-xs shrink-0 cursor-pointer ${
+              isClientSeller
+                ? 'bg-[#FF5B00] text-white font-bold shadow-sm shadow-orange-500/25 border border-orange-400'
+                : 'bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800'
             }`}
-            title="Compte Basic : 2/3 produits gratuits utilisés"
+            title={translate("Parcours Vendeur Déstockage : Annonces, Lots B2B & Retraits", "Liquidation Seller Flow: Listings, B2B Lots & Payouts")}
           >
-            <UserCheck className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span>Kouassi (Basic 2/3)</span>
+            <Store className={`w-3.5 h-3.5 ${isClientSeller ? 'text-white' : 'text-[#FF5B00]'} shrink-0`} />
+            <span>{translate("Vendeur Déstockage", "Liquidation Seller")}</span>
           </button>
 
-          {/* Client Pro: Awa Diabaté */}
+          {/* 3. Livreur Express */}
           <button
-            id="role-btn-awa"
-            onClick={() => loginAsUser('user-awa')}
-            className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 font-medium text-[11px] shrink-0 ${
-              currentUser?.id === 'user-awa'
-                ? 'bg-amber-600 text-white shadow'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+            id="role-btn-actor-driver"
+            onClick={handleSelectDriver}
+            className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 font-medium text-[11px] sm:text-xs shrink-0 cursor-pointer ${
+              isDriver
+                ? 'bg-emerald-600 text-white font-bold shadow-sm shadow-emerald-500/25 border border-emerald-400'
+                : 'bg-slate-900/90 text-slate-300 hover:text-white hover:bg-slate-800 border border-slate-800'
             }`}
-            title="Pass Pro (10 000 FCFA) : 5% commission, illimité"
+            title={translate("Parcours Livreur : Bourse de fret, GPS & Validation OTP", "Courier Flow: Freight board, GPS & OTP verification")}
           >
-            <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Awa (Pro 5%)</span>
+            <Bike className={`w-3.5 h-3.5 ${isDriver ? 'text-white' : 'text-emerald-400'} shrink-0`} />
+            <span>{translate("Livreur Express", "Express Courier")}</span>
+          </button>
+        </div>
+
+        {/* Right: Direct Access to GPS & KYC Verification Flows */}
+        <div className="flex items-center gap-1 shrink-0 ml-auto pl-1 border-l border-slate-800">
+          {/* GPS Quick Action */}
+          <button
+            id="role-btn-gps-zone"
+            onClick={() => setGpsModalOpen(true)}
+            className="px-2 py-1 rounded-md bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-800 flex items-center gap-1 text-[10px] sm:text-[11px] font-medium transition-colors"
+            title={translate("Modifier ma zone GPS (Abidjan & Banlieue)", "Change GPS zone (Abidjan & Environs)")}
+          >
+            <MapPin className="w-3 h-3 text-amber-400 shrink-0" />
+            <span className="hidden sm:inline font-mono-num">{userLocation ? userLocation.commune.split(' ')[0] : 'Abidjan'}</span>
+            <span className="sm:hidden font-mono-num">GPS</span>
           </button>
 
-          {/* Driver Trial: Bakary (2/5 free rides left) */}
+          {/* KYC Quick Action */}
           <button
-            id="role-btn-bakary"
-            onClick={() => loginAsUser('user-bakary-driver')}
-            className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 font-medium text-[11px] shrink-0 ${
-              currentUser?.id === 'user-bakary-driver'
-                ? 'bg-emerald-600 text-white shadow'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+            id="role-btn-kyc-verify"
+            onClick={() => setKycModalOpen(true)}
+            className={`px-2 py-1 rounded-md border flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold transition-all ${
+              currentUser?.kycStatus === 'verified'
+                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
+                : 'bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25'
             }`}
-            title="Livreur Essai : 2 courses gratuites restantes"
+            title={currentUser?.kycStatus === 'verified' ? translate("Identité Certifiée KYC", "KYC Certified Identity") : translate("Valider mon identité KYC", "Validate my KYC Identity")}
           >
-            <Bike className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Bakary (Livreur 2/5)</span>
-          </button>
-
-          {/* Driver VIP: Yaya Touré */}
-          <button
-            id="role-btn-yaya"
-            onClick={() => loginAsUser('user-yaya-driver')}
-            className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 font-medium text-[11px] shrink-0 ${
-              currentUser?.id === 'user-yaya-driver'
-                ? 'bg-teal-600 text-white shadow'
-                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-            }`}
-            title="Pass Livreur VIP (6 000 FCFA) : Illimité"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-            <span>Yaya (Pass VIP)</span>
+            <ShieldCheck className="w-3 h-3 shrink-0" />
+            <span className="hidden sm:inline">
+              {currentUser?.kycStatus === 'verified' ? translate("KYC Vérifié", "KYC Verified") : translate("Vérifier KYC", "Verify KYC")}
+            </span>
+            <span className="sm:hidden">KYC</span>
           </button>
         </div>
       </div>
-    </div>
+    </nav>
   );
 };
