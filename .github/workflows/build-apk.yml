@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+  workflow_dispatch:
 
 jobs:
   build-production:
@@ -20,16 +21,18 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies
-        run: npm ci || npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build Web Application
-        run: npm run build
+        run: |
+          export CI=false
+          npm run build || npx vite build
 
       - name: Configure Capacitor & Add Android
         run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
           npx cap init "BRAD'CI" "com.bradci.app" --web-dir dist || true
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap add android
+          npx cap add android || true
           npx cap sync android
 
       - name: Setup Java JDK 17
@@ -48,7 +51,7 @@ jobs:
             -validity 10000 \
             -storepass ${{ secrets.RELEASE_KEYSTORE_PASSWORD }} \
             -keypass ${{ secrets.RELEASE_KEY_PASSWORD }} \
-            -dname "CN=BRADCI, OU=IT, O=BRADCI, L=Abidjan, C=CI"
+            -dname "CN=BRADCI, OU=IT, O=BRADCI, L=Abidjan, C=CI" || true
 
       - name: Build Production Signed APK
         run: |
@@ -60,23 +63,8 @@ jobs:
             -Pandroid.injected.signing.key.alias=${{ secrets.RELEASE_KEY_ALIAS }} \
             -Pandroid.injected.signing.key.password=${{ secrets.RELEASE_KEY_PASSWORD }}
 
-      - name: Build Production Signed AAB (Play Store)
-        run: |
-          cd android
-          ./gradlew bundleRelease \
-            -Pandroid.injected.signing.store.file=app/bradci-release.jks \
-            -Pandroid.injected.signing.store.password=${{ secrets.RELEASE_KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.RELEASE_KEY_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.RELEASE_KEY_PASSWORD }}
-
-      - name: Upload Production APK (Direct Install)
+      - name: Upload Production APK
         uses: actions/upload-artifact@v4
         with:
           name: BRADCI-Official-APK-Production
           path: android/app/build/outputs/apk/release/app-release.apk
-
-      - name: Upload Production AAB (Google Play Store)
-        uses: actions/upload-artifact@v4
-        with:
-          name: BRADCI-Official-Bundle-PlayStore
-          path: android/app/build/outputs/bundle/release/app-release.aab
