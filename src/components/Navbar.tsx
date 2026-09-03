@@ -4,6 +4,7 @@ import { BradCiLogo } from './BradCiLogo';
 import { 
   Gavel, 
   ShieldCheck, 
+  Clock,
   PlusCircle, 
   User, 
   Bike, 
@@ -19,14 +20,9 @@ import {
   MapPin,
   Navigation,
   Bell,
-  Globe,
-  Sun,
-  Moon,
-  Volume2,
-  VolumeX,
-  Laptop,
   Building2,
-  ShoppingCart
+  ShoppingCart,
+  Settings
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -55,6 +51,7 @@ export const Navbar: React.FC = () => {
     toggleVoice,
     readCurrentScreenAloud,
     setKycModalOpen,
+    checkKycVerifiedOrPrompt,
     cart,
     setCartModalOpen
   } = useApp();
@@ -63,36 +60,14 @@ export const Navbar: React.FC = () => {
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
   const handleSellClick = () => {
-    if (!currentUser) {
-      setAuthModalOpen(true);
+    // Just-in-time KYC restriction: user cannot sell without verified KYC
+    if (!checkKycVerifiedOrPrompt('sell')) {
       return;
     }
     setNewProductModalOpen(true);
   };
 
   const publishQuota = currentUser ? canUserPublishProduct(currentUser) : null;
-
-  const getThemeIcon = () => {
-    if (theme === 'auto') {
-      return <Laptop className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-cyan-400" />;
-    }
-    if (effectiveTheme === 'light') {
-      return <Sun className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400" />;
-    }
-    return <Moon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400" />;
-  };
-
-  const getThemeLabel = () => {
-    if (theme === 'auto') return 'Auto';
-    if (effectiveTheme === 'light') return translate('Clair', 'Light');
-    return translate('Sombre', 'Dark');
-  };
-
-  const getThemeTitle = () => {
-    if (theme === 'auto') return translate("Thème Automatique (Jour/Nuit)", "Auto Theme (Day/Night)");
-    if (theme === 'light') return translate("Thème Clair (Blanc)", "Light Theme (White)");
-    return translate("Thème Sombre", "Dark Theme");
-  };
 
   return (
     <header id="main-navbar" className="sticky top-0 z-40 bg-[#0B1021]/95 backdrop-blur-md border-b border-[#222D4A] transition-colors">
@@ -221,84 +196,22 @@ export const Navbar: React.FC = () => {
             </button>
           </nav>
 
-          {/* Right Action Bar - Fully responsive, properly sized, and accessible on all device formats */}
+          {/* Right Action Bar - Pure, focused, essential navigation only */}
           <div 
             id="navbar-actions-bar" 
-            className="flex items-center gap-1 sm:gap-1.5 md:gap-2 min-w-0 flex-1 justify-end overflow-x-auto md:overflow-visible scrollbar-none py-1 pl-1"
+            className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 justify-end py-1 pl-1"
           >
-            {/* Language Toggle (FR / EN) */}
-            <button
-              id="btn-toggle-language"
-              onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')}
-              className="h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 transition-all text-[11px] sm:text-xs font-bold font-mono-num flex items-center gap-1 shrink-0"
-              title={translate("Changer de langue (FR / EN)", "Switch language (FR / EN)")}
-            >
-              <Globe className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>{language.toUpperCase()}</span>
-            </button>
-
-            {/* Theme Toggle (Dark / Light / Auto) */}
-            <button
-              id="btn-toggle-theme"
-              onClick={toggleTheme}
-              className="h-8 sm:h-9 w-8 sm:w-9 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 transition-all text-xs shrink-0 flex items-center justify-center"
-              title={getThemeTitle()}
-            >
-              {getThemeIcon()}
-              <span className="hidden xl:inline text-[10px] font-mono-num font-semibold text-slate-400 ml-1">
-                {getThemeLabel()}
-              </span>
-            </button>
-
-            {/* Voice Assistant Toggle & Live Screen Reader */}
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                id="btn-toggle-voice"
-                onClick={toggleVoice}
-                className={`h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg border transition-all text-xs shrink-0 flex items-center gap-1 ${
-                  voiceEnabled 
-                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25 shadow-sm shadow-emerald-500/20' 
-                    : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200'
-                }`}
-                title={voiceEnabled ? translate("Assistance Vocale Active (Cliquez pour couper)", "Voice Guidance Active (Click to mute)") : translate("Assistance Vocale Coupée (Cliquez pour activer)", "Voice Guidance Muted (Click to activate)")}
-              >
-                {voiceEnabled ? (
-                  <>
-                    <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-                    <span className="hidden xl:inline text-[9px] font-bold text-emerald-400">{translate("VOIX ON", "VOICE ON")}</span>
-                  </>
-                ) : (
-                  <>
-                    <VolumeX className="w-3.5 h-3.5" />
-                    <span className="hidden xl:inline text-[9px] font-medium text-slate-500">{translate("VOIX OFF", "VOICE OFF")}</span>
-                  </>
-                )}
-              </button>
-
-              {voiceEnabled && (
-                <button
-                  id="btn-read-screen-aloud"
-                  onClick={readCurrentScreenAloud}
-                  className="hidden xl:flex items-center gap-1 h-8 sm:h-9 px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold transition-all"
-                  title={translate("Lire la synthèse audio des données de la page", "Read current page audio summary aloud")}
-                >
-                  <Sparkles className="w-3 h-3 text-emerald-400" />
-                  <span>{translate("Lire l'écran", "Read screen")}</span>
-                </button>
-              )}
-            </div>
-
-            {/* Shopping Cart Button */}
+            {/* Shopping Cart Button with Dynamic Item Counter */}
             <button
               id="btn-navbar-cart"
               onClick={() => setCartModalOpen(true)}
-              className="relative h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 flex items-center gap-1.5"
+              className="relative h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 flex items-center gap-1.5 shadow-sm"
               title={translate("Mon Panier Multi-Articles", "My Multi-Item Cart")}
             >
               <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
               <span className="text-xs font-bold hidden sm:inline">{translate("Panier", "Cart")}</span>
               {cart.length > 0 && (
-                <span className="min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[9px] sm:text-[10px] flex items-center justify-center animate-bounce shrink-0">
+                <span className="min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[9px] sm:text-[10px] flex items-center justify-center animate-bounce shrink-0 shadow">
                   {cart.reduce((s, i) => s + i.quantity, 0)}
                 </span>
               )}
@@ -422,8 +335,9 @@ export const Navbar: React.FC = () => {
                             {translate("Vérifié KYC", "KYC Verified")}
                           </span>
                         ) : currentUser.kycStatus === 'pending' ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center gap-1 border border-amber-500/30">
-                            {translate("En attente", "Pending")}
+                          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-semibold flex items-center gap-1 border border-amber-500/30">
+                            <Clock className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
+                            <span>{translate("KYC en cours de vérification", "KYC under verification")}</span>
                           </span>
                         ) : (
                           <button
@@ -474,6 +388,21 @@ export const Navbar: React.FC = () => {
                       >
                         <Sparkles className="w-4 h-4 text-amber-400" />
                         <span>{translate("Souscrire un Pass / Boost", "Get a Pass / Boost")}</span>
+                      </button>
+
+                      <button
+                        id="btn-profile-settings"
+                        onClick={() => {
+                          setActiveTab('dashboard_client');
+                          setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('bradci_open_subtab', { detail: 'settings' }));
+                          }, 60);
+                          setProfileDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-amber-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-colors font-bold"
+                      >
+                        <Settings className="w-4 h-4 text-amber-400" />
+                        <span>{translate("Paramètres & Préférences", "Settings & Preferences")}</span>
                       </button>
 
                       <div className="pt-2 border-t border-slate-800">
@@ -581,6 +510,21 @@ export const Navbar: React.FC = () => {
                     <span>{translate("Back-Office Super Admin", "Super Admin Back-Office")}</span>
                   </button>
                 )}
+
+                <button
+                  id="btn-mobile-settings"
+                  onClick={() => {
+                    setActiveTab('dashboard_client');
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('bradci_open_subtab', { detail: 'settings' }));
+                    }, 60);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full text-left p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-bold flex items-center gap-2"
+                >
+                  <Settings className="w-4 h-4 text-amber-400" />
+                  <span>{translate("Paramètres & Préférences", "Settings & Preferences")}</span>
+                </button>
 
                 <div className="pt-2 border-t border-slate-800">
                   <button

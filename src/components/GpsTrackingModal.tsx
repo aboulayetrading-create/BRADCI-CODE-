@@ -211,7 +211,7 @@ export const GpsTrackingModal: React.FC = () => {
               <span>Assistance Client 24/7</span>
             </button>
             <span className="hidden sm:inline-block text-[11px] text-slate-400">
-              Paiement Direct à la Livraison (Pay on Delivery via API)
+              Paiement Direct à la Livraison (Pay on Delivery Sécurisé)
             </span>
           </div>
 
@@ -345,7 +345,7 @@ export const GpsTrackingModal: React.FC = () => {
                     {isDelivered
                       ? '✓ Commande Clôturée (OTP Validé)'
                       : isPaid
-                      ? '✅ Paiement API Confirmé • OTP Débloqué'
+                      ? '✅ Paiement Mobile Confirmé • Code Débloqué'
                       : isArrived
                       ? '📍 Livreur Arrivé sur Place • Paiement Débloqué'
                       : isReturning
@@ -498,7 +498,7 @@ export const GpsTrackingModal: React.FC = () => {
                         </div>
                         <div>
                           <h3 className="font-black text-sm text-white">Le Livreur est à votre porte !</h3>
-                          <p className="text-xs text-slate-300">Inspectez votre colis, puis initiez le paiement direct sécurisé par API.</p>
+                          <p className="text-xs text-slate-300">Inspectez votre colis, puis initiez le paiement direct sécurisé.</p>
                         </div>
                       </div>
                       <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-black text-xs border border-emerald-500/30">
@@ -509,7 +509,7 @@ export const GpsTrackingModal: React.FC = () => {
                     {/* Operator Selection */}
                     <div>
                       <label className="text-xs font-bold text-slate-300 block mb-2">
-                        Choisissez votre moyen de paiement direct (API) :
+                        Choisissez votre moyen de paiement Mobile Money :
                       </label>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-2">
                         {[
@@ -567,7 +567,7 @@ export const GpsTrackingModal: React.FC = () => {
                         {isProcessingPayment || isPaymentPending ? (
                           <>
                             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Traitement API {selectedOperator}...</span>
+                            <span>Paiement en cours ({selectedOperator})...</span>
                           </>
                         ) : (
                           <>
@@ -600,11 +600,11 @@ export const GpsTrackingModal: React.FC = () => {
                           <span className="font-black text-sm uppercase tracking-wide text-[#00C853] block">
                             Paiement Direct Validé (PAID)
                           </span>
-                          <span className="text-[10px] text-slate-400">Transaction Webhook Marchand Confirmée</span>
+                          <span className="text-[10px] text-slate-400">Règlement Marchand Sécurisé & Confirmé</span>
                         </div>
                       </div>
                       <span className="px-2.5 py-1 rounded-full bg-[#00C853]/20 text-[#00C853] border border-[#00C853]/40 font-mono text-xs font-black">
-                        API VALIDÉE
+                        PAIEMENT VALIDÉ
                       </span>
                     </div>
 

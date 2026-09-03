@@ -33,6 +33,7 @@ import { LiveDeliveryStatusBar } from './components/LiveDeliveryStatusBar';
 import { NotificationsModal } from './components/NotificationsModal';
 import { KYCModal } from './components/KYCModal';
 import { MandatoryKYCGate } from './components/MandatoryKYCGate';
+import { KycRequiredModal } from './components/KycRequiredModal';
 import { ProfileAvatarModal } from './components/ProfileAvatarModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { OrderDispatchModal } from './components/OrderDispatchModal';
@@ -204,8 +205,8 @@ const AppContent: React.FC = () => {
       <ErrorBoundary fallbackTitle="Module d'authentification">
         <AuthModal />
       </ErrorBoundary>
-      <ErrorBoundary fallbackTitle="Vérification KYC Obligatoire">
-        <MandatoryKYCGate />
+      <ErrorBoundary fallbackTitle="Vérification KYC Requise">
+        <KycRequiredModal />
       </ErrorBoundary>
       <ErrorBoundary fallbackTitle="Modal KYC">
         <KYCModal />

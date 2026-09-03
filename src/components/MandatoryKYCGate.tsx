@@ -36,28 +36,10 @@ const DEMO_KYC_PHOTOS = {
 };
 
 export const MandatoryKYCGate: React.FC = () => {
-  const { 
-    currentUser, 
-    submitKYC, 
-    logoutUser, 
-    translate, 
-    language, 
-    addToast 
-  } = useApp();
-
-  // If no user or already verified or admin, gate is not active
-  if (!currentUser || currentUser.role === 'admin' || currentUser.kycStatus === 'verified') {
-    return null;
-  }
-
-  const isDriver = currentUser.role === 'driver';
-  const isPending = currentUser.kycStatus === 'pending';
-  
-  // For Buyer & Seller: 3 Steps
-  // 1: Official ID (CNI, Passeport, Carte Consulaire)
-  // 2: Simple Selfie
-  // 3: Selfie holding ID
-  // For Driver: 4 Steps
+  // Global screen-blocking at registration/login is removed per BRAD'CI specifications.
+  // KYC verification is now checked just-in-time when attempting transactional actions (buy/sell).
+  return null;
+};
   // 1: Official ID (CNI, Passeport)
   // 2: Selfie holding ID
   // 3: Driver's License (Recto / Verso)

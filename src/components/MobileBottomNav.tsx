@@ -26,12 +26,13 @@ export const MobileBottomNav: React.FC = () => {
     setNotificationsModalOpen,
     cart,
     setCartModalOpen,
+    checkKycVerifiedOrPrompt,
     translate
   } = useApp();
 
   const handleSellClick = () => {
-    if (!currentUser) {
-      setAuthModalOpen(true);
+    // Just-in-time KYC restriction: user cannot sell without verified KYC
+    if (!checkKycVerifiedOrPrompt('sell')) {
       return;
     }
     setNewProductModalOpen(true);

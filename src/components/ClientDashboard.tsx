@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   User, 
@@ -37,7 +37,18 @@ import {
   XCircle,
   Undo2,
   FileText,
-  Gift
+  Gift,
+  Settings,
+  Sun,
+  Moon,
+  Laptop,
+  Globe,
+  Volume2,
+  VolumeX,
+  Bell,
+  LogOut,
+  Radio,
+  Smartphone
 } from 'lucide-react';
 import { Product, ShopProfile, PaymentMethod, DeliveryJob } from '../types';
 import { ReferralDashboard } from './ReferralDashboard';
@@ -53,6 +64,7 @@ export const ClientDashboard: React.FC = () => {
     gpsPermissionStatus,
     setGpsModalOpen,
     setNewProductModalOpen, 
+    checkKycVerifiedOrPrompt,
     setPricingModalOpen,
     setTargetPlanForPricing,
     setFiveBiddersModalProduct,
@@ -75,11 +87,40 @@ export const ClientDashboard: React.FC = () => {
     setKycModalOpen,
     setProfileAvatarModalOpen,
     addToast,
-    translate
+    translate,
+    theme,
+    effectiveTheme,
+    setTheme,
+    toggleTheme,
+    language,
+    setLanguage,
+    voiceEnabled,
+    toggleVoice,
+    readCurrentScreenAloud,
+    logout,
+    requestGpsPermission,
+    browserNotificationsEnabled,
+    requestBrowserNotificationPermission
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'sales' | 'expeditions' | 'shop' | 'purchases' | 'transactions' | 'kyc' | 'referral'>('sales');
+  const [activeSubTab, setActiveSubTab] = useState<'sales' | 'expeditions' | 'shop' | 'purchases' | 'transactions' | 'kyc' | 'referral' | 'settings'>('sales');
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'withdrawals' | 'sales' | 'purchases' | 'subscriptions'>('all');
+
+  // Notification Preferences State
+  const [notifAuctions, setNotifAuctions] = useState(() => localStorage.getItem('bradci_notif_auctions') !== 'false');
+  const [notifDeliveries, setNotifDeliveries] = useState(() => localStorage.getItem('bradci_notif_deliveries') !== 'false');
+  const [notifPayments, setNotifPayments] = useState(() => localStorage.getItem('bradci_notif_payments') !== 'false');
+  const [notifPromos, setNotifPromos] = useState(() => localStorage.getItem('bradci_notif_promos') !== 'false');
+
+  useEffect(() => {
+    const handleOpenSubTab = (e: any) => {
+      if (e?.detail) {
+        setActiveSubTab(e.detail);
+      }
+    };
+    window.addEventListener('bradci_open_subtab', handleOpenSubTab);
+    return () => window.removeEventListener('bradci_open_subtab', handleOpenSubTab);
+  }, []);
 
   // Withdrawal state
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
@@ -235,7 +276,7 @@ export const ClientDashboard: React.FC = () => {
           </div>
 
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-xl font-extrabold text-white font-display">{currentUser.name}</h2>
               <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded ${
                 currentUser.sellerPlan === 'pro'
@@ -247,6 +288,18 @@ export const ClientDashboard: React.FC = () => {
                 {currentUser.sellerPlan === 'pro' ? 'PASS BOUTIQUE VIP OR' :
                  currentUser.sellerPlan === 'standard' ? 'PASS VENDEUR CERTIFIÉ' : 'COMPTE GRATUIT (ILLIMITÉ)'}
               </span>
+              {currentUser.kycStatus === 'pending' && (
+                <span id="profile-header-kyc-pending-badge" className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-xs">
+                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  <span>{translate("KYC en cours de vérification", "KYC under verification")}</span>
+                </span>
+              )}
+              {currentUser.kycStatus === 'verified' && (
+                <span id="profile-header-kyc-verified-badge" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{translate("Vérifié KYC", "KYC Verified")}</span>
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400 mt-0.5">{currentUser.email} • {currentUser.phone}</p>
             
@@ -316,7 +369,7 @@ export const ClientDashboard: React.FC = () => {
                 <span>Paiement Direct à la Livraison (POD) :</span>
               </span>
               <span className="text-xs font-semibold text-slate-200">
-                Paiement par API une fois le colis reçu
+                Paiement Mobile Money une fois le colis reçu
               </span>
             </div>
             <span className="text-[9px] bg-emerald-500/20 text-emerald-200 px-2 py-0.5 rounded font-medium max-w-[110px] text-center leading-tight">
@@ -624,7 +677,10 @@ export const ClientDashboard: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
           )}
           {currentUser.kycStatus === 'pending' && (
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30 flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5 animate-pulse" />
+              <span>{translate("En cours", "In review")}</span>
+            </span>
           )}
         </button>
 
@@ -644,6 +700,19 @@ export const ClientDashboard: React.FC = () => {
           {(currentUser.referralBalance || 0) > 0 && (
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           )}
+        </button>
+
+        <button
+          id="btn-subtab-settings"
+          onClick={() => setActiveSubTab('settings')}
+          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
+            activeSubTab === 'settings'
+              ? 'border-amber-500 text-amber-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Settings className="w-4 h-4 text-amber-400" />
+          <span>{translate("Paramètres", "Settings")}</span>
         </button>
       </div>
 
@@ -698,7 +767,10 @@ export const ClientDashboard: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setNewProductModalOpen(true)}
+                onClick={() => {
+                  if (!checkKycVerifiedOrPrompt('sell')) return;
+                  setNewProductModalOpen(true);
+                }}
                 className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center gap-1.5"
               >
                 <PlusCircle className="w-4 h-4" />
@@ -714,7 +786,10 @@ export const ClientDashboard: React.FC = () => {
               <p className="text-sm text-slate-300 font-bold">Vous n'avez pas encore d'article en vente.</p>
               <p className="text-xs text-slate-500 mt-1">Publiez votre premier article gratuitement (jusqu'à 3 produits offerts).</p>
               <button
-                onClick={() => setNewProductModalOpen(true)}
+                onClick={() => {
+                  if (!checkKycVerifiedOrPrompt('sell')) return;
+                  setNewProductModalOpen(true);
+                }}
                 className="mt-4 px-5 py-2.5 bg-amber-500 text-slate-950 font-bold text-xs rounded-xl"
               >
                 Commencer à vendre
@@ -1401,7 +1476,7 @@ export const ClientDashboard: React.FC = () => {
             <div>
               <p className="font-bold text-white">Modèle Paiement Direct à la Livraison (Pay on Delivery)</p>
               <p className="text-slate-300 mt-0.5">
-                Aucun débit préalable ni blocage de fonds. Vous payez par API (Wave, Orange Money, MTN MoMo, Moov, Carte) directement lorsque le livreur arrive et que vous avez examiné votre colis.
+                Aucun débit préalable ni blocage de fonds. Vous payez directement par Mobile Money (Wave, Orange Money, MTN MoMo, Moov) ou Carte lorsque le livreur arrive et que vous avez examiné votre colis.
               </p>
             </div>
           </div>
@@ -1945,11 +2020,19 @@ export const ClientDashboard: React.FC = () => {
                 <p className="text-[11px] uppercase font-bold text-slate-400">
                   {translate("Statut Actuel de votre Dossier :", "Current File Status:")}
                 </p>
-                <p className="text-sm font-extrabold text-white capitalize">
-                  {currentUser.kycStatus === 'verified' ? translate('✅ Vérifié & Certifié Brad\'CI', '✅ Verified & Brad\'CI Certified') :
-                   currentUser.kycStatus === 'pending' ? translate('⏳ En attente de validation par la modération', '⏳ Pending validation by moderation team') :
-                   currentUser.kycStatus === 'rejected' ? translate('❌ Rejeté (Veuillez renouveler)', '❌ Rejected (Please re-submit)') :
-                   translate('⚠️ Non Vérifié', '⚠️ Unverified')}
+                <p className="text-sm font-extrabold text-white capitalize flex items-center gap-2 mt-0.5">
+                  {currentUser.kycStatus === 'verified' ? (
+                    <span className="text-emerald-400">{translate('✅ Vérifié & Certifié Brad\'CI', '✅ Verified & Brad\'CI Certified')}</span>
+                  ) : currentUser.kycStatus === 'pending' ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                      <span>{translate("KYC en cours de vérification", "KYC under verification")}</span>
+                    </span>
+                  ) : currentUser.kycStatus === 'rejected' ? (
+                    <span className="text-red-400">{translate('❌ Rejeté (Veuillez renouveler)', '❌ Rejected (Please re-submit)')}</span>
+                  ) : (
+                    <span className="text-slate-400">{translate('⚠️ Non Vérifié', '⚠️ Unverified')}</span>
+                  )}
                 </p>
                 {currentUser.kycStatus === 'pending' && (
                   <p className="text-[11px] text-amber-400/90 mt-0.5">
@@ -2079,6 +2162,482 @@ export const ClientDashboard: React.FC = () => {
       {/* SUB-TAB 7: PARRAINAGE & BONUS RÉCIPROQUES */}
       {activeSubTab === 'referral' && (
         <ReferralDashboard />
+      )}
+
+      {/* SUB-TAB 8: PARAMÈTRES & PRÉFÉRENCES */}
+      {activeSubTab === 'settings' && (
+        <div id="settings-container" className="space-y-6">
+          {/* Header Banner */}
+          <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#0C1425] via-slate-900 to-[#0C1425] border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <Settings className="w-6 h-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-white">
+                  {translate("Paramètres & Préférences", "Settings & Preferences")}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {translate("Gérez l'apparence, la langue, la voix de guidage et vos alertes de compte.", "Manage appearance, language, voice guidance and account alerts.")}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold font-mono">
+                {currentUser.sellerPlan === 'pro' ? 'Compte Vendeur Pro' : currentUser.sellerPlan === 'standard' ? 'Compte Vendeur Standard' : 'Compte Client / Vendeur'}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 1. APPARENCE & THÈME VISUEL */}
+            <div className="p-5 rounded-2xl bg-[#0E1524] border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Sun className="w-5 h-5 text-amber-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    {translate("Apparence & Thème d'Affichage", "Appearance & Display Theme")}
+                  </h4>
+                </div>
+                <span className="text-[11px] font-mono font-bold text-slate-400">
+                  {theme === 'auto' ? 'Automatique' : theme === 'light' ? 'Clair' : 'Sombre'}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {translate(
+                  "Choisissez votre confort de lecture. Le mode sombre réduit la consommation de batterie sur écran OLED.",
+                  "Choose your viewing comfort. Dark mode saves battery on OLED screens."
+                )}
+              </p>
+
+              <div className="grid grid-cols-3 gap-2.5 pt-1">
+                {/* Dark */}
+                <button
+                  id="btn-settings-theme-dark"
+                  type="button"
+                  onClick={() => {
+                    setTheme('dark');
+                    addToast(translate("Thème Sombre activé", "Dark theme activated"), translate("Contraste élevé pour usage de nuit.", "High contrast for night use."), 'info');
+                  }}
+                  className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-2 ${
+                    theme === 'dark'
+                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-md ring-1 ring-amber-500/40'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <Moon className="w-5 h-5" />
+                  <span className="text-xs font-bold">{translate("Sombre", "Dark")}</span>
+                </button>
+
+                {/* Light */}
+                <button
+                  id="btn-settings-theme-light"
+                  type="button"
+                  onClick={() => {
+                    setTheme('light');
+                    addToast(translate("Thème Clair activé", "Light theme activated"), translate("Affichage blanc lumineux pour la journée.", "Bright white display for daytime."), 'info');
+                  }}
+                  className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-2 ${
+                    theme === 'light'
+                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-md ring-1 ring-amber-500/40'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <Sun className="w-5 h-5" />
+                  <span className="text-xs font-bold">{translate("Clair", "Light")}</span>
+                </button>
+
+                {/* Auto */}
+                <button
+                  id="btn-settings-theme-auto"
+                  type="button"
+                  onClick={() => {
+                    setTheme('auto');
+                    addToast(translate("Thème Automatique activé", "Auto theme activated"), translate("Synchronisation avec votre système jour/nuit.", "Synced with your device day/night settings."), 'info');
+                  }}
+                  className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-2 ${
+                    theme === 'auto'
+                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-md ring-1 ring-amber-500/40'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <Laptop className="w-5 h-5" />
+                  <span className="text-xs font-bold">{translate("Système", "Auto")}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 2. LANGUE & RÉGION */}
+            <div className="p-5 rounded-2xl bg-[#0E1524] border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Globe className="w-5 h-5 text-amber-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    {translate("Langue & Localisation", "Language & Region")}
+                  </h4>
+                </div>
+                <span className="text-[11px] font-mono font-bold text-emerald-400">
+                  XOF (FCFA)
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {translate(
+                  "BRAD'CI s'adapte à votre langue de préférence. Les montants et le calcul GPS restent ancrés en Côte d'Ivoire.",
+                  "BRAD'CI adapts to your preferred language. Currency and GPS routing remain anchored in Ivory Coast."
+                )}
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <button
+                  id="btn-settings-lang-fr"
+                  type="button"
+                  onClick={() => {
+                    setLanguage('fr');
+                    addToast("Langue : Français", "Interface configurée en Français de Côte d'Ivoire.", "success");
+                  }}
+                  className={`p-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 ${
+                    language === 'fr'
+                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-md ring-1 ring-amber-500/40'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <span className="text-base">🇨🇮</span>
+                  <span className="text-xs font-bold">Français</span>
+                </button>
+
+                <button
+                  id="btn-settings-lang-en"
+                  type="button"
+                  onClick={() => {
+                    setLanguage('en');
+                    addToast("Language: English", "Interface switched to English.", "success");
+                  }}
+                  className={`p-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 ${
+                    language === 'en'
+                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-md ring-1 ring-amber-500/40'
+                      : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                  }`}
+                >
+                  <span className="text-base">🇬🇧</span>
+                  <span className="text-xs font-bold">English</span>
+                </button>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
+                <span>{translate("Zone Horaire :", "Timezone:")}</span>
+                <span className="font-mono text-slate-300 font-semibold">GMT (Heure d'Abidjan)</span>
+              </div>
+            </div>
+
+            {/* 3. ASSISTANCE VOCALE & ACCESSIBILITÉ */}
+            <div className="p-5 rounded-2xl bg-[#0E1524] border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Volume2 className="w-5 h-5 text-amber-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    {translate("Assistance Vocale & Accessibilité", "Voice Guidance & Accessibility")}
+                  </h4>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                  voiceEnabled ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {voiceEnabled ? 'ACTIVÉE' : 'DÉSACTIVÉE'}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {translate(
+                  "Activez la lecture à voix haute des étapes d'enchères, des alertes de livraison et des confirmations de commande.",
+                  "Enable spoken audio announcements for auction steps, courier dispatch and payment validations."
+                )}
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
+                <button
+                  id="btn-settings-toggle-voice"
+                  type="button"
+                  onClick={toggleVoice}
+                  className={`flex-1 p-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                    voiceEnabled
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-md'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {voiceEnabled ? <Volume2 className="w-4 h-4 text-emerald-400 animate-pulse" /> : <VolumeX className="w-4 h-4" />}
+                  <span>{voiceEnabled ? translate("Désactiver l'Assistance Vocale", "Disable Voice Guidance") : translate("Activer l'Assistance Vocale", "Enable Voice Guidance")}</span>
+                </button>
+
+                <button
+                  id="btn-settings-test-voice"
+                  type="button"
+                  onClick={() => {
+                    if ('speechSynthesis' in window) {
+                      window.speechSynthesis.cancel();
+                      const utter = new SpeechSynthesisUtterance("Bienvenue sur BRAD'CI. L'assistance vocale est opérationnelle pour vous guider.");
+                      utter.lang = language === 'en' ? 'en-US' : 'fr-FR';
+                      window.speechSynthesis.speak(utter);
+                      addToast(translate("Test vocal", "Voice test"), translate("Message audio en cours de lecture.", "Playing test voice prompt."), "info");
+                    } else {
+                      addToast(translate("Non disponible", "Unavailable"), translate("Synthèse vocale non supportée par ce navigateur.", "Text-to-speech not supported."), "warning");
+                    }
+                  }}
+                  className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>{translate("Tester la voix", "Test voice")}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4. PRÉFÉRENCES DES NOTIFICATIONS */}
+            <div className="p-5 rounded-2xl bg-[#0E1524] border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Bell className="w-5 h-5 text-amber-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    {translate("Préférences de Notifications", "Notification Preferences")}
+                  </h4>
+                </div>
+                {!browserNotificationsEnabled && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const granted = await requestBrowserNotificationPermission();
+                      if (granted) {
+                        addToast(translate("Notifications autorisées", "Notifications allowed"), translate("Vous recevrez des alertes en direct.", "You will receive live alerts."), "success");
+                      }
+                    }}
+                    className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold transition-all cursor-pointer"
+                  >
+                    {translate("Autoriser Push", "Enable Push")}
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-2.5 pt-1 text-xs">
+                {/* Option A: Auctions */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                  <div>
+                    <span className="font-bold text-white block">Enchères en direct & Surenchères</span>
+                    <span className="text-[11px] text-slate-400">Alertes lors d'une nouvelle offre ou fin imminente</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !notifAuctions;
+                      setNotifAuctions(next);
+                      localStorage.setItem('bradci_notif_auctions', String(next));
+                      addToast("Préférence mise à jour", next ? "Alertes enchères activées" : "Alertes enchères désactivées", "info");
+                    }}
+                    className={`w-10 h-6 rounded-full transition-colors p-1 flex items-center cursor-pointer ${notifAuctions ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'}`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white block shadow" />
+                  </button>
+                </div>
+
+                {/* Option B: Deliveries */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                  <div>
+                    <span className="font-bold text-white block">Suivi des colis & Courses coursier</span>
+                    <span className="text-[11px] text-slate-400">Prise en charge et arrivée du livreur avec code secret OTP</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !notifDeliveries;
+                      setNotifDeliveries(next);
+                      localStorage.setItem('bradci_notif_deliveries', String(next));
+                      addToast("Préférence mise à jour", next ? "Alertes livraisons activées" : "Alertes livraisons désactivées", "info");
+                    }}
+                    className={`w-10 h-6 rounded-full transition-colors p-1 flex items-center cursor-pointer ${notifDeliveries ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'}`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white block shadow" />
+                  </button>
+                </div>
+
+                {/* Option C: Payments */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                  <div>
+                    <span className="font-bold text-white block">Paiements & Séquestre sécurisé</span>
+                    <span className="text-[11px] text-slate-400">Confirmations de versement Wave, Orange Money et libération</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !notifPayments;
+                      setNotifPayments(next);
+                      localStorage.setItem('bradci_notif_payments', String(next));
+                      addToast("Préférence mise à jour", next ? "Alertes paiements activées" : "Alertes paiements désactivées", "info");
+                    }}
+                    className={`w-10 h-6 rounded-full transition-colors p-1 flex items-center cursor-pointer ${notifPayments ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'}`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white block shadow" />
+                  </button>
+                </div>
+
+                {/* Option D: Promos */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                  <div>
+                    <span className="font-bold text-white block">Bonus Parrainage & Déstockages VIP</span>
+                    <span className="text-[11px] text-slate-400">Crédits gagnés par vos filleuls et arrivages de lots B2B</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !notifPromos;
+                      setNotifPromos(next);
+                      localStorage.setItem('bradci_notif_promos', String(next));
+                      addToast("Préférence mise à jour", next ? "Alertes bonus activées" : "Alertes bonus désactivées", "info");
+                    }}
+                    className={`w-10 h-6 rounded-full transition-colors p-1 flex items-center cursor-pointer ${notifPromos ? 'bg-emerald-500 justify-end' : 'bg-slate-800 justify-start'}`}
+                  >
+                    <span className="w-4 h-4 rounded-full bg-white block shadow" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. GÉOLOCALISATION GPS & ADRESSE DE LIVRAISON */}
+            <div className="p-5 rounded-2xl bg-[#0E1524] border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Navigation className="w-5 h-5 text-emerald-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    {translate("Géolocalisation & Adresse par Défaut", "Geolocation & Default Address")}
+                  </h4>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                  gpsPermissionStatus === 'granted' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                }`}>
+                  {gpsPermissionStatus === 'granted' ? 'GPS ACTIF' : 'ATTENTE GPS'}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Commune actuelle :</span>
+                  <span className="font-bold text-white font-mono">{userLocation?.commune || currentUser.city || 'Cocody'}</span>
+                </div>
+                <div className="flex items-start justify-between text-slate-400 pt-1 border-t border-slate-800/60">
+                  <span>Adresse enregistrée :</span>
+                  <span className="text-right text-slate-300 max-w-[220px] truncate">{userLocation?.address || 'Abidjan, Côte d\'Ivoire'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  id="btn-settings-update-gps"
+                  type="button"
+                  onClick={async () => {
+                    const loc = await requestGpsPermission(true);
+                    if (loc) {
+                      addToast(translate("Position GPS actualisée", "GPS position updated"), `${loc.commune} (${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)})`, "success");
+                    }
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Navigation className="w-4 h-4" />
+                  <span>{translate("Actualiser ma position GPS", "Refresh GPS position")}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGpsModalOpen(true)}
+                  className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-bold text-xs transition-all cursor-pointer"
+                >
+                  {translate("Changer Commune", "Change District")}
+                </button>
+              </div>
+            </div>
+
+            {/* 6. GESTION DU COMPTE & SÉCURITÉ */}
+            <div className="p-5 rounded-2xl bg-[#0E1524] border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    {translate("Options de Compte & Sécurité", "Account & Security Options")}
+                  </h4>
+                </div>
+                <span className="text-[11px] font-mono text-slate-400">ID: {currentUser.id.slice(0, 10)}</span>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                {/* Photo change */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={currentUser.avatar}
+                      alt={currentUser.name}
+                      referrerPolicy="no-referrer"
+                      className="w-9 h-9 rounded-full object-cover border border-amber-400/60"
+                    />
+                    <div>
+                      <span className="font-bold text-white block">{currentUser.name}</span>
+                      <span className="text-[11px] text-slate-400">{currentUser.phone || '+225 07 00 00 00 00'}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setProfileAvatarModalOpen(true)}
+                    className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    {translate("Modifier photo", "Edit photo")}
+                  </button>
+                </div>
+
+                {/* KYC Certification status */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
+                  <div>
+                    <span className="font-bold text-white block">{translate("Certification d'Identité KYC", "KYC Identity Certification")}</span>
+                    <span className="text-[11px] text-slate-400">
+                      {currentUser.kycStatus === 'verified'
+                        ? 'Votre compte est certifié conforme (badge vérifié actif)'
+                        : 'Certifiez votre pièce CNI / Passeport pour débloquer les plafonds'}
+                    </span>
+                  </div>
+
+                  {currentUser.kycStatus === 'verified' ? (
+                    <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-bold text-xs border border-emerald-500/30 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Certifié</span>
+                    </span>
+                  ) : currentUser.kycStatus === 'pending' ? (
+                    <span className="px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 font-semibold text-xs border border-amber-500/30 flex items-center gap-1.5 shadow-xs">
+                      <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                      <span>{translate("KYC en cours de vérification", "KYC under verification")}</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setKycModalOpen(true)}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all shadow cursor-pointer"
+                    >
+                      {translate("Certifier", "Certify")}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Sign out */}
+              <div className="pt-2 border-t border-slate-800 flex justify-end">
+                <button
+                  id="btn-settings-logout"
+                  type="button"
+                  onClick={logout}
+                  className="w-full py-2.5 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>{translate("Se Déconnecter de BRAD'CI", "Sign Out of BRAD'CI")}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -222,7 +222,7 @@ export const FiveBiddersModal: React.FC = () => {
 
         <div className="mt-4 text-center text-slate-500 text-[11px] flex items-center justify-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{translate("L'acheteur paiera directement à la livraison via API (Wave/MoMo/Carte).", "The buyer will pay directly on delivery via API (Wave/MoMo/Card).")}</span>
+          <span>{translate("L'acheteur paiera directement à la livraison via Mobile Money (Wave/MoMo/Carte).", "The buyer will pay directly on delivery via Mobile Money (Wave/MoMo/Card).")}</span>
         </div>
       </div>
     </div>

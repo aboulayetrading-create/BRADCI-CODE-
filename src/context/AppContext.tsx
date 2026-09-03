@@ -108,6 +108,11 @@ interface AppContextType {
   kycModalOpen: boolean;
   setKycModalOpen: (open: boolean) => void;
   adminInstantApproveMyKYC: () => void;
+  kycRequiredModalOpen: boolean;
+  setKycRequiredModalOpen: (open: boolean) => void;
+  kycRestrictionAction: 'buy' | 'sell' | 'bid' | 'general';
+  setKycRestrictionAction: (action: 'buy' | 'sell' | 'bid' | 'general') => void;
+  checkKycVerifiedOrPrompt: (action?: 'buy' | 'sell' | 'bid' | 'general') => boolean;
 
   // Auth & Email OTP & Google Profile
   registerUser: (data: { firstName: string; lastName: string; city: string; email: string; phone: string; role: UserRole; password?: string; referralCode?: string }) => { success: boolean; otpCode: string };
@@ -836,9 +841,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('bradci_map_provider', p);
   };
 
-  // KYC Modal State
+  // KYC Modal State & Just-in-Time Action Restrictions
   const [kycModalOpen, setKycModalOpen] = useState<boolean>(false);
+  const [kycRequiredModalOpen, setKycRequiredModalOpen] = useState<boolean>(false);
+  const [kycRestrictionAction, setKycRestrictionAction] = useState<'buy' | 'sell' | 'bid' | 'general'>('general');
   const [profileAvatarModalOpen, setProfileAvatarModalOpen] = useState<boolean>(false);
+
+  // Just-in-Time KYC validation check for transactional actions (buy, sell, bid)
+  const checkKycVerifiedOrPrompt = (action: 'buy' | 'sell' | 'bid' | 'general' = 'general'): boolean => {
+    if (!currentUser) {
+      setAuthModalOpen(true);
+      return false;
+    }
+    // Admins bypass KYC checks
+    if (currentUser.role === 'admin') {
+      return true;
+    }
+    // Verified users can proceed
+    if (currentUser.kycStatus === 'verified') {
+      return true;
+    }
+
+    // Block the action and display the clear, elegant restriction popup
+    setKycRestrictionAction(action);
+    setKycRequiredModalOpen(true);
+    return false;
+  };
 
   // 30s Driver Dispatch Engine State
   const [pendingOrderOffer, setPendingOrderOffer] = useState<DeliveryJob | null>(null);
@@ -1275,6 +1303,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
+    // Restriction KYC: User is not allowed to publish/sell without a validated KYC
+    if (currentUser.role !== 'admin' && currentUser.kycStatus !== 'verified') {
+      setKycRestrictionAction('sell');
+      setKycRequiredModalOpen(true);
+      addToast(
+        'Validation KYC Requise',
+        'Pour sécuriser vos transactions, la validation de votre identité (KYC) est requise pour acheter ou vendre sur BRAD\'CI. Si votre dossier est déjà envoyé, il est actuellement en cours de vérification.',
+        'warning'
+      );
+      return false;
+    }
+
     // Account suspension check (Anti-Fraud Enforcement)
     if (currentUser.isSuspended) {
       addToast(
@@ -1460,6 +1500,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
+    // Restriction KYC: User is not allowed to purchase without a validated KYC
+    if (currentUser.role !== 'admin' && currentUser.kycStatus !== 'verified') {
+      setKycRestrictionAction('buy');
+      setKycRequiredModalOpen(true);
+      addToast(
+        'Validation KYC Requise',
+        'Pour sécuriser vos transactions, la validation de votre identité (KYC) est requise pour acheter ou vendre sur BRAD\'CI. Si votre dossier est déjà envoyé, il est actuellement en cours de vérification.',
+        'warning'
+      );
+      return false;
+    }
+
     const prod = products.find(p => p.id === productId);
     if (!prod || prod.status !== 'active') {
       addToast('Article Indisponible', 'Cet article n\'est plus disponible à la vente.', 'error');
@@ -1570,11 +1622,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ================= SHOPPING CART & MULTI-ITEM CHECKOUT ENGINE =================
   const addToCart = (product: Product, quantity: number = 1, forcedChannel?: CartItemChannel): boolean => {
-    if (!currentUser) {
-      setAuthModalOpen(true);
-      return false;
-    }
-
     if (product.status !== 'active') {
       addToast('Article Indisponible', 'Cet article n\'est plus disponible à la vente.', 'error');
       return false;
@@ -1654,7 +1701,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     useReferralDiscount: boolean = false
   ): Promise<CartOrderRecord | null> => {
     if (!currentUser) {
+      addToast(
+        'Connexion Requise',
+        'Veuillez vous connecter ou créer un compte pour finaliser et valider votre commande panier.',
+        'info'
+      );
       setAuthModalOpen(true);
+      return null;
+    }
+
+    // Restriction KYC: User is not allowed to finalize an order without a validated KYC
+    if (currentUser.role !== 'admin' && currentUser.kycStatus !== 'verified') {
+      setKycRestrictionAction('buy');
+      setKycRequiredModalOpen(true);
+      addToast(
+        'Validation KYC Requise',
+        'Pour sécuriser vos transactions, la validation de votre identité (KYC) est requise pour acheter ou vendre sur BRAD\'CI. Si votre dossier est déjà envoyé, il est actuellement en cours de vérification.',
+        'warning'
+      );
       return null;
     }
 
@@ -1693,6 +1757,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rawDeliveryFeesFCFA: optimization.rawDeliveryFeeSum,
       optimizedDeliveryFeeFCFA: optimization.optimizedDeliveryFee,
       deliverySavingsFCFA: optimization.totalDeliverySavings,
+      referralDiscountFCFA: referralDiscount,
       appliedReferralDiscountFCFA: referralDiscount,
       totalAmountPaidFCFA: finalAmountToPay,
       paymentMethod,
@@ -1876,6 +1941,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const placeBid = (productId: string, amount: number): boolean => {
     if (!currentUser) {
       setAuthModalOpen(true);
+      return false;
+    }
+
+    // Restriction KYC: User is not allowed to bid without a validated KYC
+    if (currentUser.role !== 'admin' && currentUser.kycStatus !== 'verified') {
+      setKycRestrictionAction('bid');
+      setKycRequiredModalOpen(true);
+      addToast(
+        'Validation KYC Requise',
+        'Pour sécuriser vos transactions, la validation de votre identité (KYC) est requise pour acheter ou vendre sur BRAD\'CI. Si votre dossier est déjà envoyé, il est actuellement en cours de vérification.',
+        'warning'
+      );
       return false;
     }
 
@@ -5007,6 +5084,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         kycModalOpen,
         setKycModalOpen,
         adminInstantApproveMyKYC,
+        kycRequiredModalOpen,
+        setKycRequiredModalOpen,
+        kycRestrictionAction,
+        setKycRestrictionAction,
+        checkKycVerifiedOrPrompt,
 
         // Auth & Email OTP & Google Profile
         registerUser,

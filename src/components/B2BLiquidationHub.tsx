@@ -402,7 +402,11 @@ export const B2BLiquidationHub: React.FC = () => {
 
                     <button
                       type="button"
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20 group-hover:scale-105 shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProductDetailModal(lot);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20 group-hover:scale-105 shrink-0 cursor-pointer"
                     >
                       <Gavel className="w-3.5 h-3.5" />
                       <span>{translate("Enchérir sur le Lot", "Bid on Lot")}</span>

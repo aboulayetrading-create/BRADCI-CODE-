@@ -23,7 +23,8 @@ import {
   Users,
   Navigation,
   AlertCircle,
-  Building2
+  Building2,
+  ShoppingCart
 } from 'lucide-react';
 import { Product, VehicleType } from '../types';
 import { 
@@ -49,7 +50,9 @@ export const VisitorFeed: React.FC = () => {
     driverAcceptJob,
     language,
     translate,
-    t
+    t,
+    addToCart,
+    setCartModalOpen
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,8 +200,8 @@ export const VisitorFeed: React.FC = () => {
 
             <p className="text-slate-300 text-xs sm:text-sm mt-3 leading-relaxed max-w-2xl">
               {translate(
-                "La 1ère plateforme sécurisée de déstockage express couvrant les 13 communes d'Abidjan ainsi que Grand-Bassam, Assinie, Bingerville et Dabou. Payez par API (Wave, Orange Money, MTN MoMo, Moov, Carte) après vérification du colis.",
-                "The #1 secure express liquidation platform covering all 13 communes of Abidjan, as well as Grand-Bassam, Assinie, Bingerville, and Dabou. Pay via API (Wave, Orange Money, MTN MoMo, Moov, Card) after parcel inspection."
+                "La 1ère plateforme sécurisée de déstockage express couvrant les 13 communes d'Abidjan ainsi que Grand-Bassam, Assinie, Bingerville et Dabou. Payez facilement par Mobile Money (Wave, Orange Money, MTN MoMo, Moov, Carte) après vérification du colis.",
+                "The #1 secure express liquidation platform covering all 13 communes of Abidjan, as well as Grand-Bassam, Assinie, Bingerville, and Dabou. Pay easily via Mobile Money (Wave, Orange Money, MTN MoMo, Moov, Card) after parcel inspection."
               )}
             </p>
 
@@ -724,14 +727,32 @@ export const VisitorFeed: React.FC = () => {
                           ) : null}
                         </div>
                       ) : isShop ? (
-                        <div className="mt-3 space-y-1">
-                          <button
-                            type="button"
-                            className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20"
-                          >
-                            <Store className="w-3.5 h-3.5" />
-                            <span>{translate("Commander en Boutique", "Order from Store")}</span>
-                          </button>
+                        <div className="mt-3 space-y-1.5">
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addToCart(product, 1, 'boutique');
+                                setCartModalOpen(true);
+                              }}
+                              className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
+                            >
+                              <ShoppingCart className="w-3.5 h-3.5" />
+                              <span>{translate("Ajouter au Panier", "Add to Cart")}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setProductDetailModal(product);
+                              }}
+                              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 text-xs font-bold transition-all cursor-pointer"
+                              title={translate("Voir l'article", "View item")}
+                            >
+                              <Store className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                           <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 font-medium">
                             <span>{product.stockQuantity ?? 1} en stock</span>
                             {product.soldCount ? <span>{product.soldCount} vendu{product.soldCount > 1 ? 's' : ''}</span> : null}
@@ -740,7 +761,11 @@ export const VisitorFeed: React.FC = () => {
                       ) : (
                         <button
                           type="button"
-                          className="mt-3 w-full py-2 rounded-xl bg-slate-900 hover:bg-amber-500 hover:text-slate-950 text-slate-200 border border-slate-700 hover:border-amber-500 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProductDetailModal(product);
+                          }}
+                          className="mt-3 w-full py-2 rounded-xl bg-slate-900 hover:bg-amber-500 hover:text-slate-950 text-slate-200 border border-slate-700 hover:border-amber-500 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           <Gavel className="w-3.5 h-3.5" />
                           <span>{translate("Enchérir en Direct", "Place Live Bid")}</span>

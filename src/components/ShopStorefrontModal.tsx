@@ -17,7 +17,8 @@ import {
   Check,
   Building2,
   SlidersHorizontal,
-  Navigation
+  Navigation,
+  ShoppingCart
 } from 'lucide-react';
 import { Product } from '../types';
 
@@ -31,7 +32,10 @@ export const ShopStorefrontModal: React.FC = () => {
     setProductDetailModal,
     setPricingModalOpen,
     setTargetPlanForPricing,
-    addToast 
+    addToast,
+    addToCart,
+    setCartModalOpen,
+    translate
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'products' | 'reviews'>('products');
@@ -406,6 +410,23 @@ export const ShopStorefrontModal: React.FC = () => {
                               </span>
                             </div>
                           </div>
+
+                          {isShopListing && !isOutOfStock && (
+                            <div className="pt-2">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToCart(prod, 1, 'boutique');
+                                  setCartModalOpen(true);
+                                }}
+                                className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                              >
+                                <ShoppingCart className="w-3.5 h-3.5" />
+                                <span>{translate("Ajouter au Panier", "Add to Cart")}</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

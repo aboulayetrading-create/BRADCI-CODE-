@@ -143,16 +143,12 @@ export const AuthModal: React.FC = () => {
     if (res.success) {
       setAuthModalOpen(false);
       setAuthView('login');
-      // Mandatory KYC flow immediately after registration: direct redirect to dashboard & KYC interface
-      setActiveTab(selectedRole === 'driver' ? 'dashboard_driver' : 'dashboard_client');
-      setTimeout(() => {
-        setKycModalOpen(true);
-        addToast(
-          translate('🛡️ Certification KYC Obligatoire', '🛡️ Mandatory KYC Verification'),
-          translate('Veuillez compléter votre vérification d\'identité (Pièce d\'identité + Selfie en direct) pour activer tous vos droits sur BRAD\'CI.', 'Please complete your identity verification (ID Document + Live Selfie) to unlock all features on BRAD\'CI.'),
-          'warning'
-        );
-      }, 300);
+      // Free navigation without registration blocking: user can freely browse catalog, auctions, and configure profile
+      addToast(
+        translate('Bienvenue sur BRAD\'CI !', 'Welcome to BRAD\'CI!'),
+        translate('Votre compte est créé avec succès. Vous pouvez parcourir le catalogue, consulter les enchères et configurer votre profil librement.', 'Your account was created successfully. You can freely browse the catalog, view auctions, and configure your profile.'),
+        'success'
+      );
     }
   };
 
@@ -192,16 +188,12 @@ export const AuthModal: React.FC = () => {
     });
     setAuthModalOpen(false);
     setAuthView('login');
-    // Mandatory KYC flow immediately after registration: direct redirect to dashboard & KYC interface
-    setActiveTab(selectedRole === 'driver' ? 'dashboard_driver' : 'dashboard_client');
-    setTimeout(() => {
-      setKycModalOpen(true);
-      addToast(
-        translate('🛡️ Certification KYC Obligatoire', '🛡️ Mandatory KYC Verification'),
-        translate('Veuillez compléter votre vérification d\'identité (Pièce d\'identité + Selfie en direct) pour activer votre compte.', 'Please complete your identity verification (ID Document + Live Selfie) to activate your account.'),
-        'warning'
-      );
-    }, 300);
+    // Free navigation without registration blocking: user can freely browse catalog, auctions, and configure profile
+    addToast(
+      translate('Bienvenue sur BRAD\'CI !', 'Welcome to BRAD\'CI!'),
+      translate('Votre profil a été configuré avec succès. Vous pouvez parcourir le catalogue et les enchères librement.', 'Your profile was set up successfully. You can freely browse the catalog and auctions.'),
+      'success'
+    );
   };
 
   return (

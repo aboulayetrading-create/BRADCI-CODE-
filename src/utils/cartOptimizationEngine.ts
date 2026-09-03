@@ -59,11 +59,16 @@ export function createCartItemFromProduct(
 
   const safeQty = Math.min(Math.max(1, quantity), maxStock);
 
+  const img = product.images?.[0] || product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500';
   return {
     id: `cart-item-${product.id}`,
     productId: product.id,
     productTitle: product.title,
-    productImage: product.images?.[0] || product.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
+    title: product.title,
+    productImage: img,
+    imageUrl: img,
+    image: img,
+    price: unitPrice,
     category: product.category,
     channel,
     unitPrice,
@@ -104,19 +109,26 @@ export function groupCartItemsBySeller(items: CartItem[]): CartSellerGroup[] {
         shopName: item.shopName,
         sellerAvatar: item.sellerAvatar,
         commune: item.commune,
+        sellerCommune: item.commune,
         pickupAddress: item.pickupAddress,
+        sellerAddress: item.pickupAddress,
         pickupCoords: item.pickupCoords || getCommuneCoords(item.commune),
         pickupCode: item.pickupCode,
+        sellerPickupCode: item.pickupCode,
+        itemsCount: 0,
         isPickedUp: false,
         items: [],
         subtotal: 0,
+        sellerSubtotal: 0,
         requiredVehicle: item.requiredVehicle
       });
     }
 
     const group = groupsMap.get(key)!;
     group.items.push(item);
+    group.itemsCount = (group.itemsCount || 0) + item.quantity;
     group.subtotal += item.unitPrice * item.quantity;
+    group.sellerSubtotal = group.subtotal;
 
     // Upgrader le véhicule si un article nécessite plus grand
     if (item.requiredVehicle === 'cargo') {
@@ -141,13 +153,21 @@ export function calculateCartDeliveryOptimization(
     return {
       totalItemCount: 0,
       totalUniqueSellers: 0,
+      uniqueSellersCount: 0,
       totalUniqueCommunes: 0,
       dominantVehicle: 'moto',
       rawIndividualDeliveryFees: 0,
+      rawDeliveryFeeSum: 0,
       optimizedDeliveryFee: 0,
       groupingSavingsFCFA: 0,
+      totalDeliverySavings: 0,
       driverMultiPickupBonusFCFA: 0,
-      pickupStops: []
+      pickupStops: [],
+      sellerGroups: [],
+      itemsSubtotal: 0,
+      totalCostEstimate: 0,
+      totalDistanceKm: 0,
+      estimatedMinutesTotal: 0
     };
   }
 
@@ -217,6 +237,7 @@ export function calculateCartDeliveryOptimization(
 
   const pickupStops: CartPickupStop[] = sortedGroups.map((group, idx) => ({
     stopIndex: idx + 1,
+    stopId: `stop-${group.sellerId}-${idx + 1}`,
     sellerId: group.sellerId,
     sellerName: group.sellerName,
     sellerPhone: group.sellerPhone || '+225 07 48 92 11 34',
@@ -225,20 +246,39 @@ export function calculateCartDeliveryOptimization(
     coords: group.pickupCoords || getCommuneCoords(group.commune),
     pickupCode: group.pickupCode,
     itemCount: group.items.reduce((acc, i) => acc + i.quantity, 0),
-    itemTitles: group.items.map(i => `${i.productTitle} (x${i.quantity})`),
+    itemTitles: group.items.map(i => `${i.productTitle || i.title} (x${i.quantity})`),
     isCompleted: false
   }));
+
+  const itemsSubtotal = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+  const totalCostEstimate = itemsSubtotal + optimizedDeliveryFee;
+
+  let totalDistanceKm = 0;
+  sortedGroups.forEach(g => {
+    const coords = g.pickupCoords || getCommuneCoords(g.commune);
+    totalDistanceKm += calculateHaversineDistance(coords.lat, coords.lng, targetCoords.lat, targetCoords.lng);
+  });
+  totalDistanceKm = Math.max(3, Math.round(totalDistanceKm * 10) / 10);
+  const estimatedMinutesTotal = Math.round(totalDistanceKm * 3.5 + (sortedGroups.length * 10));
 
   return {
     totalItemCount,
     totalUniqueSellers,
+    uniqueSellersCount: totalUniqueSellers,
     totalUniqueCommunes,
     dominantVehicle,
     rawIndividualDeliveryFees,
+    rawDeliveryFeeSum: rawIndividualDeliveryFees,
     optimizedDeliveryFee,
     groupingSavingsFCFA,
+    totalDeliverySavings: groupingSavingsFCFA,
     driverMultiPickupBonusFCFA,
-    pickupStops
+    pickupStops,
+    sellerGroups: sortedGroups,
+    itemsSubtotal,
+    totalCostEstimate,
+    totalDistanceKm,
+    estimatedMinutesTotal
   };
 }
 

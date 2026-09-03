@@ -119,12 +119,12 @@ export const SecurityGuideView: React.FC = () => {
       <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#0C1424] to-[#070B14] border border-slate-800 space-y-4">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <ShieldCheck className="w-5 h-5 text-amber-400" />
-          <span>{translate("Le Mécanisme du Paiement Direct à la Livraison (Pay on Delivery API)", "The Direct Pay on Delivery Mechanism (API)")}</span>
+          <span>{translate("Le Mécanisme du Paiement Direct à la Livraison (Pay on Delivery Sécurisé)", "The Direct Pay on Delivery Mechanism (Secure)")}</span>
         </h2>
         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
           {translate(
-            "L'acheteur passe commande ou gagne une enchère sans aucun débit préalable. Le livreur achemine le colis et signale son arrivée par GPS. L'acheteur examine le produit, initie son paiement direct via l'API de son choix (Wave, Orange Money, MTN MoMo, Moov Money, Carte), puis transmet son code secret OTP au livreur pour clôturer la livraison avec répartition automatique des fonds.",
-            "The buyer places an order or wins an auction without upfront debit. The driver transports the package and reports GPS arrival. The buyer inspects the item, initiates direct payment via their chosen API (Wave, Orange Money, MTN MoMo, Moov Money, Card), and provides the secret OTP code to complete delivery with automatic split payout."
+            "L'acheteur passe commande ou gagne une enchère sans aucun débit préalable. Le livreur achemine le colis et signale son arrivée par GPS. L'acheteur examine le produit, initie son paiement direct via le service de son choix (Wave, Orange Money, MTN MoMo, Moov Money, Carte), puis transmet son code secret OTP au livreur pour clôturer la livraison avec répartition automatique des fonds.",
+            "The buyer places an order or wins an auction without upfront debit. The driver transports the package and reports GPS arrival. The buyer inspects the item, initiates direct payment via their chosen service (Wave, Orange Money, MTN MoMo, Moov Money, Card), and provides the secret OTP code to complete delivery with automatic split payout."
           )}
         </p>
 
@@ -134,7 +134,7 @@ export const SecurityGuideView: React.FC = () => {
             <span className="text-[11px] text-slate-400">{translate("Bouton de paiement débloqué", "Payment button unlocked")}</span>
           </div>
           <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-center">
-            <span className="text-blue-400 font-mono font-black text-sm block">2. {translate("Paiement API Acheteur", "Buyer API Payment")}</span>
+            <span className="text-blue-400 font-mono font-black text-sm block">2. {translate("Paiement Mobile Money", "Buyer Mobile Payment")}</span>
             <span className="text-[11px] text-slate-400">{translate("Wave, Orange, MTN, Moov, Carte", "Wave, Orange, MTN, Moov, Card")}</span>
           </div>
           <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-center">

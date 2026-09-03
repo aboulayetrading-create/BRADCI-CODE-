@@ -50,6 +50,7 @@ export const ProductDetailModal: React.FC = () => {
     setProductDetailModal, 
     placeBid, 
     buyShopProductDirect,
+    checkKycVerifiedOrPrompt,
     restockProduct,
     currentUser,
     setAuthModalOpen,
@@ -61,7 +62,9 @@ export const ProductDetailModal: React.FC = () => {
     translate,
     userLocation,
     applyReferralBalanceToPurchase,
-    addToast
+    addToast,
+    addToCart,
+    setCartModalOpen
   } = useApp();
 
   const [bidAmount, setBidAmount] = useState<number>(0);
@@ -160,16 +163,16 @@ export const ProductDetailModal: React.FC = () => {
   };
 
   const handlePlaceBid = (amount: number) => {
-    if (!currentUser) {
-      setAuthModalOpen(true);
+    // Just-in-time KYC restriction: user cannot bid without verified KYC
+    if (!checkKycVerifiedOrPrompt('bid')) {
       return;
     }
     placeBid(prod.id, amount);
   };
 
   const handleBuyShop = () => {
-    if (!currentUser) {
-      setAuthModalOpen(true);
+    // Just-in-time KYC restriction: user cannot buy without verified KYC
+    if (!checkKycVerifiedOrPrompt('buy')) {
       return;
     }
     if (useShoppingBalance && shoppingDiscount > 0) {
@@ -705,7 +708,7 @@ export const ProductDetailModal: React.FC = () => {
                   <ul className="text-[11px] text-slate-300 space-y-1.5 pl-1">
                     <li className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      <span>Paiement Direct par API (Wave/MoMo/Carte) après inspection du colis sur place.</span>
+                      <span>Paiement Direct Mobile Money (Wave/MoMo/Carte) après inspection du colis sur place.</span>
                     </li>
                     <li className="flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
@@ -1016,19 +1019,36 @@ export const ProductDetailModal: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* Direct Buy Button */}
-                        <button
-                          onClick={handleBuyShop}
-                          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                        >
-                          <ShoppingBag className="w-4 h-4" />
-                          <span>
-                            {paymentChoice === 'delivery' 
-                              ? translate(`Commander & Payer à la Livraison (${finalToPayBoutique.toLocaleString('fr-FR')} FCFA)`, `Order & Pay on Delivery (${finalToPayBoutique.toLocaleString('fr-FR')} FCFA)`)
-                              : translate(`Valider la Commande Prépayée (${finalToPayBoutique.toLocaleString('fr-FR')} FCFA)`, `Validate Prepaid Order (${finalToPayBoutique.toLocaleString('fr-FR')} FCFA)`)
-                            }
-                          </span>
-                        </button>
+                        {/* Actions: Add to Cart and Direct Buy */}
+                        <div className="flex flex-col sm:flex-row gap-2.5">
+                          <button
+                            type="button"
+                            id="btn-modal-add-to-cart"
+                            onClick={() => {
+                              addToCart(prod, 1, 'boutique');
+                              setProductDetailModal(null);
+                              setCartModalOpen(true);
+                            }}
+                            className="flex-1 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-emerald-500/40 text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                          >
+                            <ShoppingCart className="w-4 h-4" />
+                            <span>{translate("Ajouter au Panier", "Add to Cart")}</span>
+                          </button>
+
+                          <button
+                            id="btn-modal-buy-direct"
+                            onClick={handleBuyShop}
+                            className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                          >
+                            <ShoppingBag className="w-4 h-4" />
+                            <span>
+                              {paymentChoice === 'delivery' 
+                                ? translate(`Commander Direct (${finalToPayBoutique.toLocaleString('fr-FR')} F)`, `Direct Order (${finalToPayBoutique.toLocaleString('fr-FR')} F)`)
+                                : translate(`Paiement Séquestre (${finalToPayBoutique.toLocaleString('fr-FR')} F)`, `Escrow Pay (${finalToPayBoutique.toLocaleString('fr-FR')} F)`)
+                              }
+                            </span>
+                          </button>
+                        </div>
                       </>
                     )}
                   </div>

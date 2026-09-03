@@ -35,6 +35,7 @@ export const CartModal: React.FC = () => {
     updateCartItemQuantity, 
     clearCart, 
     checkoutCart,
+    checkKycVerifiedOrPrompt,
     currentUser,
     userLocation,
     translate
@@ -81,6 +82,10 @@ export const CartModal: React.FC = () => {
 
   const handleConfirmCheckout = async () => {
     if (cart.length === 0) return;
+    // Just-in-time KYC restriction: user cannot finalize order without verified KYC
+    if (!checkKycVerifiedOrPrompt('buy')) {
+      return;
+    }
     setIsSubmitting(true);
     try {
       await checkoutCart(
@@ -211,8 +216,8 @@ export const CartModal: React.FC = () => {
 
               {/* Multi-Pickup Itinerary Steps Preview */}
               <div className="pt-2 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[11px]">
-                {optimization.pickupStops.map((stop, idx) => (
-                  <div key={stop.stopId} className="p-2 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2">
+                {(optimization.pickupStops || []).map((stop, idx) => (
+                  <div key={stop.stopId || `${stop.sellerId}-${idx}`} className="p-2 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-blue-500/20 text-cyan-300 font-mono font-bold text-[10px] flex items-center justify-center border border-blue-500/30 shrink-0">
                       {idx + 1}
                     </span>
@@ -229,11 +234,11 @@ export const CartModal: React.FC = () => {
             <div className="space-y-4">
               <h3 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Store className="w-3.5 h-3.5 text-amber-400" />
-                <span>Articles par Vendeur ({optimization.sellerGroups.length} Vendeur{optimization.sellerGroups.length > 1 ? 's' : ''})</span>
+                <span>Articles par Vendeur ({(optimization.sellerGroups || []).length} Vendeur{(optimization.sellerGroups || []).length > 1 ? 's' : ''})</span>
               </h3>
 
               <div className="space-y-4">
-                {optimization.sellerGroups.map((group) => (
+                {(optimization.sellerGroups || []).map((group) => (
                   <div 
                     key={group.sellerId}
                     className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3 shadow-sm"
@@ -244,12 +249,12 @@ export const CartModal: React.FC = () => {
                         <Store className="w-4 h-4 text-emerald-400" />
                         <div>
                           <span className="text-xs font-bold text-white block">{group.sellerName}</span>
-                          <span className="text-[10px] text-slate-400 block">{group.sellerCommune} • {group.sellerAddress}</span>
+                          <span className="text-[10px] text-slate-400 block">{group.sellerCommune || group.commune} • {group.sellerAddress || group.pickupAddress}</span>
                         </div>
                       </div>
 
                       <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20">
-                        Sous-total : {group.sellerSubtotal.toLocaleString('fr-FR')} FCFA
+                        Sous-total : {(group.sellerSubtotal ?? group.subtotal ?? 0).toLocaleString('fr-FR')} FCFA
                       </span>
                     </div>
 
@@ -262,13 +267,13 @@ export const CartModal: React.FC = () => {
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <img 
-                              src={item.imageUrl} 
-                              alt={item.title} 
+                              src={item.imageUrl || item.productImage || item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500'} 
+                              alt={item.title || item.productTitle} 
                               className="w-12 h-12 rounded-xl object-cover border border-slate-700 shrink-0" 
                             />
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs font-bold text-white truncate block">{item.title}</span>
+                                <span className="text-xs font-bold text-white truncate block">{item.title || item.productTitle}</span>
                                 {(item.channel === 'enchere' || (item.channel as string) === 'auction') && (
                                   <span className="px-1.5 py-0.2 rounded text-[9px] bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
                                     Enchère
@@ -281,7 +286,7 @@ export const CartModal: React.FC = () => {
                                 )}
                               </div>
                               <span className="text-[11px] text-amber-400 font-mono font-bold block mt-0.5">
-                                {item.unitPrice.toLocaleString('fr-FR')} FCFA <span className="text-slate-500 font-normal">/ unité</span>
+                                {(item.unitPrice || 0).toLocaleString('fr-FR')} FCFA <span className="text-slate-500 font-normal">/ unité</span>
                               </span>
                             </div>
                           </div>
@@ -440,7 +445,7 @@ export const CartModal: React.FC = () => {
                     <span className="text-[10px] font-mono font-bold text-slate-400">Wave / OM / MoMo</span>
                   </div>
                   <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                    Règlement immédiat via API Mobile Money. Votre Code Secret OTP est généré à l'avance.
+                    Règlement immédiat via Mobile Money. Votre Code Secret OTP est généré à l'avance.
                   </p>
                 </button>
               </div>
@@ -484,7 +489,7 @@ export const CartModal: React.FC = () => {
               <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
                 <span className="text-[10px] text-slate-400 uppercase font-bold block">Sous-total Articles :</span>
                 <span className="text-sm font-black text-white font-mono">
-                  {optimization.itemsSubtotal.toLocaleString('fr-FR')} F
+                  {(optimization.itemsSubtotal || 0).toLocaleString('fr-FR')} F
                 </span>
               </div>
 
@@ -492,11 +497,11 @@ export const CartModal: React.FC = () => {
                 <span className="text-[10px] text-slate-400 uppercase font-bold block">Frais de Livraison :</span>
                 <div className="flex items-baseline gap-1">
                   <span className="text-sm font-black text-emerald-400 font-mono">
-                    {optimization.optimizedDeliveryFee.toLocaleString('fr-FR')} F
+                    {(optimization.optimizedDeliveryFee || 0).toLocaleString('fr-FR')} F
                   </span>
-                  {optimization.totalDeliverySavings > 0 && (
+                  {(optimization.totalDeliverySavings || 0) > 0 && (
                     <span className="text-[10px] text-slate-500 line-through">
-                      {optimization.rawDeliveryFeeSum.toLocaleString('fr-FR')} F
+                      {(optimization.rawDeliveryFeeSum || 0).toLocaleString('fr-FR')} F
                     </span>
                   )}
                 </div>
@@ -505,14 +510,14 @@ export const CartModal: React.FC = () => {
               <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
                 <span className="text-[10px] text-slate-400 uppercase font-bold block">Remise Parrainage :</span>
                 <span className="text-sm font-black text-amber-400 font-mono">
-                  - {referralDiscountToApply.toLocaleString('fr-FR')} F
+                  - {(referralDiscountToApply || 0).toLocaleString('fr-FR')} F
                 </span>
               </div>
 
               <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
                 <span className="text-[10px] text-emerald-300 uppercase font-black block">Total Net à Régler :</span>
                 <span className="text-base font-black text-white font-mono">
-                  {finalTotalAmount.toLocaleString('fr-FR')} FCFA
+                  {(finalTotalAmount || 0).toLocaleString('fr-FR')} FCFA
                 </span>
               </div>
             </div>

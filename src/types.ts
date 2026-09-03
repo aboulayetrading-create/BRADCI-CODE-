@@ -456,21 +456,21 @@ export interface CartPickupStop {
 export interface CartDeliveryOptimization {
   totalItemCount: number;
   totalUniqueSellers: number;
+  uniqueSellersCount: number;
   totalUniqueCommunes: number;
   dominantVehicle: VehicleType;
   rawIndividualDeliveryFees: number; // If paid separately (e.g. 3 x 2000 = 6000 F)
+  rawDeliveryFeeSum: number;
   optimizedDeliveryFee: number; // Grouped fee (e.g. 2500 F)
   groupingSavingsFCFA: number; // Savings for buyer (e.g. 3500 F)
+  totalDeliverySavings: number;
   driverMultiPickupBonusFCFA: number; // Multi-stop incentive for driver
   pickupStops: CartPickupStop[];
-  totalCostEstimate?: number;
-  uniqueSellersCount?: number;
-  totalDeliverySavings?: number;
-  sellerGroups?: CartSellerGroup[];
-  itemsSubtotal?: number;
-  rawDeliveryFeeSum?: number;
-  totalDistanceKm?: number;
-  estimatedMinutesTotal?: number;
+  sellerGroups: CartSellerGroup[];
+  itemsSubtotal: number;
+  totalCostEstimate: number;
+  totalDistanceKm: number;
+  estimatedMinutesTotal: number;
 }
 
 export interface CartOrderRecord {
