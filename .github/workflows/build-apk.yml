@@ -37,15 +37,64 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Configure Capacitor & Add Android
+      - name: Configure Capacitor & Add Native Plugins
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/assets @capacitor/geolocation @capacitor/camera --legacy-peer-deps
           npx cap init "BRAD'CI" "com.bradci.app" --web-dir dist || true
           rm -rf android
           npx cap add android
+          
+          # Vérification de l'emplacement de l'icône (assets/icon.png ou icon.png à la racine)
+          if [ -f "assets/icon.png" ]; then
+            npx capassets generate --android || true
+          elif [ -f "icon.png" ]; then
+            mkdir -p assets
+            cp icon.png assets/icon.png
+            npx capassets generate --android || true
+          fi
+
           npx cap sync android
 
-      - name: Fix Duplicate Kotlin Standard Libraries
+      - name: Add Android Manifest Permissions (GPS, Camera, Micro)
+        run: |
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="BRAD'CI"
+                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:supportsRtl="true"
+                  android:theme="@style/AppTheme">
+
+                  <activity
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+                      android:name=".MainActivity"
+                      android:label="BRAD'CI"
+                      android:theme="@style/AppTheme.NoActionBar"
+                      android:launchMode="singleTask"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
+      - name: Fix Kotlin Duplicates
         run: |
           cat << 'EOF' >> android/app/build.gradle
 
@@ -59,7 +108,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --rerun-tasks
 
       - name: Upload Production APK
         uses: actions/upload-artifact@v4
