@@ -105,7 +105,7 @@ export function generateAbidjanRoute(
       durationText: isEn ? 'Arrival' : 'Arrivée',
       icon: 'destination',
       streetName: isEn ? `Final drop-off point - ${destination}` : `Point de livraison final - ${destination}`,
-      warning: isEn ? 'Verify parcel conformity before sharing the 4-digit OTP code' : 'Vérifiez la conformité avant tout partage du code OTP'
+      warning: isEn ? 'Verify parcel conformity before sharing the 4-digit secret code' : 'Vérifiez la conformité avant tout partage du Code Secret'
     }
   ];
 
@@ -155,7 +155,7 @@ export function playGpsChime() {
   }
 }
 
-// Authentic Multi-Tone Delivery Ringtone for incoming orders (Yango / Uber Eats / Deliveroo courier style)
+// Authentic Multi-Tone Delivery Ringtone for incoming orders (Courier sound alert)
 export function playDriverNewOrderRingtone() {
   try {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;

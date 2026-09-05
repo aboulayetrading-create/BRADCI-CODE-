@@ -16,7 +16,8 @@ import {
   CreditCard,
   Building2,
   Lock,
-  Loader2
+  Loader2,
+  MapPin
 } from 'lucide-react';
 import { 
   generateReceiptPDF, 
@@ -32,19 +33,22 @@ import {
 export interface ReceiptModalData {
   transactionData: TransactionAuditInput;
   auditLog: PaymentAuditLog;
-  initialMode?: 'buyer' | 'seller';
+  initialMode?: 'buyer' | 'seller' | 'driver';
+  lockedMode?: 'buyer' | 'seller' | 'driver';
 }
 
 export const ReceiptModal: React.FC = () => {
   const { receiptModalData, setReceiptModalData, addToast, translate } = useApp();
-  const [activeMode, setActiveMode] = useState<'buyer' | 'seller'>('buyer');
+  const [activeMode, setActiveMode] = useState<'buyer' | 'seller' | 'driver'>('buyer');
   const [copiedRef, setCopiedRef] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const paperPreviewRef = useRef<HTMLDivElement>(null);
 
-  // Sync mode when modal data changes
+  // Strictly sync mode with the authorized caller role (no unauthenticated cross-viewing)
   React.useEffect(() => {
-    if (receiptModalData?.initialMode) {
+    if (receiptModalData?.lockedMode) {
+      setActiveMode(receiptModalData.lockedMode);
+    } else if (receiptModalData?.initialMode) {
       setActiveMode(receiptModalData.initialMode);
     } else {
       setActiveMode('buyer');
@@ -72,6 +76,9 @@ export const ReceiptModal: React.FC = () => {
 
   const txUniqueNumber = `TX-BRAD-${new Date(transactionData.timestamp).getFullYear()}-${(transactionData.transactionId || '1001').replace(/[^0-9]/g, '').slice(-5).padStart(5, '0')}`;
   const saleRef = `VNT-BRAD-${new Date(transactionData.timestamp).getFullYear()}-${(transactionData.transactionId || '5001').replace(/[^0-9]/g, '').slice(-5).padStart(5, '0')}`;
+  const driverMissionRef = `LIV-BRAD-${new Date(transactionData.timestamp).getFullYear()}-${(transactionData.transactionId || '3001').replace(/[^0-9]/g, '').slice(-5).padStart(5, '0')}`;
+
+  const currentRef = activeMode === 'buyer' ? txUniqueNumber : activeMode === 'seller' ? saleRef : driverMissionRef;
 
   const formattedDate = new Date(transactionData.timestamp).toLocaleDateString('fr-FR', {
     day: '2-digit',
@@ -84,9 +91,10 @@ export const ReceiptModal: React.FC = () => {
   });
 
   const handlePrint = () => {
+    const docLabel = activeMode === 'buyer' ? 'Acheteur' : activeMode === 'seller' ? 'Vendeur' : 'Livreur';
     addToast(
       'Impression officielle', 
-      `Préparation du document ${activeMode === 'buyer' ? 'Acheteur' : 'Vendeur'} pour impression / export PDF...`, 
+      `Préparation du document ${docLabel} pour impression / export PDF...`, 
       'info'
     );
     openReceiptInPrintWindow(currentReceiptHtml);
@@ -95,7 +103,9 @@ export const ReceiptModal: React.FC = () => {
   const handleDownloadPdf = async () => {
     const filename = activeMode === 'buyer'
       ? `Recu_Acheteur_${txUniqueNumber}.pdf`
-      : `Attestation_Vente_${saleRef}.pdf`;
+      : activeMode === 'seller'
+      ? `Attestation_Vente_${saleRef}.pdf`
+      : `Bordereau_Livreur_${driverMissionRef}.pdf`;
 
     if (paperPreviewRef.current) {
       setIsGeneratingPdf(true);
@@ -122,7 +132,9 @@ export const ReceiptModal: React.FC = () => {
   const handleDownloadHtml = () => {
     const filename = activeMode === 'buyer'
       ? `Recu_Acheteur_${txUniqueNumber}.html`
-      : `Attestation_Vente_${saleRef}.html`;
+      : activeMode === 'seller'
+      ? `Attestation_Vente_${saleRef}.html`
+      : `Bordereau_Livreur_${driverMissionRef}.html`;
 
     const blob = new Blob([currentReceiptHtml], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -137,7 +149,7 @@ export const ReceiptModal: React.FC = () => {
   };
 
   const copyRefCode = () => {
-    const code = activeMode === 'buyer' ? txUniqueNumber : saleRef;
+    const code = currentRef;
     navigator.clipboard.writeText(code);
     setCopiedRef(true);
     setTimeout(() => setCopiedRef(false), 2000);
@@ -169,39 +181,32 @@ export const ReceiptModal: React.FC = () => {
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
-                Génération automatique • {activeMode === 'buyer' ? txUniqueNumber : saleRef}
+                Génération automatique • {currentRef}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            {/* Mode Switcher Tabs */}
-            <div className="flex items-center bg-slate-900 border border-slate-800 p-1 rounded-xl">
-              <button
-                id="btn-tab-buyer-receipt"
-                onClick={() => setActiveMode('buyer')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  activeMode === 'buyer' 
-                    ? 'bg-[#1E53E5] text-white shadow-md' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Reçu Acheteur</span>
-              </button>
-
-              <button
-                id="btn-tab-seller-receipt"
-                onClick={() => setActiveMode('seller')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  activeMode === 'seller' 
-                    ? 'bg-[#FF5B00] text-white shadow-md' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Store className="w-3.5 h-3.5" />
-                <span>Reçu Vendeur</span>
-              </button>
+            {/* Role Document Badge (Strict Separation: No unauthorized role-switching) */}
+            <div className="flex items-center">
+              {activeMode === 'buyer' && (
+                <span className="px-3 py-1.5 rounded-xl bg-blue-600/20 text-blue-300 border border-blue-500/30 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                  <UserCheck className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Reçu Acheteur Personnel</span>
+                </span>
+              )}
+              {activeMode === 'seller' && (
+                <span className="px-3 py-1.5 rounded-xl bg-amber-600/20 text-amber-300 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                  <Store className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Attestation Vendeur Sécurisée</span>
+                </span>
+              )}
+              {activeMode === 'driver' && (
+                <span className="px-3 py-1.5 rounded-xl bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                  <Truck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Bordereau Mission & Gain Livreur</span>
+                </span>
+              )}
             </div>
 
             <button
@@ -222,31 +227,49 @@ export const ReceiptModal: React.FC = () => {
           className="bg-white text-slate-900 rounded-2xl p-5 sm:p-8 shadow-2xl text-xs space-y-5 border border-slate-200"
         >
           {/* Header Paper */}
-          <div className="flex flex-col sm:flex-row justify-between items-start border-b-2 pb-4 gap-4" style={{ borderColor: activeMode === 'buyer' ? '#1E53E5' : '#FF5B00' }}>
+          <div 
+            className="flex flex-col sm:flex-row justify-between items-start border-b-2 pb-4 gap-4" 
+            style={{ borderColor: activeMode === 'buyer' ? '#1E53E5' : activeMode === 'seller' ? '#FF5B00' : '#059669' }}
+          >
             <div>
               <div className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
                 BRAD<span className="text-[#FF5B00]">'</span><span className="text-[#1E53E5]">CI</span>
+                {activeMode === 'driver' && <span className="text-[#059669] text-xl font-bold ml-2">LOGISTIQUE</span>}
               </div>
               <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 mt-0.5">
-                Plateforme Certifiée d'Occasion & Déstockage • Abidjan, Côte d'Ivoire
+                {activeMode === 'driver'
+                  ? "Bordereau de Mission & Rémunération Coursier • Abidjan, Côte d'Ivoire"
+                  : "Plateforme Certifiée d'Occasion & Déstockage • Abidjan, Côte d'Ivoire"}
               </div>
               <div className="text-[10px] text-slate-400 mt-1">
-                RCCM : CI-ABJ-2026-B-1428 • Régime Fiscal Vente Particulier / Micro-Entreprise
+                RCCM : CI-ABJ-2026-B-1428 • Agrément officiel commerce électronique & logistique
               </div>
             </div>
 
             <div className="sm:text-right">
               <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                activeMode === 'buyer' ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'
+                activeMode === 'buyer' 
+                  ? 'bg-emerald-100 text-emerald-800' 
+                  : activeMode === 'seller' 
+                  ? 'bg-orange-100 text-orange-800' 
+                  : 'bg-emerald-100 text-emerald-800'
               }`}>
-                {activeMode === 'buyer' ? '✓ Transaction Validée & Payée' : `✓ ${deliveryStatus.toUpperCase()}`}
+                {activeMode === 'buyer' 
+                  ? '✓ Transaction Validée & Payée' 
+                  : activeMode === 'seller' 
+                  ? `✓ ${deliveryStatus.toUpperCase()}` 
+                  : '✓ Course Validée & Rémunérée'}
               </span>
               <div className="text-sm font-black text-slate-900 mt-1.5 uppercase font-display">
-                {activeMode === 'buyer' ? "Reçu d'Achat & Facture Acquéreur" : "Attestation & Bordereau Vendeur"}
+                {activeMode === 'buyer' 
+                  ? "Reçu d'Achat & Facture Acquéreur" 
+                  : activeMode === 'seller' 
+                  ? "Attestation & Bordereau Vendeur" 
+                  : "Bordereau de Mission & Rémunération Coursier"}
               </div>
               <div className="flex items-center sm:justify-end gap-1.5 mt-0.5">
                 <span className="font-mono text-xs font-extrabold text-blue-700">
-                  {activeMode === 'buyer' ? txUniqueNumber : saleRef}
+                  {currentRef}
                 </span>
                 <button
                   onClick={copyRefCode}
@@ -263,62 +286,194 @@ export const ReceiptModal: React.FC = () => {
           </div>
 
           {/* Parties 2-Column Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Box 1: Seller Box */}
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-              <div className="text-[10px] font-black uppercase text-[#1E53E5] flex items-center justify-between">
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Vendeur Partenaire Certifié</span>
-                </span>
-                <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
-                  KYC Vérifié
-                </span>
-              </div>
-              <div className="font-bold text-sm text-slate-900">{transactionData.sellerName}</div>
-              {transactionData.sellerShopName && (
-                <div className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                  <Store className="w-3 h-3 text-amber-600" />
-                  <span>Boutique : {transactionData.sellerShopName}</span>
+          {activeMode === 'driver' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Driver Box */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="text-[10px] font-black uppercase text-emerald-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Coursier Livreur Agréé</span>
+                  </span>
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                    Certifié BRAD'CI
+                  </span>
                 </div>
-              )}
-              <div className="text-slate-600 text-[11px]">Téléphone : {transactionData.sellerPhone}</div>
-              <div className="text-slate-600 text-[11px] flex items-center gap-1 pt-1 border-t border-slate-200">
-                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                <span>Pièce ID (Confidentialité) : <strong className="font-mono text-slate-900 bg-white px-1.5 py-0.2 rounded border border-slate-200">{maskedSellerKyc}</strong></span>
+                <div className="font-bold text-sm text-slate-900">{transactionData.driverName || 'Coursier Agréé BRAD\'CI'}</div>
+                <div className="text-slate-600 text-[11px]">Type de Mission : Transport & Livraison Express</div>
+                <div className="text-slate-500 text-[10px] pt-1 border-t border-slate-200">
+                  Statut Course : <strong className="text-emerald-700 font-bold">Validée & Rémunérée</strong>
+                </div>
               </div>
-              <div className="text-slate-500 text-[10px]">
-                Origine : {transactionData.communeOrigin} (Abidjan)
-              </div>
-            </div>
 
-            {/* Box 2: Buyer Box */}
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
-              <div className="text-[10px] font-black uppercase text-slate-700 flex items-center justify-between">
-                <span className="flex items-center gap-1">
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>Client Acquéreur</span>
-                </span>
-                <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">
-                  Paiement Garanti
-                </span>
-              </div>
-              <div className="font-bold text-sm text-slate-900">{transactionData.buyerName}</div>
-              <div className="text-slate-600 text-[11px]">
-                Téléphone : {activeMode === 'buyer' ? transactionData.buyerPhone : maskedBuyerPhone}
-              </div>
-              <div className="text-slate-600 text-[11px] flex items-center gap-1 pt-1 border-t border-slate-200">
-                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                <span>Pièce ID (Confidentialité) : <strong className="font-mono text-slate-900 bg-white px-1.5 py-0.2 rounded border border-slate-200">{maskedBuyerKyc}</strong></span>
-              </div>
-              <div className="text-slate-500 text-[10px]">
-                Destination : {transactionData.communeDestination} (Abidjan)
+              {/* Route Box */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="text-[10px] font-black uppercase text-slate-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Itinéraire & Acheminement</span>
+                  </span>
+                  <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">
+                    Trajet Direct
+                  </span>
+                </div>
+                <div className="text-slate-700 text-[11px]">
+                  <span className="font-semibold text-slate-500">Collecte (Origine) :</span> <strong className="text-slate-900">{transactionData.communeOrigin}</strong>
+                </div>
+                <div className="text-slate-700 text-[11px]">
+                  <span className="font-semibold text-slate-500">Dépose (Destination) :</span> <strong className="text-slate-900">{transactionData.communeDestination}</strong>
+                </div>
+                <div className="text-slate-500 text-[10px] pt-1 border-t border-slate-200">
+                  Mode de Remise : En main propre certifiée
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Box 1: Seller Box */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="text-[10px] font-black uppercase text-[#1E53E5] flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Vendeur Partenaire Certifié</span>
+                  </span>
+                  <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                    KYC Vérifié
+                  </span>
+                </div>
+                <div className="font-bold text-sm text-slate-900">{transactionData.sellerName}</div>
+                {transactionData.sellerShopName && (
+                  <div className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                    <Store className="w-3 h-3 text-amber-600" />
+                    <span>Boutique : {transactionData.sellerShopName}</span>
+                  </div>
+                )}
+                <div className="text-slate-600 text-[11px]">Téléphone : {transactionData.sellerPhone}</div>
+                <div className="text-slate-600 text-[11px] flex items-center gap-1 pt-1 border-t border-slate-200">
+                  <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span>Pièce ID (Confidentialité) : <strong className="font-mono text-slate-900 bg-white px-1.5 py-0.2 rounded border border-slate-200">{maskedSellerKyc}</strong></span>
+                </div>
+                <div className="text-slate-500 text-[10px]">
+                  Origine : {transactionData.communeOrigin} (Abidjan)
+                </div>
+              </div>
+
+              {/* Box 2: Buyer Box */}
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+                <div className="text-[10px] font-black uppercase text-slate-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Client Acquéreur</span>
+                  </span>
+                  <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-bold">
+                    Paiement Garanti
+                  </span>
+                </div>
+                <div className="font-bold text-sm text-slate-900">{transactionData.buyerName}</div>
+                <div className="text-slate-600 text-[11px]">
+                  Téléphone : {activeMode === 'buyer' ? transactionData.buyerPhone : maskedBuyerPhone}
+                </div>
+                <div className="text-slate-600 text-[11px] flex items-center gap-1 pt-1 border-t border-slate-200">
+                  <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span>Pièce ID (Confidentialité) : <strong className="font-mono text-slate-900 bg-white px-1.5 py-0.2 rounded border border-slate-200">{maskedBuyerKyc}</strong></span>
+                </div>
+                <div className="text-slate-500 text-[10px]">
+                  Destination : {transactionData.communeDestination} (Abidjan)
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Mode-Specific Body */}
-          {activeMode === 'buyer' ? (
+          {activeMode === 'driver' ? (
+            /* ================= DRIVER VIEW ================= */
+            <div className="space-y-4">
+              {/* Anti-Theft / Confidentiality Banner */}
+              <div className="p-3.5 bg-emerald-50/80 border border-emerald-300 rounded-xl flex items-start gap-2.5 text-xs text-emerald-950">
+                <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-bold text-emerald-900 block mb-0.5">Protection & Confidentialité Marchande :</strong>
+                  <span>Conformément aux protocoles stricts de sécurité logistique BRAD'CI, la valeur marchande du contenu et la marge commerciale du vendeur sont strictement confidentielles et masquées sur ce bordereau afin de garantir l'intégrité de la prestation.</span>
+                </div>
+              </div>
+
+              {/* Package Details */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-slate-900 text-white px-4 py-2 font-black text-[11px] uppercase tracking-wider flex justify-between">
+                  <span>Colis Logistique Pris en Charge</span>
+                  <span>Statut Prise en Charge</span>
+                </div>
+                <div className="p-4 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div>
+                    <div className="font-black text-sm text-slate-900">Colis Logistique Scellé BRAD'CI</div>
+                    <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                      Réf Colis : <strong>{transactionData.itemId || transactionData.transactionId}</strong> • Contrôlé à la remise
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs rounded-full uppercase">
+                    ✓ Livré avec succès
+                  </span>
+                </div>
+              </div>
+
+              {/* Driver Remuneration Card */}
+              <div className="border-2 border-emerald-300 bg-emerald-50/60 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-emerald-200">
+                  <div className="flex items-center gap-2 text-xs font-black text-slate-900 uppercase">
+                    <Truck className="w-4 h-4 text-emerald-700" />
+                    <span>Rémunération de la Course Livreur</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-200 px-2 py-0.5 rounded">
+                    ✓ Virement Immédiat
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm space-y-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                      Frais de Livraison Alloués
+                    </span>
+                    <div className="text-slate-600 text-xs">Prestation de transport sécurisé</div>
+                    <span className="font-mono text-xl font-black text-emerald-700 block">
+                      + {transactionData.deliveryFeeFCFA.toLocaleString('fr-FR')} FCFA
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm space-y-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                      Mode de Reversement
+                    </span>
+                    <div className="text-xs font-bold text-slate-900">Portefeuille Livreur Immédiat</div>
+                    <span className="text-[10px] text-emerald-700 font-semibold block">
+                      Retrait Mobile Money sans frais disponible 24/7
+                    </span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-emerald-200 flex justify-between items-center">
+                  <span className="text-xs font-black text-emerald-950 uppercase">TOTAL GAIN NET ENCAISSÉ :</span>
+                  <span className="text-lg font-black font-mono text-emerald-800">
+                    + {transactionData.deliveryFeeFCFA.toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+              </div>
+
+              {/* Physical Delivery Validation */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-900 block">
+                    Code Secret de Remise du Colis
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Vérifié contradictoirement lors de la remise physique en main propre
+                  </span>
+                </div>
+                <span className="px-3 py-1 bg-emerald-700 text-white font-mono font-bold text-xs rounded-lg uppercase tracking-wider">
+                  ✓ Code Validé
+                </span>
+              </div>
+            </div>
+          ) : activeMode === 'buyer' ? (
             /* ================= BUYER VIEW ================= */
             <div className="space-y-4">
               {/* Order Items Table */}
@@ -417,16 +572,16 @@ export const ReceiptModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Delivery OTP Validation */}
+              {/* Delivery Validation Physical Strip */}
               <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-300 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <KeyRound className="w-4 h-4 text-emerald-700 shrink-0" />
                   <div>
                     <span className="text-[11px] font-bold text-emerald-900 block">
-                      Code Secret OTP de Déblocage Physique :
+                      Code Secret de Remise du Colis :
                     </span>
                     <span className="text-[10px] text-emerald-700">
-                      Vérifié et validé avec le coursier à la livraison du colis
+                      Vérifié et validé avec le coursier à la livraison en main propre
                     </span>
                   </div>
                 </div>

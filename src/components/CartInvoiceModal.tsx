@@ -67,7 +67,7 @@ export const CartInvoiceModal: React.FC = () => {
   const handleCopyOtp = () => {
     if (order.masterDeliveryOtp) {
       navigator.clipboard.writeText(order.masterDeliveryOtp);
-      addToast('Code Secret OTP Copié', `Le code ${order.masterDeliveryOtp} a été copié dans votre presse-papier.`, 'success');
+      addToast('Code Secret Copié', `Le code ${order.masterDeliveryOtp} a été copié dans votre presse-papier.`, 'success');
     }
   };
 
@@ -165,7 +165,7 @@ export const CartInvoiceModal: React.FC = () => {
                   <KeyRound className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-black text-white">Code Secret OTP Unique de Livraison</h3>
+                  <h3 className="text-sm font-black text-white">Code Secret Unique de Remise</h3>
                   <p className="text-[11px] text-slate-300">
                     Valide pour l'ensemble des {order.totalItemsCount} article(s) de cette commande.
                   </p>
@@ -181,7 +181,7 @@ export const CartInvoiceModal: React.FC = () => {
                   type="button"
                   onClick={handleCopyOtp}
                   className="p-2.5 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all"
-                  title="Copier le code OTP"
+                  title="Copier le code secret"
                 >
                   <Copy className="w-5 h-5" />
                 </button>

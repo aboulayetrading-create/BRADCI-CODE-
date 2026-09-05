@@ -335,7 +335,7 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
             allowFullScreen
           />
 
-          {/* Live Telemetry Overlay Pill in Top Left (Dynamic Vehicle Icon like Yango) */}
+          {/* Live Telemetry Overlay Pill in Top Left (Dynamic Vehicle Icon) */}
           <div className="absolute top-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1.5 text-blue-400 font-bold">
               {vehicleType === 'voiture' || vehicleType === 'car' ? (

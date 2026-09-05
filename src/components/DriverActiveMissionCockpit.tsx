@@ -38,8 +38,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
     driverConfirmReturnOTP,
     driverStartAbsentTimer,
     driverCancelDueToAbsentBuyer,
-    setGpsTrackingJob,
-    assignTestJobToDriver
+    setGpsTrackingJob
   } = useApp();
 
   const [pickupCodeInput, setPickupCodeInput] = useState('');
@@ -84,7 +83,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
     setDeliveryOtpInput('');
   };
 
-  // If no active job: display sleek Yango Pro radar standby view
+  // If no active job: display sleek radar standby view
   if (!job) {
     return (
       <div id="driver-radar-standby" className="p-8 sm:p-12 rounded-3xl bg-[#0C121E] border border-slate-800 text-center space-y-6 shadow-xl">
@@ -115,14 +114,6 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
           >
             <Package className="w-4 h-4" />
             <span>Consulter la Bourse aux Courses Disponibles</span>
-          </button>
-          <button
-            id="driver-standby-test-mission-btn"
-            onClick={() => assignTestJobToDriver()}
-            className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 hover:scale-[1.02] cursor-pointer border border-blue-400/40"
-          >
-            <Zap className="w-4 h-4 text-amber-300" />
-            <span>Démarrer une Mission de Test (Simulation Rapide)</span>
           </button>
         </div>
       </div>
@@ -263,7 +254,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
                 className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 transition-all hover:scale-[1.02]"
               >
                 <Navigation className="w-4 h-4" />
-                <span>Navigation GPS Intégrée (Yango & Google Maps In-App)</span>
+                <span>Navigation GPS Intégrée (Cartographie Live In-App)</span>
               </button>
             </div>
           </div>
@@ -290,13 +281,6 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
                   placeholder="Code vendeur (4 chiffres)"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-base font-mono-num font-bold text-white focus:outline-none focus:border-amber-500"
                 />
-                <button
-                  type="button"
-                  onClick={() => setPickupCodeInput(job.pickupCode || '4491')}
-                  className="text-[10px] text-amber-400 hover:text-amber-300 underline font-mono flex items-center justify-center gap-1 mx-auto cursor-pointer"
-                >
-                  Code vendeur test : {job.pickupCode || '4491'} (Cliquer pour remplir)
-                </button>
                 <button
                   id="driver-validate-pickup-btn"
                   onClick={() => handlePickup(job.id)}
@@ -361,7 +345,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
                   <CheckCircle2 className={`w-5 h-5 mt-0.5 shrink-0 ${job.inspectionStatus === 'client_confirmed_good' ? 'text-emerald-400' : 'text-slate-500'}`} />
                   <div>
                     <div className="font-bold text-xs text-emerald-400">1. Client Présent & Produit Conforme</div>
-                    <div className="text-[11px] text-slate-400">Le client accepte le produit et va vous communiquer son Code OTP Secret.</div>
+                    <div className="text-[11px] text-slate-400">Le client accepte le produit et va vous communiquer son Code Secret de Remise.</div>
                   </div>
                 </button>
 
@@ -450,11 +434,11 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
                 )}
               </div>
 
-              {/* If Good: OTP entry */}
+              {/* If Good: Secret Code entry */}
               {job.inspectionStatus === 'client_confirmed_good' && (
                 <div className="pt-2 border-t border-slate-800 space-y-2 animate-in fade-in">
                   <label className="text-xs font-bold text-white block">
-                    Entrez le Code OTP à 4 chiffres fourni par l'acheteur :
+                    Entrez le Code Secret à 4 chiffres fourni par l'acheteur :
                   </label>
                   <input
                     id="driver-delivery-otp-input"
@@ -462,16 +446,9 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
                     maxLength={4}
                     value={deliveryOtpInput}
                     onChange={(e) => setDeliveryOtpInput(e.target.value)}
-                    placeholder="Code OTP (4 chiffres)"
+                    placeholder="Code Secret (4 chiffres)"
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-lg font-mono-num font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 tracking-widest"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryOtpInput(job.deliveryOtpCode || '8814')}
-                    className="text-[10px] text-emerald-400 hover:text-emerald-300 underline font-mono flex items-center justify-center gap-1 mx-auto cursor-pointer"
-                  >
-                    Code OTP acheteur test : {job.deliveryOtpCode || '8814'} (Cliquer pour remplir)
-                  </button>
                   <button
                     id="driver-validate-otp-btn"
                     onClick={() => handleDeliveryOTP(job.id)}
@@ -487,7 +464,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
               {job.inspectionStatus === 'client_confirmed_bad' && (
                 <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-slate-300 space-y-1">
                   <p className="font-bold text-red-400">Colis refusé pour non-conformité :</p>
-                  <p className="text-[11px] text-slate-400">L'acheteur doit cliquer sur "Confirmer le Refus" dans son interface pour vous délivrer le <strong>Code OTP Retour</strong>. Vos frais de course ({job.deliveryFee.toLocaleString('fr-FR')} FCFA) vous sont intégralement payés.</p>
+                  <p className="text-[11px] text-slate-400">L'acheteur doit cliquer sur "Confirmer le Refus" dans son interface pour vous délivrer le <strong>Code Secret de Retour</strong>. Vos frais de course ({job.deliveryFee.toLocaleString('fr-FR')} FCFA) vous sont intégralement payés.</p>
                 </div>
               )}
             </div>
@@ -500,7 +477,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
                 <span>Étape 2 (Retour) : Prise en charge du Colis Refusé</span>
               </div>
               <p className="text-xs text-slate-300">
-                L'acheteur a refusé le colis (non-conforme). Vos <strong>frais de course ({job.deliveryFee.toLocaleString('fr-FR')} FCFA)</strong> sont garantis. Entrez le <strong>Code OTP Retour</strong> transmis par l'acheteur pour valider la prise en charge :
+                L'acheteur a refusé le colis (non-conforme). Vos <strong>frais de course ({job.deliveryFee.toLocaleString('fr-FR')} FCFA)</strong> sont garantis. Entrez le <strong>Code Secret de Retour</strong> transmis par l'acheteur pour valider la prise en charge :
               </p>
               <div className="space-y-2">
                 <input
@@ -509,7 +486,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
                   maxLength={4}
                   value={returnOtpInput}
                   onChange={(e) => setReturnOtpInput(e.target.value)}
-                  placeholder="Code OTP Retour Acheteur (4 chiffres)"
+                  placeholder="Code Secret de Retour (4 chiffres)"
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-lg font-mono-num font-bold text-red-400 focus:outline-none focus:border-red-500 tracking-widest"
                 />
                 <button
@@ -521,7 +498,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
                   className="w-full py-3 bg-gradient-to-r from-red-500 to-amber-500 hover:from-red-400 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span>Valider OTP & Démarrer Retour vers Vendeur</span>
+                  <span>Valider le Code Secret & Démarrer Retour vers Vendeur</span>
                 </button>
               </div>
               <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 text-[11px] text-slate-300">

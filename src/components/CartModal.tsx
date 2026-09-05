@@ -20,9 +20,15 @@ import {
   Receipt, 
   Gift, 
   AlertCircle,
-  HelpCircle
+  HelpCircle,
+  Navigation,
+  LocateFixed,
+  Loader2,
+  ExternalLink,
+  Compass
 } from 'lucide-react';
-import { ABIDJAN_COMMUNES, getCommuneCoords } from '../data/communes';
+import { ABIDJAN_COMMUNES, getCommuneCoords, findNearestCommune } from '../data/communes';
+import { nativeBridge } from '../utils/nativeBridge';
 import { calculateCartDeliveryOptimization } from '../utils/cartOptimizationEngine';
 import { PaymentMethod, VehicleType } from '../types';
 
@@ -38,6 +44,8 @@ export const CartModal: React.FC = () => {
     checkKycVerifiedOrPrompt,
     currentUser,
     userLocation,
+    requestGpsPermission,
+    addToast,
     translate
   } = useApp();
 
@@ -49,6 +57,19 @@ export const CartModal: React.FC = () => {
     return userLocation?.address || `${deliveryCommune}, Abidjan, Côte d'Ivoire`;
   });
 
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(() => {
+    if (userLocation?.lat && userLocation?.lng) {
+      return { lat: userLocation.lat, lng: userLocation.lng };
+    }
+    return null;
+  });
+
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(() => {
+    return userLocation?.accuracy ? Math.round(userLocation.accuracy) : null;
+  });
+
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+
   const [paymentChoice, setPaymentChoice] = useState<'delivery' | 'direct'>('delivery');
   const [selectedOperator, setSelectedOperator] = useState<PaymentMethod>('Wave');
   const [useReferralDiscount, setUseReferralDiscount] = useState<boolean>(true);
@@ -56,8 +77,8 @@ export const CartModal: React.FC = () => {
 
   if (!cartModalOpen) return null;
 
-  const dropoffCoords = getCommuneCoords(deliveryCommune);
-  const optimization = calculateCartDeliveryOptimization(cart, deliveryCommune, dropoffCoords);
+  const activeDropoffCoords = gpsCoords || getCommuneCoords(deliveryCommune);
+  const optimization = calculateCartDeliveryOptimization(cart, deliveryCommune, activeDropoffCoords);
 
   const availableReferralBalance = currentUser?.referralBalance || 0;
   const referralDiscountToApply = (useReferralDiscount && availableReferralBalance > 0)
@@ -70,7 +91,7 @@ export const CartModal: React.FC = () => {
     switch (v) {
       case 'voiture':
       case 'car':
-        return { label: 'Voiture (Yango / VTC)', icon: <Car className="w-3.5 h-3.5 text-amber-400" /> };
+        return { label: 'Voiture (VTC / Express)', icon: <Car className="w-3.5 h-3.5 text-amber-400" /> };
       case 'cargo':
         return { label: 'Camionnette / Cargo', icon: <Truck className="w-3.5 h-3.5 text-purple-400" /> };
       default:
@@ -79,6 +100,67 @@ export const CartModal: React.FC = () => {
   };
 
   const dominantVehicleInfo = getVehicleBadge(optimization.dominantVehicle);
+
+  const handleCaptureGps = async () => {
+    setIsLocating(true);
+    try {
+      let lat: number | null = null;
+      let lng: number | null = null;
+      let accuracy = 10;
+      let detectedCommune = deliveryCommune;
+
+      try {
+        const loc = await requestGpsPermission(false);
+        if (loc && loc.lat && loc.lng) {
+          lat = loc.lat;
+          lng = loc.lng;
+          accuracy = Math.round(loc.accuracy || 10);
+          detectedCommune = loc.commune;
+        }
+      } catch (e) {
+        // Fallback to direct nativeBridge
+      }
+
+      if (!lat || !lng) {
+        const pos = await nativeBridge.getCurrentPosition({ enableHighAccuracy: true, timeout: 12000 });
+        lat = pos.latitude;
+        lng = pos.longitude;
+        accuracy = Math.round(pos.accuracy || 10);
+        const nearest = findNearestCommune(lat, lng);
+        if (nearest) {
+          detectedCommune = nearest.name;
+        }
+      }
+
+      if (lat && lng) {
+        setGpsCoords({ lat, lng });
+        setGpsAccuracy(accuracy);
+        setDeliveryCommune(detectedCommune);
+        setDeliveryAddress(`${detectedCommune}, Abidjan (Point GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+
+        addToast(
+          translate('📍 Position GPS Exacte Fixée', '📍 Exact GPS Location Fixed'),
+          translate(
+            `Commune détectée : ${detectedCommune} (Précision ~${accuracy}m). Itinéraire coursier direct actualisé.`,
+            `Detected commune: ${detectedCommune} (Accuracy ~${accuracy}m). Direct courier route updated.`
+          ),
+          'success'
+        );
+      }
+    } catch (err: any) {
+      console.warn('GPS Geolocation access error:', err);
+      addToast(
+        translate('Accès Position GPS', 'GPS Location Access'),
+        translate(
+          'Veuillez autoriser l\'accès à votre position GPS dans votre navigateur ou sélectionner votre commune manuellement.',
+          'Please allow GPS access in your browser or select your commune manually.'
+        ),
+        'warning'
+      );
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   const handleConfirmCheckout = async () => {
     if (cart.length === 0) return;
@@ -91,7 +173,7 @@ export const CartModal: React.FC = () => {
       await checkoutCart(
         deliveryAddress,
         deliveryCommune,
-        dropoffCoords,
+        activeDropoffCoords,
         selectedOperator,
         paymentChoice,
         useReferralDiscount
@@ -162,27 +244,59 @@ export const CartModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Modal Body */}
+        {/* Modal Body (div:nth-of-type(2)) - Haute Visibilité & Contraste Épuré */}
         {cart.length === 0 ? (
-          <div className="p-8 sm:p-12 text-center space-y-4 my-auto">
-            <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-600">
-              <ShoppingCart className="w-8 h-8" />
+          <div 
+            id="cart-modal-body-empty"
+            className="flex-1 min-h-[340px] flex flex-col items-center justify-center p-6 sm:p-12 text-center space-y-5 bg-gradient-to-b from-slate-900/40 to-slate-950/80"
+          >
+            <div className="w-20 h-20 rounded-3xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center mx-auto text-amber-400 shadow-xl shadow-amber-500/10 animate-bounce duration-1000">
+              <ShoppingCart className="w-10 h-10" />
             </div>
-            <div className="space-y-1">
-              <h3 className="text-base font-black text-white">Votre panier est vide</h3>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                Parcourez les enchères en direct, les annonces boutiques et les lots de déstockage pour ajouter vos premiers articles.
+            
+            <div className="space-y-2 max-w-md mx-auto">
+              <h3 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                {translate("Votre Panier est Actuellement Vide", "Your Cart is Currently Empty")}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                {translate(
+                  "Parcourez les enchères en direct, les boutiques certifiées et les déstockages express d'Abidjan pour faire vos premières trouvailles en paiement direct à la livraison.",
+                  "Browse live auctions, certified stores, and express liquidation deals in Abidjan with 100% direct pay on delivery."
+                )}
               </p>
             </div>
+
+            {/* Quick Benefits Highlight */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full max-w-lg pt-1">
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <span className="text-emerald-400 text-xs font-bold block">✓ 0 F d'avance</span>
+                <span className="text-[10px] text-slate-400">Paiement à la livraison</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <span className="text-amber-400 text-xs font-bold block">✓ Multi-Vendeurs</span>
+                <span className="text-[10px] text-slate-400">1 seule tournée de livraison</span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-center">
+                <span className="text-blue-400 text-xs font-bold block">✓ Code Secret Unique</span>
+                <span className="text-[10px] text-slate-400">Validation après contrôle</span>
+              </div>
+            </div>
+
             <button
+              id="btn-discover-products-empty-cart"
+              type="button"
               onClick={() => setCartModalOpen(false)}
-              className="px-6 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/20"
+              className="px-7 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-xl shadow-amber-500/25 active:scale-95 cursor-pointer flex items-center gap-2"
             >
-              Découvrir les Articles Disponibles
+              <span>{translate("Découvrir les Articles Disponibles", "Discover Available Items")}</span>
+              <ArrowRight className="w-4 h-4 stroke-[3]" />
             </button>
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+          <div 
+            id="cart-modal-body"
+            className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-700/80 scrollbar-track-slate-950 text-slate-100"
+          >
             {/* Delivery Consolidation Smart Banner */}
             <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-blue-950/70 border border-emerald-500/40 shadow-lg space-y-3">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
@@ -336,25 +450,122 @@ export const CartModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Delivery Destination & Commune Picker */}
-            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-xs font-black text-white uppercase tracking-wider">
-                  Adresse de Livraison Finale (Abidjan)
-                </h3>
+            {/* Delivery Destination & Exact GPS Geolocation */}
+            <div 
+              id="cart-delivery-address-section"
+              className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-900/90 via-slate-900 to-slate-950 border-2 border-emerald-500/40 space-y-4 shadow-xl shadow-emerald-500/5"
+            >
+              {/* Header with Title and Live GPS status badge */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-sm">
+                    <MapPin className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                      <span>{translate("Adresse & Position Exacte de Livraison", "Delivery Address & Exact Location")}</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      {translate("Guidage GPS en direct pour la remise directe en main propre à Abidjan", "Direct GPS routing for personal delivery in Abidjan")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* GPS Status Pill */}
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  {gpsCoords ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm shadow-emerald-500/10">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>GPS Fixé (~{gpsAccuracy || 5}m)</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span>GPS Disponible</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Exact Geolocation Access Action Banner */}
+              <div className="p-3.5 sm:p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Navigation className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="text-xs sm:text-sm font-black text-emerald-300">
+                      {gpsCoords 
+                        ? translate("Position GPS Exacte Enregistrée", "Exact GPS Position Recorded")
+                        : translate("Accès à la Position Exacte (Géolocalisation)", "Access Exact Position (Geolocation)")}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    {gpsCoords 
+                      ? `${deliveryCommune} • Lat: ${gpsCoords.lat.toFixed(5)}, Lng: ${gpsCoords.lng.toFixed(5)}`
+                      : translate("Cliquez pour détecter automatiquement votre commune et géolocaliser le coursier.", "Click to auto-detect your commune and geolocate for the courier.")}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                  <button
+                    id="btn-cart-capture-gps"
+                    type="button"
+                    onClick={handleCaptureGps}
+                    disabled={isLocating}
+                    className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20 active:scale-95 disabled:opacity-60 cursor-pointer"
+                  >
+                    {isLocating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>{translate("Accès GPS en cours...", "Accessing GPS...")}</span>
+                      </>
+                    ) : (
+                      <>
+                        <LocateFixed className="w-4 h-4" />
+                        <span>
+                          {gpsCoords 
+                            ? translate("Actualiser Position GPS", "Refresh GPS Position") 
+                            : translate("Accéder à ma Position Exacte", "Access My Exact Position")}
+                        </span>
+                      </>
+                    )}
+                  </button>
+
+                  {gpsCoords && (
+                    <a
+                      id="link-cart-view-google-maps"
+                      href={`https://www.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2.5 bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-700 hover:border-emerald-500/50 rounded-xl text-xs flex items-center justify-center transition-all"
+                      title={translate("Voir la position exacte sur Google Maps", "View exact position on Google Maps")}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Destination Commune & Street / Landmark Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">Commune de Destination :</label>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5 flex items-center justify-between">
+                    <span>{translate("Commune de Destination :", "Destination Commune:")}</span>
+                    {gpsCoords && (
+                      <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Auto-détectée par GPS</span>
+                      </span>
+                    )}
+                  </label>
                   <select
+                    id="cart-delivery-commune-select"
                     value={deliveryCommune}
                     onChange={(e) => {
-                      setDeliveryCommune(e.target.value);
-                      setDeliveryAddress(`${e.target.value}, Abidjan`);
+                      const newCommune = e.target.value;
+                      setDeliveryCommune(newCommune);
+                      setDeliveryAddress(`${newCommune}, Abidjan`);
                     }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
                   >
                     {ABIDJAN_COMMUNES.map(c => (
                       <option key={c.name} value={c.name}>
@@ -365,15 +576,29 @@ export const CartModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 block mb-1">Précision Adresse / Repère :</label>
+                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
+                    {translate("Précision Adresse & Repère Visuel :", "Address Precision & Landmark:")}
+                  </label>
                   <input
+                    id="cart-delivery-address-input"
                     type="text"
                     value={deliveryAddress}
                     onChange={(e) => setDeliveryAddress(e.target.value)}
-                    placeholder="Ex: Cocody Angré 8ème Tranche, près de la pharmacie"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    placeholder="Ex: Cocody Angré 8ème Tranche, près de la pharmacie du carrefour"
+                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
                   />
                 </div>
+              </div>
+
+              {/* Delivery Assurance Footer Note */}
+              <div className="flex items-center gap-2 text-[11px] text-slate-400 pt-0.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>
+                  {translate(
+                    "Le livreur coursier reçoit les coordonnées géographiques exactes pour vous rejoindre directement sans égarement.",
+                    "The courier receives the exact geographic coordinates to reach you directly without getting lost."
+                  )}
+                </span>
               </div>
             </div>
 
@@ -445,7 +670,7 @@ export const CartModal: React.FC = () => {
                     <span className="text-[10px] font-mono font-bold text-slate-400">Wave / OM / MoMo</span>
                   </div>
                   <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                    Règlement immédiat via Mobile Money. Votre Code Secret OTP est généré à l'avance.
+                    Règlement immédiat via Mobile Money. Votre Code Secret de Remise est généré à l'avance.
                   </p>
                 </button>
               </div>
@@ -473,9 +698,9 @@ export const CartModal: React.FC = () => {
             <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-start gap-3 text-xs text-slate-300">
               <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
               <div className="space-y-0.5">
-                <strong className="text-white">Sécurité Maximale & 1 Seul Code OTP Panier :</strong>
+                <strong className="text-white">Sécurité Maximale & 1 Seul Code Secret Panier :</strong>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Le coursier récupère chaque article chez son vendeur respectif grâce aux codes de retrait vendeur, puis regroupe tout pour vous livrer. Vous ne communiquez votre <strong>Code Secret OTP Unique</strong> qu'une fois la commande complète entre vos mains.
+                  Le coursier récupère chaque article chez son vendeur respectif grâce aux codes de retrait vendeur, puis regroupe tout pour vous livrer. Vous ne communiquez votre <strong>Code Secret Unique de Remise</strong> qu'une fois la commande complète entre vos mains.
                 </p>
               </div>
             </div>

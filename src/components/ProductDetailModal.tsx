@@ -740,7 +740,7 @@ export const ProductDetailModal: React.FC = () => {
                 </li>
                 <li className="flex items-start gap-1.5">
                   <span className="text-emerald-400 font-bold">✓</span>
-                  <span><strong>Code OTP Secret :</strong> Ne transmettez votre Code OTP au coursier <em>qu'après validation satisfaisante</em> du produit.</span>
+                  <span><strong>Code Secret de Remise :</strong> Ne transmettez votre Code Secret au coursier <em>qu'après validation satisfaisante</em> du produit.</span>
                 </li>
               </ul>
             </div>
@@ -901,7 +901,7 @@ export const ProductDetailModal: React.FC = () => {
                                 <span className="text-[10px] text-slate-300 leading-tight">
                                   {currentUser?.isCodSuspended 
                                     ? "Débloqué après 5 commandes prépayées avec succès." 
-                                    : "Inspectez votre colis devant le livreur, payez via Mobile Money sur place et donnez votre code OTP."}
+                                    : "Inspectez votre colis devant le livreur, payez via Mobile Money sur place et donnez votre Code Secret."}
                                 </span>
                               </button>
 
@@ -1156,7 +1156,7 @@ export const ProductDetailModal: React.FC = () => {
 
                 <p className="text-[10px] text-slate-500 mt-2 flex items-center gap-1 justify-center">
                   <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                  <span>{translate(`Paiement sécurisé par séquestre ${selectedPaymentMethod}. Déblocage sur code OTP à la livraison.`, `Secured payment in ${selectedPaymentMethod} escrow. Payout released upon OTP delivery inspection.`)}</span>
+                  <span>{translate(`Paiement sécurisé par séquestre ${selectedPaymentMethod}. Déblocage sur Code Secret à la livraison.`, `Secured payment in ${selectedPaymentMethod} escrow. Payout released upon secret code delivery inspection.`)}</span>
                 </p>
               </div>
             )}

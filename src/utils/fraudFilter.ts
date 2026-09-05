@@ -126,12 +126,12 @@ export function detectImageFraud(images: string[]): FraudCheckResult {
 export const BRAD_CI_TERMS = {
   title: "Conditions Générales d'Utilisation & Charte de Sécurité BRAD'CI",
   lastUpdated: "24 Août 2026",
-  summary: "En utilisant BRAD'CI, chaque membre s'engage à respecter le système de Séquestre Garanti, la livraison vérifiée par OTP et l'interdiction stricte de transaction en dehors de la plateforme.",
+  summary: "En utilisant BRAD'CI, chaque membre s'engage à respecter le système de Séquestre Garanti, la livraison vérifiée par Code Secret et l'interdiction stricte de transaction en dehors de la plateforme.",
   rules: [
     {
       id: "escrow",
       title: "1. Paiement Séquestre Garanti (Wave, MoMo, Orange)",
-      desc: "Tous les paiements sont bloqués en compte séquestre sécurisé jusqu'à ce que l'acheteur inspecte le colis et communique son code OTP de validation au livreur. Aucun vendeur n'est payé d'avance sans validation physique du produit."
+      desc: "Tous les paiements sont bloqués en compte séquestre sécurisé jusqu'à ce que l'acheteur inspecte le colis et communique son Code Secret de validation au livreur. Aucun vendeur n'est payé d'avance sans validation physique du produit."
     },
     {
       id: "no_direct_contact",
@@ -149,9 +149,9 @@ export const BRAD_CI_TERMS = {
       desc: "Les boutiques doivent obligatoirement renseigner leur stock disponible. En cas de rupture de stock, l'annonce affiche 'Stock épuisé - Nouveau stock disponible bientôt'. Si aucun réapprovisionnement n'est effectué sous 14 jours (2 semaines), le produit est automatiquement supprimé. Les enchères vendues restent affichées avec chrono 1h avant archivage."
     },
     {
-      id: "otp_delivery",
+      id: "secret_delivery",
       title: "5. Protocole de Livraison & Inspection Obligatoire",
-      desc: "Le livreur doit présenter le code de ramassage au vendeur. L'acheteur dispose de 10 minutes pour tester et inspecter l'article en présence du livreur avant de communiquer son code OTP de validation ou son OTP de retour."
+      desc: "Le livreur doit présenter le code de ramassage au vendeur. L'acheteur dispose de 10 minutes pour tester et inspecter l'article en présence du livreur avant de communiquer son Code Secret de validation ou son code de retour."
     }
   ]
 };
@@ -164,6 +164,6 @@ export function generateTermsConfirmationEmail(userName: string, email: string, 
     recipientEmail: email,
     recipientName: userName,
     subject: `✅ Bienvenue sur BRAD'CI - Charte de Confiance & Conditions de Sécurité (${role.toUpperCase()})`,
-    body: `Bonjour ${userName},\n\nNous vous confirmons l'enregistrement de votre profil (${role}) sur la plateforme BRAD'CI.\n\nRAPPEL DES RÈGLES DE SÉCURITÉ ESSENTIELLES :\n- 🛡️ Transactions 100% protégées par Séquestre Mobile Money (Wave, Orange, MTN, MoMo).\n- 🚫 Interdiction stricte d'échanger des numéros de téléphone ou coordonnées WhatsApp en public afin d'éviter toute arnaque.\n- 📦 Remise du colis sous code OTP après inspection physique.\n\nMerci de votre confiance et excellentes affaires sur BRAD'CI !`
+    body: `Bonjour ${userName},\n\nNous vous confirmons l'enregistrement de votre profil (${role}) sur la plateforme BRAD'CI.\n\nRAPPEL DES RÈGLES DE SÉCURITÉ ESSENTIELLES :\n- 🛡️ Transactions 100% protégées par Séquestre Mobile Money (Wave, Orange, MTN, MoMo).\n- 🚫 Interdiction stricte d'échanger des numéros de téléphone ou coordonnées WhatsApp en public afin d'éviter toute arnaque.\n- 📦 Remise du colis sous Code Secret après inspection physique.\n\nMerci de votre confiance et excellentes affaires sur BRAD'CI !`
   };
 }

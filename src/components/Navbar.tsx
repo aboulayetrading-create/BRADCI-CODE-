@@ -91,7 +91,11 @@ export const Navbar: React.FC = () => {
               onClick={() => setActiveTab(isDriver ? 'dashboard_driver' : 'explore')}
               className="flex items-center text-left group focus:outline-none transition-transform active:scale-95 shrink-0"
             >
-              <BradCiLogo size="md" />
+              <BradCiLogo 
+                size="md" 
+                showSubtitle={true} 
+                subtitleText="ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS" 
+              />
             </button>
 
             {/* Direct POD Guarantee Pill */}
@@ -294,7 +298,7 @@ export const Navbar: React.FC = () => {
               </button>
             )}
 
-            {/* For Drivers: Quick Yango Pro Style Master Availability Switch (Hidden on mobile as it's in bottom bar) */}
+            {/* For Drivers: Quick Master Availability Switch (Hidden on mobile as it's in bottom bar) */}
             {isDriver && (
               <button
                 id="navbar-driver-status-toggle"
@@ -541,7 +545,18 @@ export const Navbar: React.FC = () => {
 
         {/* Mobile Dropdown Menu Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-800/80 py-3 space-y-2 bg-[#080C14]/98 backdrop-blur-xl animate-in slide-in-from-top duration-200">
+          <div className="md:hidden border-t border-slate-800/80 py-3 space-y-3 bg-[#06102E]/98 backdrop-blur-xl animate-in slide-in-from-top duration-200">
+            {/* Branded Mobile Drawer Header */}
+            <div className="px-3 pb-2 border-b border-slate-800/80 flex items-center justify-between">
+              <BradCiLogo 
+                size="sm" 
+                showSubtitle={true} 
+                subtitleText="ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS" 
+              />
+              <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                SÉCURISÉ
+              </span>
+            </div>
             {isDriver ? (
               <div className="px-3 space-y-3">
                 {/* Driver Online / Offline master toggle */}

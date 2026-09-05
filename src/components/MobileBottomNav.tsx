@@ -67,7 +67,7 @@ export const MobileBottomNav: React.FC = () => {
     activeTab === 'dashboard_driver' || 
     activeTab === 'dashboard_admin';
 
-  // Couriers / Drivers get a dedicated "Yango Pro" delivery mobile bottom bar
+  // Couriers / Drivers get a dedicated delivery mobile bottom bar
   if (isDriver) {
     return (
       <nav 
@@ -75,7 +75,23 @@ export const MobileBottomNav: React.FC = () => {
         className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B1021]/95 backdrop-blur-xl border-t border-[#222D4A] px-2 pt-1.5 pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
       >
         <div className="flex items-center justify-around max-w-lg mx-auto">
-          {/* 1. Bourse aux Courses */}
+          {/* 1. Cockpit Radar & Carte */}
+          <button
+            id="btn-driver-mobile-radar"
+            onClick={() => {
+              setActiveTab('dashboard_driver');
+              setActiveDriverTab('radar_map');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'radar_map' }));
+            }}
+            className={`relative flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
+              activeDriverTab === 'radar_map' ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-emerald-400'
+            }`}
+          >
+            <Navigation className={`w-5 h-5 ${activeDriverTab === 'radar_map' ? 'text-emerald-400' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Radar</span>
+          </button>
+
+          {/* 2. Bourse aux Courses */}
           <button
             id="btn-driver-mobile-orders"
             onClick={() => {
@@ -96,26 +112,7 @@ export const MobileBottomNav: React.FC = () => {
             <span className="text-[10px] mt-0.5 tracking-tight">Courses</span>
           </button>
 
-          {/* 2. Cockpit GPS Active Mission */}
-          <button
-            id="btn-driver-mobile-mission"
-            onClick={() => {
-              setActiveTab('dashboard_driver');
-              setActiveDriverTab('active_mission');
-              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'active_mission' }));
-            }}
-            className={`relative flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
-              activeDriverTab === 'active_mission' ? 'text-cyan-300 font-black' : 'text-slate-400 hover:text-blue-400'
-            }`}
-          >
-            <Navigation className={`w-5 h-5 ${activeDriverTab === 'active_mission' ? 'text-cyan-300' : 'text-slate-400'}`} />
-            {driverActiveJob && (
-              <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            )}
-            <span className="text-[10px] mt-0.5 tracking-tight">Mission</span>
-          </button>
-
-          {/* 3. Central Availability Switch (Yango Pro Style) */}
+          {/* 3. Central Availability Switch */}
           <button
             id="btn-driver-mobile-availability"
             onClick={toggleDriverAvailability}
@@ -130,36 +127,36 @@ export const MobileBottomNav: React.FC = () => {
             <span className="sr-only">Statut service</span>
           </button>
 
-          {/* 4. Gains & Reçus */}
+          {/* 4. Tableau de Bord Revenus */}
           <button
             id="btn-driver-mobile-earnings"
+            onClick={() => {
+              setActiveTab('dashboard_driver');
+              setActiveDriverTab('earnings');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'earnings' }));
+            }}
+            className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
+              activeDriverTab === 'earnings' ? 'text-amber-400 font-black' : 'text-slate-400 hover:text-amber-400'
+            }`}
+          >
+            <Receipt className={`w-5 h-5 ${activeDriverTab === 'earnings' ? 'text-amber-400' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Revenus</span>
+          </button>
+
+          {/* 5. Historique & Reçus */}
+          <button
+            id="btn-driver-mobile-history"
             onClick={() => {
               setActiveTab('dashboard_driver');
               setActiveDriverTab('history');
               window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'history' }));
             }}
             className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
-              activeDriverTab === 'history' ? 'text-amber-400 font-black' : 'text-slate-400 hover:text-amber-400'
+              activeDriverTab === 'history' ? 'text-white font-black' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <Receipt className={`w-5 h-5 ${activeDriverTab === 'history' ? 'text-amber-400' : 'text-slate-400'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">Gains</span>
-          </button>
-
-          {/* 5. Véhicule & KYC */}
-          <button
-            id="btn-driver-mobile-profile"
-            onClick={() => {
-              setActiveTab('dashboard_driver');
-              setActiveDriverTab('profile');
-              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'profile' }));
-            }}
-            className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
-              activeDriverTab === 'profile' ? 'text-white font-black' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <FileCheck className={`w-5 h-5 ${activeDriverTab === 'profile' ? 'text-emerald-400' : 'text-slate-400'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">Véhicule</span>
+            <FileCheck className={`w-5 h-5 ${activeDriverTab === 'history' ? 'text-emerald-400' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Historique</span>
           </button>
         </div>
       </nav>

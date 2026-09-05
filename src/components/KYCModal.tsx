@@ -56,7 +56,7 @@ const DEMO_KYC_PHOTOS = {
   vehicleReg: KYC_DRAWING_DATA_URIS.vehicleReg
 };
 
-// Popular vehicle models and presets used in Abidjan & Yango Delivery fleets
+// Popular vehicle models and presets used in Abidjan delivery fleets
 interface VehiclePresetItem {
   model: string;
   brand: string;
@@ -68,7 +68,7 @@ interface VehiclePresetItem {
 const POPULAR_DELIVERY_VEHICLES: Record<string, {
   label: string;
   shortDesc: string;
-  yangoService: string;
+  fleetCategory: string;
   icon: any;
   plateExample: string;
   suggestions: VehiclePresetItem[];
@@ -76,12 +76,12 @@ const POPULAR_DELIVERY_VEHICLES: Record<string, {
   moto: {
     label: 'Moto / Scooter',
     shortDesc: 'Livraison Express colis légers, plis & repas (max 15 kg)',
-    yangoService: 'Yango Delivery Moto & Flash',
+    fleetCategory: 'Flotte BRAD\'CI Moto & Colis Express',
     icon: Bike,
     plateExample: '4523 JJ 01',
     suggestions: [
       { model: 'Yamaha Crypton 110', brand: 'Yamaha', tag: 'Standard N°1 Abidjan', badge: 'Top Vente', defaultColor: 'Noir & Rouge' },
-      { model: 'Haojue 110cc Express', brand: 'Haojue', tag: 'Flotte Yango Moto', badge: 'Flotte Yango', defaultColor: 'Bleu' },
+      { model: 'Haojue 110cc Express', brand: 'Haojue', tag: 'Flotte Moto Express', badge: 'Flotte Recommandée', defaultColor: 'Bleu' },
       { model: 'TVS HLX 125 Plus', brand: 'TVS', tag: 'Robuste & Économique', badge: 'Recommandé', defaultColor: 'Rouge' },
       { model: 'Bajaj Boxer CT 100', brand: 'Bajaj', tag: 'Tout-terrain & Endurant', badge: 'Indestructible', defaultColor: 'Noir' },
       { model: 'Bajaj Boxer BM 150', brand: 'Bajaj', tag: 'Grande puissance', badge: 'Rapide', defaultColor: 'Bleu Nuit' },
@@ -95,12 +95,12 @@ const POPULAR_DELIVERY_VEHICLES: Record<string, {
   voiture: {
     label: 'Voiture / Citadine / Berline',
     shortDesc: 'Colis volumineux/sécurisés, écrans, pluie & haute valeur (max 80 kg)',
-    yangoService: 'Yango Delivery Auto & VTC Express',
+    fleetCategory: 'Flotte BRAD\'CI Auto & VTC Express',
     icon: Car,
     plateExample: '8912 KL 01',
     suggestions: [
-      { model: 'Toyota Yaris', brand: 'Toyota', tag: 'Véhicule N°1 Yango Abidjan', badge: '⭐ Top 1 Yango', defaultColor: 'Blanc' },
-      { model: 'Hyundai Grand i10', brand: 'Hyundai', tag: 'Citadine économique', badge: 'Flotte Yango', defaultColor: 'Gris Argent' },
+      { model: 'Toyota Yaris', brand: 'Toyota', tag: 'Véhicule N°1 Abidjan Express', badge: '⭐ Top 1 Abidjan', defaultColor: 'Blanc' },
+      { model: 'Hyundai Grand i10', brand: 'Hyundai', tag: 'Citadine économique', badge: 'Flotte Éco', defaultColor: 'Gris Argent' },
       { model: 'Suzuki Swift / Dzire', brand: 'Suzuki', tag: 'Flottes récentes Abidjan', badge: 'Très Populaire', defaultColor: 'Blanc' },
       { model: 'Suzuki Alto / S-Presso', brand: 'Suzuki', tag: 'Ultra maniable & Agile', badge: 'Compact', defaultColor: 'Bleu' },
       { model: 'Toyota Corolla', brand: 'Toyota', tag: 'Grand coffre sécurisé', badge: 'Confort Pro', defaultColor: 'Gris Métal' },
@@ -114,7 +114,7 @@ const POPULAR_DELIVERY_VEHICLES: Record<string, {
   cargo: {
     label: 'Cargo / Fourgon / Tricycle',
     shortDesc: 'Électroménager lourd, palettes, mobilier & cartons B2B',
-    yangoService: 'Yango Cargo & Fret Lourd Urbain',
+    fleetCategory: 'Flotte BRAD\'CI Cargo & Fret Lourd Urbain',
     icon: Truck,
     plateExample: 'CI-3920-AB',
     suggestions: [
@@ -429,7 +429,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     translate("Prenez en photo ou importez le recto de votre CNI ou Passeport.", "Take a photo or upload the front of your National ID or Passport."),
     translate("Prenez un selfie tenant votre pièce d'identité bien visible à côté de votre visage.", "Take a selfie holding your ID clearly visible next to your face."),
     translate("Prenez en photo votre permis de conduire ivoirien valide (Catégorie A moto, B auto ou C cargo).", "Take a photo of your valid Ivorian driver's license (Cat A bike, B car or C cargo)."),
-    translate("Déclarez votre véhicule (suggestions Yango / Abidjan) et prenez en photo votre carte grise.", "Declare your vehicle (Yango / Abidjan presets) and photograph your registration certificate.")
+    translate("Déclarez votre véhicule (suggestions Abidjan Express) et prenez en photo votre carte grise.", "Declare your vehicle (Abidjan Express presets) and photograph your registration certificate.")
   ] : [
     translate("Prenez en photo ou importez le recto de votre CNI, passeport ou carte consulaire.", "Take a photo or import the front of your ID card, passport or consular card."),
     translate("Prenez un selfie simple de face, bien éclairé, sans lunettes de soleil ni chapeau.", "Take a clear front-facing selfie in good lighting, without sunglasses or hat."),
@@ -544,11 +544,11 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
                   else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.driverLicense;
                   else if (currentStep === 4) sampleUri = KYC_DRAWING_DATA_URIS.vehicleReg;
                 }
-                if (currentStep === 1) setDocFrontPhoto(sampleUri);
+                if (currentStep === 1) setDocPhoto(sampleUri);
                 else if (currentStep === 2) setSelfiePhoto(sampleUri);
                 else if (currentStep === 3) {
                   if (isDriver) setDriverLicensePhoto(sampleUri);
-                  else setSelfieWithCardPhoto(sampleUri);
+                  else setSelfieWithIdPhoto(sampleUri);
                 } else if (currentStep === 4 && isDriver) {
                   setVehicleRegPhoto(sampleUri);
                 }
@@ -624,7 +624,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
           </div>
         )}
 
-        {/* Step 4 Specific for Driver: Vehicle Registration, Plate, Color & Yango Model Presets */}
+        {/* Step 4 Specific for Driver: Vehicle Registration, Plate, Color & Vehicle Model Presets */}
         {isDriver && currentStep === 4 && (
           <div className="space-y-4 mb-4 p-4 bg-slate-950/80 rounded-2xl border border-amber-500/30">
             {/* Header with Title & Context */}
@@ -637,7 +637,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
                 ) : (
                   <Bike className="w-4 h-4 text-emerald-400" />
                 )}
-                <span>{translate("Déclaration & Matériel de Livraison (Yango / Abidjan)", "Delivery Vehicle & Asset Declaration (Yango / Abidjan)")}</span>
+                <span>{translate("Déclaration & Matériel de Livraison (Flotte Abidjan)", "Delivery Vehicle & Asset Declaration (Abidjan Fleet)")}</span>
               </div>
               <span className="text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">
                 ✓ Conforme BRAD'CI
@@ -655,21 +655,21 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
                   { 
                     id: 'moto', 
                     label: 'Moto / Scooter', 
-                    sub: 'Yango Moto & Flash (≤ 15 kg)', 
+                    sub: 'Moto & Colis Flash (≤ 15 kg)', 
                     icon: Bike,
                     activeColor: 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
                   },
                   { 
                     id: 'voiture', 
                     label: 'Voiture / Citadine', 
-                    sub: 'Yango Auto & VTC (≤ 80 kg)', 
+                    sub: 'Voiture & Colis Fragile (≤ 80 kg)', 
                     icon: Car,
                     activeColor: 'bg-amber-500/20 border-amber-500 text-amber-300'
                   },
                   { 
                     id: 'cargo', 
                     label: 'Cargo / Fourgon', 
-                    sub: 'Yango Cargo & Fret Lourd B2B', 
+                    sub: 'Camionnette & Fret Lourd B2B', 
                     icon: Truck,
                     activeColor: 'bg-purple-500/20 border-purple-500 text-purple-300'
                   }
@@ -707,18 +707,18 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
               </div>
             </div>
 
-            {/* Smart Suggestions of Popular Models for Yango & Abidjan */}
+            {/* Smart Suggestions of Popular Models for Abidjan */}
             {POPULAR_DELIVERY_VEHICLES[vehicleType === 'car' ? 'voiture' : vehicleType] && (
               <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-200">
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                     <span>
-                      {translate("Modèles recommandés Yango & Abidjan (Cliquez pour appliquer) :", "Recommended Yango & Abidjan models (Click to apply):")}
+                      {translate("Modèles recommandés Abidjan (Cliquez pour appliquer) :", "Recommended Abidjan models (Click to apply):")}
                     </span>
                   </div>
                   <span className="text-[10px] text-slate-400">
-                    {POPULAR_DELIVERY_VEHICLES[vehicleType === 'car' ? 'voiture' : vehicleType].yangoService}
+                    {POPULAR_DELIVERY_VEHICLES[vehicleType === 'car' ? 'voiture' : vehicleType].fleetCategory}
                   </span>
                 </div>
 
@@ -1003,11 +1003,11 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
                     else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.driverLicense;
                     else if (currentStep === 4) sampleUri = KYC_DRAWING_DATA_URIS.vehicleReg;
                   }
-                  if (currentStep === 1) setDocFrontPhoto(sampleUri);
+                  if (currentStep === 1) setDocPhoto(sampleUri);
                   else if (currentStep === 2) setSelfiePhoto(sampleUri);
                   else if (currentStep === 3) {
                     if (isDriver) setDriverLicensePhoto(sampleUri);
-                    else setSelfieWithCardPhoto(sampleUri);
+                    else setSelfieWithIdPhoto(sampleUri);
                   } else if (currentStep === 4 && isDriver) {
                     setVehicleRegPhoto(sampleUri);
                   }

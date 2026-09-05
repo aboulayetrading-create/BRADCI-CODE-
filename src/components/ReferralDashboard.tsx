@@ -135,8 +135,8 @@ Mon code parrain : ${referralCode}`;
 
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
               {translate(
-                "Invitez vos proches sur BRAD'CI. À chaque filleul validé qui réalise son premier achat ou sa première vente livrée par code OTP : vous gagnez 1 000 FCFA et votre filleul gagne 1 000 FCFA !",
-                "Invite friends to BRAD'CI. For each verified referee who completes their first purchase or sale delivered via OTP: you earn 1,000 FCFA and your referee earns 1,000 FCFA!"
+                "Invitez vos proches sur BRAD'CI. À chaque filleul validé qui réalise son premier achat ou sa première vente livrée avec Code Secret : vous gagnez 1 000 FCFA et votre filleul gagne 1 000 FCFA !",
+                "Invite friends to BRAD'CI. For each verified referee who completes their first purchase or sale delivered with Secret Code: you earn 1,000 FCFA and your referee earns 1,000 FCFA!"
               )}
             </p>
 
@@ -310,8 +310,8 @@ Mon code parrain : ${referralCode}`;
             <Truck className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
             <p>
               {translate(
-                "Filleuls avec KYC validé : ce solde basculera en utilisable dès leur 1ère livraison validée par OTP.",
-                "Referees with verified KYC: this balance unlocks upon their 1st OTP-validated delivery."
+                "Filleuls avec KYC validé : ce solde basculera en utilisable dès leur 1ère livraison validée par Code Secret.",
+                "Referees with verified KYC: this balance unlocks upon their 1st secret code-validated delivery."
               )}
             </p>
           </div>
@@ -381,12 +381,12 @@ Mon code parrain : ${referralCode}`;
               </span>
             </div>
             <h4 className="text-xs font-bold text-white">
-              {translate("1ère Livraison OTP = Bonus Débloqué !", "1st OTP Delivery = Bonus Unlocked!")}
+              {translate("1ère Livraison par Code Secret = Bonus Débloqué !", "1st Secret Code Delivery = Bonus Unlocked!")}
             </h4>
             <p className="text-[11px] text-slate-400 leading-relaxed">
               {translate(
-                "Dès la 1ère vente ou achat validé sur le terrain par code OTP : +1 000 FCFA utilisables chacun et +1 sur la jauge !",
-                "Upon 1st OTP-validated purchase or sale: +1,000 FCFA usable credit each and +1 on the gauge!"
+                "Dès la 1ère vente ou achat validé sur le terrain par Code Secret : +1 000 FCFA utilisables chacun et +1 sur la jauge !",
+                "Upon 1st secret code-validated purchase or sale: +1,000 FCFA usable credit each and +1 on the gauge!"
               )}
             </p>
           </div>

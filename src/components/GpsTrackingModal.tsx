@@ -185,7 +185,7 @@ export const GpsTrackingModal: React.FC = () => {
 
   const handleDriverSubmitOtp = () => {
     if (!driverEnteredOtp) {
-      addToast('Code OTP Manquant', 'Veuillez saisir le code OTP à 4 chiffres fourni par l\'acheteur.', 'warning');
+      addToast('Code Secret Manquant', 'Veuillez saisir le code secret à 4 chiffres fourni par l\'acheteur.', 'warning');
       return;
     }
     const ok = driverConfirmDeliveryOTP(job.id, driverEnteredOtp);
@@ -343,7 +343,7 @@ export const GpsTrackingModal: React.FC = () => {
                       : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                   }`}>
                     {isDelivered
-                      ? '✓ Commande Clôturée (OTP Validé)'
+                      ? '✓ Commande Clôturée (Code Secret Confirmé)'
                       : isPaid
                       ? '✅ Paiement Mobile Confirmé • Code Débloqué'
                       : isArrived
@@ -395,7 +395,7 @@ export const GpsTrackingModal: React.FC = () => {
                 {/* 5. COMPLETED */}
                 <div className={`p-2 rounded-xl border ${isDelivered ? 'bg-emerald-500/25 border-emerald-400 text-emerald-200 font-black' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
                   <p className="font-bold text-[11px]">5. COMPLETED</p>
-                  <p className="text-[9px] text-slate-400">Code OTP validé</p>
+                  <p className="text-[9px] text-slate-400">Code Secret validé</p>
                 </div>
               </div>
             </div>
@@ -609,14 +609,14 @@ export const GpsTrackingModal: React.FC = () => {
                     </div>
 
                     <p className="text-xs text-slate-300">
-                      Votre transfert de <strong>{totalBuyerAmount.toLocaleString('fr-FR')} FCFA</strong> a été sécurisé. <strong>Communiquez ce Code Secret OTP au livreur</strong> après réception de votre article :
+                      Votre transfert de <strong>{totalBuyerAmount.toLocaleString('fr-FR')} FCFA</strong> a été sécurisé. <strong>Communiquez ce Code Secret de Remise au livreur</strong> après réception de votre article :
                     </p>
 
-                    {/* Big OTP Display in #00C853 with Blue Shield Branding */}
+                    {/* Big Secret Code Display in #00C853 with Blue Shield Branding */}
                     <div className="py-5 px-4 bg-[#0B1021] rounded-2xl border border-[#00C853]/50 text-center space-y-2 shadow-inner">
                       <div className="flex items-center justify-center gap-1.5 text-[11px] text-[#1E53E5] font-black uppercase tracking-wider">
                         <KeyRound className="w-3.5 h-3.5" />
-                        <span>Code Secret OTP de Déblocage</span>
+                        <span>Code Secret de Remise du Colis</span>
                       </div>
                       <div className="text-4xl sm:text-5xl font-black font-mono-num tracking-[0.35em] text-[#00C853] drop-shadow-md">
                         {job.deliveryOtpCode || '8814'}
@@ -637,11 +637,11 @@ export const GpsTrackingModal: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <button
-                        onClick={() => openOfficialReceipt(job)}
+                        onClick={() => openOfficialReceipt(job, 'buyer')}
                         className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-[#1E53E5] hover:bg-[#1E53E5]/90 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all"
                       >
                         <FileText className="w-3.5 h-3.5" />
-                        <span>Télécharger Facture / Reçu PDF</span>
+                        <span>Reçu Acheteur Officiel</span>
                       </button>
                     </div>
                   </div>
@@ -692,12 +692,12 @@ export const GpsTrackingModal: React.FC = () => {
                     <div className="p-3 bg-[#0B1021] rounded-xl border border-[#222D4A] text-xs text-center space-y-1">
                       <p className="font-bold text-[#FF5B00]">⏳ En attente du paiement direct de l'acheteur...</p>
                       <p className="text-[11px] text-slate-400">
-                        L'acheteur valide le montant ({totalBuyerAmount.toLocaleString('fr-FR')} FCFA) depuis son application. Dès confirmation du Webhook, il vous communiquera son Code OTP.
+                        L'acheteur valide le montant ({totalBuyerAmount.toLocaleString('fr-FR')} FCFA) depuis son application. Dès confirmation du règlement, il vous communiquera son Code Secret de Remise.
                       </p>
                     </div>
                   )}
 
-                  {/* Step D: OTP Confirmation once Buyer has PAID with Mobile Touch Keypad */}
+                  {/* Step D: Secret Code Confirmation once Buyer has PAID with Mobile Touch Keypad */}
                   {isPaid && !isDelivered && (
                     <div className="p-4 bg-[#0B1021] rounded-2xl border border-[#00C853]/50 space-y-3">
                       <div className="flex items-center justify-between text-xs">
@@ -705,7 +705,7 @@ export const GpsTrackingModal: React.FC = () => {
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Paiement Acheteur Validé !</span>
                         </span>
-                        <span className="text-[10px] text-slate-400">Saisissez l'OTP remis par l'acheteur</span>
+                        <span className="text-[10px] text-slate-400">Saisissez le Code Secret remis par l'acheteur</span>
                       </div>
 
                       {/* Display Digits */}
@@ -774,7 +774,7 @@ export const GpsTrackingModal: React.FC = () => {
                         className="w-full py-3.5 bg-[#00C853] hover:bg-[#00B048] disabled:opacity-40 text-slate-950 font-black text-sm rounded-xl shadow-lg shadow-[#00C853]/20 cursor-pointer transition-all flex items-center justify-center gap-2"
                       >
                         <ShieldCheck className="w-4 h-4 text-slate-950" />
-                        <span>Valider le Code OTP & Encaisser {job.deliveryFee.toLocaleString('fr-FR')} FCFA</span>
+                        <span>Valider le Code Secret & Encaisser {job.deliveryFee.toLocaleString('fr-FR')} FCFA</span>
                       </button>
                     </div>
                   )}
@@ -805,7 +805,7 @@ export const GpsTrackingModal: React.FC = () => {
         <div className="mt-4 pt-3 border-t border-slate-800 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Paiement Direct à la Livraison BRAD'CI : Remise en main propre sécurisée par Code OTP.</span>
+            <span>Paiement Direct à la Livraison BRAD'CI : Remise en main propre sécurisée par Code Secret.</span>
           </div>
 
           <button

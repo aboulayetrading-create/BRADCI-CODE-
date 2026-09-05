@@ -208,7 +208,7 @@ const ProductMarker: React.FC<ProductMarkerProps> = React.memo(({ product, onCli
 });
 ProductMarker.displayName = 'ProductMarker';
 
-// 2. Memoized Live Driver / Courier GPS Marker (Dynamic vehicle: Moto / Voiture / Cargo like Yango)
+// 2. Memoized Live Driver / Courier GPS Marker (Dynamic vehicle: Moto / Voiture / Cargo)
 interface DriverMarkerProps {
   position: google.maps.LatLngLiteral;
   courierName: string;
@@ -578,7 +578,7 @@ export const InteractiveAbidjanMap: React.FC<InteractiveAbidjanMapProps> = ({
             </button>
           </div>
 
-          {/* Vehicle Type Switcher (Yango style: Moto vs Voiture vs Cargo) */}
+          {/* Vehicle Type Switcher: Moto vs Voiture vs Cargo */}
           {filterType !== 'auction' && (
             <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
               <button

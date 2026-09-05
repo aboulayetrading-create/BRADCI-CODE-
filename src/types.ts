@@ -75,6 +75,7 @@ export interface User {
   biometricScore?: number;
   emailVerified?: boolean;
   emailVerificationOtp?: string;
+  otpExpiresAt?: number;
   walletBalance: number; // in FCFA (Solde disponible pour retrait)
   blockedBalance?: number; // in FCFA (Solde vendeur bloqué en attente de livraison)
   buyerBlockedBalance?: number; // in FCFA (Solde acheteur bloqué sous séquestre pour commandes en cours)
@@ -619,7 +620,7 @@ export interface SupportChatMessage {
 
 export type TimeFilter = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
 
-export type DriverTab = 'available_orders' | 'active_mission' | 'history' | 'profile';
+export type DriverTab = 'radar_map' | 'available_orders' | 'active_mission' | 'earnings' | 'history' | 'profile';
 
 export type PaymentMethod = 'Wave' | 'Orange Money' | 'MTN MoMo' | 'Moov Money' | 'Carte Bancaire';
 

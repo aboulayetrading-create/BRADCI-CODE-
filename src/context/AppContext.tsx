@@ -137,9 +137,9 @@ interface AppContextType {
   submitReview: (data: { jobId: string; productId: string; productTitle: string; sellerRating: number; sellerComment: string; sellerQuickTags: string[]; driverRating: number; driverComment: string; driverQuickTags: string[] }) => void;
   
   // Official Receipt & Cryptographic Audit Suite
-  receiptModalData: { transactionData: any; auditLog: any; initialMode?: 'buyer' | 'seller' } | null;
-  setReceiptModalData: (data: { transactionData: any; auditLog: any; initialMode?: 'buyer' | 'seller' } | null) => void;
-  openOfficialReceipt: (jobIdOrJob: string | DeliveryJob) => Promise<boolean>;
+  receiptModalData: { transactionData: any; auditLog: any; initialMode?: 'buyer' | 'seller' | 'driver'; lockedMode?: 'buyer' | 'seller' | 'driver' } | null;
+  setReceiptModalData: (data: { transactionData: any; auditLog: any; initialMode?: 'buyer' | 'seller' | 'driver'; lockedMode?: 'buyer' | 'seller' | 'driver' } | null) => void;
+  openOfficialReceipt: (jobIdOrJob: string | DeliveryJob, requestedRole?: 'buyer' | 'seller' | 'driver') => Promise<boolean>;
   
   // GPS & Location States (Mandatory GPS)
   userLocation: GPSLocation | null;
@@ -478,7 +478,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [newProductModalOpen, setNewProductModalOpen] = useState(false);
   const [gpsTrackingJob, setGpsTrackingJob] = useState<DeliveryJob | null>(null);
   const [selectedShopForView, setSelectedShopForView] = useState<ShopProfile | null>(null);
-  const [receiptModalData, setReceiptModalData] = useState<{ transactionData: TransactionAuditInput; auditLog: PaymentAuditLog } | null>(null);
+  const [receiptModalData, setReceiptModalData] = useState<{ transactionData: TransactionAuditInput; auditLog: PaymentAuditLog; initialMode?: 'buyer' | 'seller' | 'driver'; lockedMode?: 'buyer' | 'seller' | 'driver' } | null>(null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
 
   // ================= SHOPPING CART & MULTI-ITEM ORDERS STATE =================
@@ -1912,7 +1912,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addToast(
       '🎉 Panier Commandé avec Succès !',
-      `${optimization.totalItemCount} article(s) groupé(s) - Économie livraison : ${optimization.totalDeliverySavings.toLocaleString('fr-FR')} FCFA. Votre Code OTP Unique est : ${masterOtp}.`,
+      `${optimization.totalItemCount} article(s) groupé(s) - Économie livraison : ${optimization.totalDeliverySavings.toLocaleString('fr-FR')} FCFA. Votre Code Secret Unique de remise est : ${masterOtp}.`,
       'success'
     );
 
@@ -2821,8 +2821,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification({
       recipientRole: 'client',
       recipientUserId: job.buyerName,
-      title: '✅ Paiement Confirmé & Code OTP Débloqué !',
-      message: `Votre paiement API ${operator} de ${totalBuyerPaid.toLocaleString('fr-FR')} FCFA a été validé avec succès. Votre Code Secret OTP est : ${generatedOtp}. Transmettez-le au coursier pour récupérer votre colis.`,
+      title: '✅ Paiement Confirmé & Code Secret Débloqué !',
+      message: `Votre paiement API ${operator} de ${totalBuyerPaid.toLocaleString('fr-FR')} FCFA a été validé avec succès. Votre Code Secret de remise est : ${generatedOtp}. Transmettez-le au coursier pour récupérer votre colis.`,
       type: 'payment',
       jobId: job.id,
       urgency: 'critical'
@@ -2843,7 +2843,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recipientRole: 'driver',
         recipientUserId: job.assignedDriverName,
         title: '💵 Paiement Effectué par l\'Acheteur !',
-        message: `L'acheteur a payé via l'API ${operator}. Récupérez son Code Secret OTP pour finaliser la livraison et encaisser vos ${deliveryFee.toLocaleString('fr-FR')} FCFA.`,
+        message: `L'acheteur a payé via l'API ${operator}. Récupérez son Code Secret de remise pour finaliser la livraison et encaisser vos ${deliveryFee.toLocaleString('fr-FR')} FCFA.`,
         type: 'delivery',
         jobId: job.id,
         urgency: 'critical'
@@ -2858,14 +2858,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addToast(
       '✅ Paiement Validé par l\'API !',
-      `Paiement direct ${operator} confirmé (${totalBuyerPaid.toLocaleString('fr-FR')} FCFA). Votre Code Secret OTP est : ${generatedOtp}. Donnez-le au livreur.`,
+      `Paiement direct ${operator} confirmé (${totalBuyerPaid.toLocaleString('fr-FR')} FCFA). Votre Code Secret de remise est : ${generatedOtp}. Donnez-le au livreur.`,
       'success'
     );
 
     return true;
   };
 
-  const openOfficialReceipt = async (jobIdOrJob: string | DeliveryJob): Promise<boolean> => {
+  const openOfficialReceipt = async (
+    jobIdOrJob: string | DeliveryJob,
+    requestedRole?: 'buyer' | 'seller' | 'driver'
+  ): Promise<boolean> => {
     const targetJob: DeliveryJob | undefined = typeof jobIdOrJob === 'string'
       ? (freightJobs.find(j => j.id === jobIdOrJob) || (gpsTrackingJob?.id === jobIdOrJob ? gpsTrackingJob : undefined))
       : jobIdOrJob;
@@ -2912,13 +2915,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       communeDestination: targetJob.dropoffCommune
     };
 
+    // Strict Role-Based Separation:
+    // Livreur => voit UNIQUEMENT son bordereau livreur ('driver'), JAMAIS acheteur ni vendeur
+    // Vendeur => voit UNIQUEMENT son attestation de vente ('seller'), JAMAIS acheteur
+    // Acheteur => voit UNIQUEMENT son reçu d'achat ('buyer'), JAMAIS vendeur
+    let authorizedRole: 'buyer' | 'seller' | 'driver' = 'buyer';
+    if (currentUser?.role === 'driver' || currentUser?.id === targetJob.assignedDriverId || currentUser?.name === targetJob.assignedDriverName) {
+      // Driver is strictly locked to driver mission slip
+      authorizedRole = 'driver';
+    } else if (requestedRole === 'seller') {
+      authorizedRole = 'seller';
+    } else if (requestedRole === 'buyer') {
+      authorizedRole = 'buyer';
+    } else if (
+      currentUser?.id === sellerUser?.id ||
+      currentUser?.name === targetJob.sellerName ||
+      (currentUser?.phone && currentUser?.phone === targetJob.sellerPhone)
+    ) {
+      authorizedRole = 'seller';
+    } else if (requestedRole === 'driver') {
+      // Client requesting driver slip only if explicit
+      authorizedRole = 'driver';
+    } else {
+      authorizedRole = 'buyer';
+    }
+
     try {
       const storedLogs = getStoredAuditLogs();
       let auditLog = storedLogs.find(l => l.orderId === targetJob.id);
       if (!auditLog) {
         auditLog = await createPaymentAuditLog(txInput);
       }
-      setReceiptModalData({ transactionData: txInput, auditLog });
+      setReceiptModalData({ 
+        transactionData: txInput, 
+        auditLog,
+        initialMode: authorizedRole,
+        lockedMode: authorizedRole
+      });
       return true;
     } catch (err) {
       console.error('Failed to open receipt:', err);
@@ -2942,8 +2975,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addNotification({
         recipientRole: 'client',
         recipientUserId: job.buyerName,
-        title: '✅ Colis Validé Conforme : Saisissez votre Code OTP',
-        message: `Le contrôle physique est bon ! Communiquez votre code secret OTP (${job.deliveryOtpCode}) au livreur pour clôturer la commande et débloquer les fonds du vendeur.`,
+        title: '✅ Colis Validé Conforme : Saisissez votre Code Secret',
+        message: `Le contrôle physique est bon ! Communiquez votre code secret de remise (${job.deliveryOtpCode}) au livreur pour clôturer la commande et débloquer les fonds du vendeur.`,
         type: 'inspection',
         jobId: job.id,
         urgency: 'high'
@@ -2951,7 +2984,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       addToast(
         '✅ Colis Déclaré Conforme',
-        'Le client a validé l\'état du produit. Récupérez son Code OTP à 4 chiffres pour valider la livraison et encaisser vos frais de course.',
+        'Le client a validé l\'état du produit. Récupérez son Code Secret à 4 chiffres pour valider la livraison et encaisser vos frais de course.',
         'success'
       );
     } else {
@@ -2967,7 +3000,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       addToast(
         '⚠️ Non-Conformité Signalée par le Client',
-        'Le client a refusé le colis. L\'option d\'annulation/retour est débloquée chez le client. Demandez-lui son Code OTP Retour dès qu\'il valide.',
+        'Le client a refusé le colis. L\'option d\'annulation/retour est débloquée chez le client. Demandez-lui son Code Secret de Retour dès qu\'il valide.',
         'warning'
       );
     }
@@ -3048,7 +3081,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         recipientRole: 'all',
         recipientUserId: ref.sponsorId,
         title: '🛡️ Filleul KYC Certifié (+1 000 F En Attente)',
-        message: `Votre filleul ${ref.refereeName} a certifié son identité ! 1 000 FCFA ont été ajoutés à votre solde en attente. Ce bonus sera débloqué dès sa 1ère transaction validée par OTP.`,
+        message: `Votre filleul ${ref.refereeName} a certifié son identité ! 1 000 FCFA ont été ajoutés à votre solde en attente. Ce bonus sera débloqué dès sa 1ère transaction validée par Code Secret.`,
         type: 'referral',
         urgency: 'normal'
       });
@@ -3296,12 +3329,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const validOtp = job.masterDeliveryOtp || job.deliveryOtpCode;
     if (!validOtp) {
-      addToast('Code OTP Manquant', 'Le code de confirmation OTP n\'a pas encore été émis.', 'warning');
+      addToast('Code Secret Manquant', 'Le code de confirmation n\'a pas encore été émis.', 'warning');
       return false;
     }
 
     if (enteredOtp.trim() !== validOtp) {
-      addToast('Code Secret OTP Incorrect', 'Demandez le code secret à 4 chiffres à l\'acheteur après remise du colis.', 'error');
+      addToast('Code Secret Incorrect', 'Demandez le code secret à 4 chiffres à l\'acheteur après remise du colis.', 'error');
       return false;
     }
 
@@ -3330,7 +3363,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
             status: 'LIVRE',
             title: 'Livraison Effectuée',
-            description: `Tous les colis du panier ont été livrés et validés par OTP auprès de ${ord.buyerName}.`
+            description: `Tous les colis du panier ont été livrés et validés par Code Secret auprès de ${ord.buyerName}.`
           }
         ]
       } : ord));
@@ -3488,7 +3521,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addToast(
       '🎉 Livraison Validée & Virement Effectué !', 
-      `OTP vérifié avec succès ! Virement de ${deliveryFee.toLocaleString('fr-FR')} FCFA crédité au livreur. Solde bloqué vendeur de ${sellerPayout.toLocaleString('fr-FR')} FCFA transféré vers son solde de retrait disponible.`,
+      `Code Secret vérifié avec succès ! Virement de ${deliveryFee.toLocaleString('fr-FR')} FCFA crédité au livreur. Solde bloqué vendeur de ${sellerPayout.toLocaleString('fr-FR')} FCFA transféré vers son solde de retrait disponible.`,
       'success'
     );
 
@@ -3600,8 +3633,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast(
       isPrepaidOrder ? '💰 Remboursement Intégral Prépayé Effectué' : '↩ Colis Refusé & Retour Déclenché',
       isPrepaidOrder 
-        ? `Le montant total prépayé (${totalPrepaidPaid.toLocaleString('fr-FR')} FCFA) vous a été intégralement remboursé sur votre portefeuille. Code OTP Retour : ${returnOtp}.`
-        : `Commande à la livraison annulée : aucun frais prélevé sur votre compte. Le colis est retourné au vendeur. Code OTP : ${returnOtp}.`,
+        ? `Le montant total prépayé (${totalPrepaidPaid.toLocaleString('fr-FR')} FCFA) vous a été intégralement remboursé sur votre portefeuille. Code Secret de Retour : ${returnOtp}.`
+        : `Commande à la livraison annulée : aucun frais prélevé sur votre compte. Le colis est retourné au vendeur. Code Secret de Retour : ${returnOtp}.`,
       'info'
     );
 
@@ -3643,7 +3676,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return {
       success: true,
       returnOtpCode: returnOtp,
-      message: `Retour enclenché avec succès. Code OTP Retour : ${returnOtp}`
+      message: `Retour enclenché avec succès. Code Secret de Retour : ${returnOtp}`
     };
   };
 
@@ -3801,7 +3834,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const expectedOtp = job.returnOtpCode || '9012';
     if (enteredOtp.trim() !== expectedOtp) {
-      addToast('Code OTP Retour Incorrect', 'Demandez le code OTP Retour généré par l\'acheteur sur son application.', 'error');
+      addToast('Code Secret de Retour Incorrect', 'Demandez le code secret de retour généré par l\'acheteur sur son application.', 'error');
       return false;
     }
 
@@ -3816,7 +3849,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addToast(
       'Prise en charge du Retour Validée',
-      `OTP retour accepté. Veuillez acheminer le colis à la boutique / adresse du vendeur (${job.sellerName} à ${job.pickupCommune}).`,
+      `Code secret de retour accepté. Veuillez acheminer le colis à la boutique / adresse du vendeur (${job.sellerName} à ${job.pickupCommune}).`,
       'info'
     );
     return true;
@@ -3998,7 +4031,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
     
     if (user && user.emailVerificationOtp && user.emailVerificationOtp !== cleanEntered) {
-      addToast('Code OTP Incorrect', 'Veuillez renseigner le code à 6 chiffres reçu par email.', 'error');
+      addToast('Code Secret Incorrect', 'Veuillez renseigner le code secret à 6 chiffres reçu par email.', 'error');
       return { success: false };
     }
 

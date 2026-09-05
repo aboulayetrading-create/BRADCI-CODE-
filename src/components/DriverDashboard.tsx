@@ -25,6 +25,7 @@ import {
   Star,
   Activity,
   ArrowUpRight,
+  TrendingUp,
   Receipt,
   FileCheck,
   CreditCard,
@@ -43,6 +44,8 @@ import { COMMUNE_NAMES_ABIDJAN, COMMUNE_NAMES_ENVIRONS, getCommuneBadgeInfo, cal
 import { GoogleMapsEmbed } from './GoogleMapsEmbed';
 import { KYCGateBanner } from './KYCGateBanner';
 import { DriverActiveMissionCockpit } from './DriverActiveMissionCockpit';
+import { DriverRadarMapDashboard } from './DriverRadarMapDashboard';
+import { DriverEarningsDashboard } from './DriverEarningsDashboard';
 import { playDriverNewOrderRingtone } from '../utils/voiceNavigator';
 
 export const DriverDashboard: React.FC = () => {
@@ -154,37 +157,6 @@ export const DriverDashboard: React.FC = () => {
          j.status === 'delivered'
   );
 
-  const simulateCompletedJobForDriver = () => {
-    const testCompletedJob: DeliveryJob = {
-      id: 'job-completed-' + Date.now(),
-      productId: 'prod-completed-' + Date.now(),
-      productTitle: 'Sneakers Nike Air Jordan 4 "Retro White Cement"',
-      productImage: 'https://images.unsplash.com/photo-1552346154-21d32810aba3?w=600&auto=format&fit=crop&q=80',
-      sellerName: 'Boutique SneakerHub Abidjan',
-      sellerPhone: '+225 07 48 92 11 34',
-      pickupCommune: 'Cocody',
-      pickupAddress: 'Deux-Plateaux Vallons, Rue des Jardins',
-      pickupCoords: { lat: 5.3620, lng: -3.9910 },
-      buyerName: 'David Kouamé',
-      buyerPhone: '+225 05 99 88 77 66',
-      dropoffCommune: 'Marcory',
-      dropoffAddress: 'Zone 4, Boulevard de Marseille',
-      dropoffCoords: { lat: 5.2954, lng: -3.9847 },
-      requiredVehicle: 'moto',
-      deliveryFee: 3500,
-      itemValue: 120000,
-      status: 'delivered',
-      assignedDriverId: currentUser.id,
-      assignedDriverName: currentUser.name,
-      assignedDriverPhone: currentUser.phone,
-      pickupCode: '4491',
-      deliveryOtpCode: '8814',
-      distanceKm: 7.4,
-      etaMinutes: 12
-    };
-    setFreightJobs(prev => [testCompletedJob, ...prev]);
-  };
-
   const driverCommune = currentUser?.gpsLocation?.commune || userLocation?.commune || 'Cocody';
 
   // Driver Ringtone Setting (Sound alert for new orders)
@@ -287,7 +259,7 @@ export const DriverDashboard: React.FC = () => {
       {/* KYC Gate Banner (Strict Driver Verification) */}
       <KYCGateBanner />
 
-      {/* 1. Header Profile, Live Status & Account Switcher (Yango Pro Style) */}
+      {/* 1. Header Profile, Live Status & Account Switcher */}
       <div id="driver-executive-hub" className="p-5 sm:p-6 rounded-3xl bg-[#0C121E] border border-slate-800 shadow-2xl space-y-4">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           {/* Driver identity */}
@@ -347,7 +319,7 @@ export const DriverDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Master Yango Pro Availability Toggle & Quick Actions */}
+          {/* Master Availability Toggle & Quick Actions */}
           <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-between lg:justify-end">
             {/* Master Availability Toggle Button */}
             <button
@@ -391,6 +363,21 @@ export const DriverDashboard: React.FC = () => {
           aria-label="Navigation Espace Livreur"
           className="flex items-center gap-2 overflow-x-auto scrollbar-none p-1.5 bg-slate-900/90 rounded-2xl border border-slate-800"
         >
+          {/* Radar & Carte Live */}
+          <button
+            id="driver-tab-radar-map"
+            onClick={() => setActiveDriverTab('radar_map')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+              activeDriverTab === 'radar_map'
+                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black'
+                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Navigation className="w-4 h-4 text-emerald-400" />
+            <span>Radar & Carte Live</span>
+          </button>
+
+          {/* Bourse aux Courses */}
           <button
             id="driver-tab-available-orders"
             onClick={() => setActiveDriverTab('available_orders')}
@@ -409,6 +396,7 @@ export const DriverDashboard: React.FC = () => {
             </span>
           </button>
 
+          {/* Mission en cours */}
           <button
             id="driver-tab-active-mission"
             onClick={() => setActiveDriverTab('active_mission')}
@@ -418,7 +406,7 @@ export const DriverDashboard: React.FC = () => {
                 : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
-            <Navigation className="w-4 h-4 text-blue-400" />
+            <Compass className="w-4 h-4 text-blue-400" />
             <span>Mission en cours</span>
             {myActiveJob && (
               <span className="px-1.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[9px] animate-pulse">
@@ -427,6 +415,21 @@ export const DriverDashboard: React.FC = () => {
             )}
           </button>
 
+          {/* Tableau de Bord Revenus */}
+          <button
+            id="driver-tab-earnings"
+            onClick={() => setActiveDriverTab('earnings')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+              activeDriverTab === 'earnings'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
+                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Revenus Livreur</span>
+          </button>
+
+          {/* Historique des Courses & Reçus */}
           <button
             id="driver-tab-history"
             onClick={() => setActiveDriverTab('history')}
@@ -437,7 +440,7 @@ export const DriverDashboard: React.FC = () => {
             }`}
           >
             <Receipt className="w-4 h-4" />
-            <span>Gain</span>
+            <span>Historique & Reçus</span>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-num ${
               activeDriverTab === 'history' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-800 text-amber-400'
             }`}>
@@ -445,6 +448,7 @@ export const DriverDashboard: React.FC = () => {
             </span>
           </button>
 
+          {/* Véhicule & KYC */}
           <button
             id="driver-tab-profile"
             onClick={() => setActiveDriverTab('profile')}
@@ -720,6 +724,16 @@ export const DriverDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 5.5 TAB CONTENT: Radar Map Live Dashboard */}
+      {activeDriverTab === 'radar_map' && (
+        <DriverRadarMapDashboard
+          onSelectJob={() => {
+            setActiveDriverTab('available_orders');
+          }}
+          onNavigateToTab={(tab) => setActiveDriverTab(tab)}
+        />
+      )}
 
       {/* 6. TAB CONTENT: Available Orders / Bourse de Fret */}
       {activeDriverTab === 'available_orders' && (
@@ -1033,6 +1047,13 @@ export const DriverDashboard: React.FC = () => {
         />
       )}
 
+      {/* 6.8 TAB CONTENT: Driver Revenue & Earnings Dashboard */}
+      {activeDriverTab === 'earnings' && (
+        <DriverEarningsDashboard
+          onOpenReceipt={(jobId) => openOfficialReceipt(jobId, 'driver')}
+        />
+      )}
+
       {/* 7. TAB CONTENT: History of Completed Deliveries (Gains) */}
       {activeDriverTab === 'history' && (
         <div className="space-y-4 animate-in fade-in duration-200">
@@ -1079,18 +1100,10 @@ export const DriverDashboard: React.FC = () => {
               <div className="max-w-md mx-auto space-y-1">
                 <h5 className="text-sm font-bold text-white">Aucune course clôturée pour le moment</h5>
                 <p className="text-xs text-slate-400">
-                  Vos gains de livraison apparaîtront ici immédiatement après chaque validation du code OTP client.
+                  Vos gains de livraison apparaîtront ici immédiatement après chaque validation du Code Secret de remise client.
                 </p>
               </div>
               <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-                <button
-                  id="driver-simulate-completed-job-btn"
-                  onClick={simulateCompletedJobForDriver}
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 cursor-pointer"
-                >
-                  <Zap className="w-4 h-4" />
-                  <span>Simuler un gain de course (+3 500 FCFA)</span>
-                </button>
                 <button
                   id="driver-history-browse-orders-btn"
                   onClick={() => setActiveDriverTab('available_orders')}
@@ -1144,12 +1157,12 @@ export const DriverDashboard: React.FC = () => {
 
                     <button
                       id={`btn-receipt-${job.id}`}
-                      onClick={() => openOfficialReceipt(job.id)}
-                      className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
-                      title="Consulter le reçu officiel certifié cryptographiquement"
+                      onClick={() => openOfficialReceipt(job.id, 'driver')}
+                      className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      title="Consulter mon bordereau officiel de course"
                     >
-                      <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-                      <span>Voir Reçu</span>
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Bordereau Livreur</span>
                     </button>
                   </div>
                 </div>

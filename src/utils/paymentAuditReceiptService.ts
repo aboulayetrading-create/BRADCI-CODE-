@@ -671,11 +671,11 @@ export function generateBuyerReceiptPDF(
       </table>
     </div>
 
-    <!-- OTP Confirmation Strip -->
+    <!-- Delivery Code Confirmation Strip -->
     <div class="otp-validation-strip">
       <div>
         <strong style="color: #065f46; font-size: 11px; text-transform: uppercase;">
-          Code Secret OTP de Validation Physique
+          Code Secret de Remise du Colis
         </strong>
         <p style="font-size: 10px; color: #047857; margin-top: 1px;">
           Remis au livreur après examen contradictoire du colis à la livraison.
@@ -1150,14 +1150,377 @@ export function generateSellerReceiptPDF(
 }
 
 /**
+ * 2b. generateDriverReceiptPDF(transactionData, auditLog)
+ * Génère le bordereau officiel de mission et de rémunération destiné exclusivement au coursier / livreur.
+ * - Ne divulgue JAMAIS le prix de vente ni les marges vendeur pour éliminer les risques de convoitise et de vol.
+ * - Affiche la rémunération de la course (frais de livraison reversés au livreur).
+ * - Affiche les points d'enlèvement et de dépose ainsi que la validation sécurisée de remise du colis.
+ */
+export function generateDriverReceiptPDF(
+  transactionData: TransactionAuditInput,
+  auditLog: PaymentAuditLog
+): string {
+  const formattedDate = new Date(transactionData.timestamp).toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
+  const formattedTime = new Date(transactionData.timestamp).toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const missionRef = `LIV-BRAD-${new Date(transactionData.timestamp).getFullYear()}-${(transactionData.transactionId || '3001').replace(/[^0-9]/g, '').slice(-5).padStart(5, '0')}`;
+  const driverFee = transactionData.deliveryFeeFCFA || 2000;
+
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Bordereau de Mission Livreur - BRAD'CI ${missionRef}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 14mm 15mm 18mm 15mm;
+      @bottom-center {
+        content: "Bordereau officiel de mission et rémunération coursier BRAD'CI Logistique • Abidjan, Côte d'Ivoire";
+        font-size: 8pt;
+        color: #64748b;
+        font-family: Arial, sans-serif;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      line-height: 1.5;
+      padding: 16px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2.5px solid #059669;
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+    }
+    .brand-title {
+      font-size: 26px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .brand-title span.accent { color: #059669; }
+    .brand-sub {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #059669;
+      margin-top: 2px;
+    }
+    .doc-meta { text-align: right; }
+    .doc-type-badge {
+      display: inline-block;
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1.5px solid #a7f3d0;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+    }
+    .doc-ref {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .doc-date { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .meta-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 11px;
+    }
+    .meta-card-title {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #475569;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .info-label { color: #64748b; font-weight: 500; }
+    .info-val { color: #0f172a; font-weight: 700; text-align: right; }
+
+    .security-banner {
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 11px;
+      color: #166534;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    table.invoice-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    table.invoice-table th {
+      background: #064e3b;
+      color: #ffffff;
+      font-size: 10.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 9px 12px;
+      text-align: left;
+    }
+    table.invoice-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 11.5px;
+    }
+    .text-right { text-align: right !important; }
+    .text-center { text-align: center !important; }
+
+    .payout-box {
+      background: #f0fdf4;
+      border: 2px solid #059669;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+    }
+    .payout-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 800;
+      color: #065f46;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #a7f3d0;
+    }
+    .payout-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .payout-total {
+      font-size: 16px;
+      font-weight: 900;
+      color: #047857;
+      font-family: 'Courier New', monospace;
+    }
+
+    .validation-strip {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cert-footer {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 12px;
+      font-size: 9.5px;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .stamp-box {
+      border: 2px solid #059669;
+      color: #059669;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 9px;
+      font-weight: 900;
+      text-align: center;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="brand-title">BRAD<span style="color: #FF5B00;">'</span><span style="color: #1E53E5;">CI</span> <span class="accent">LOGISTIQUE</span></div>
+      <div class="brand-sub">Bordereau de Mission & Rémunération Coursier</div>
+      <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+        Service Logistique Express Abidjan • Agrément Transport & Livraison
+      </div>
+    </div>
+    <div class="doc-meta">
+      <div class="doc-type-badge">Bordereau Coursier</div>
+      <div class="doc-ref">${missionRef}</div>
+      <div class="doc-date">${formattedDate} à ${formattedTime}</div>
+    </div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-card">
+      <div class="meta-card-title">1. Coursier & Informations Mission</div>
+      <div class="info-row">
+        <span class="info-label">Livreur Agréé :</span>
+        <span class="info-val">${transactionData.driverName || 'Coursier Indépendant BRAD\'CI'}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Statut Mission :</span>
+        <span class="info-val" style="color: #059669;">✓ Course Validée & Rémunérée</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Type de Trajet :</span>
+        <span class="info-val">Livraison Directe Inter-Communes</span>
+      </div>
+    </div>
+
+    <div class="meta-card">
+      <div class="meta-card-title">2. Itinéraire de la Course</div>
+      <div class="info-row">
+        <span class="info-label">Départ (Enlèvement) :</span>
+        <span class="info-val">${transactionData.communeOrigin}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Arrivée (Dépose) :</span>
+        <span class="info-val">${transactionData.communeDestination}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Mode de Remise :</span>
+        <span class="info-val">En main propre certifiée</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security Notice Against Theft & Fraud -->
+  <div class="security-banner">
+    <span style="font-size: 16px;">🛡️</span>
+    <div>
+      <strong>Sécurité & Confidentialité Marchande :</strong>
+      Conformément aux protocoles de sûreté logistique BRAD'CI, la valeur marchande du contenu et la marge commerciale du vendeur sont strictement confidentielles et masquées. Ce bordereau garantit l'intégrité de la chaîne de transport.
+    </div>
+  </div>
+
+  <!-- Parcel Handling Strip -->
+  <table class="invoice-table">
+    <thead>
+      <tr>
+        <th>Désignation Logistique</th>
+        <th class="text-center">Origine</th>
+        <th class="text-center">Destination</th>
+        <th class="text-right">Statut Prise en Charge</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <strong>Colis Logistique BRAD'CI Scellé</strong>
+          <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+            Réf Colis : <strong>${transactionData.itemId || transactionData.transactionId}</strong> • Contrôlé à la remise
+          </div>
+        </td>
+        <td class="text-center font-bold">${transactionData.communeOrigin}</td>
+        <td class="text-center font-bold" style="color: #059669;">${transactionData.communeDestination}</td>
+        <td class="text-right font-bold" style="color: #059669;">✓ Livré avec succès</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Driver Payout Breakdown -->
+  <div class="payout-box">
+    <div class="payout-header">
+      <span>Rémunération de la Course Livreur</span>
+      <span style="color: #059669;">✓ Crédit Disponible Immédiat</span>
+    </div>
+    <div class="payout-row">
+      <span style="color: #475569;">Frais de transport & livraison :</span>
+      <span style="font-family: monospace; font-weight: 700;">+ ${driverFee.toLocaleString('fr-FR')} FCFA</span>
+    </div>
+    <div class="payout-row">
+      <span style="color: #475569;">Mode de versement :</span>
+      <span style="font-weight: 700; color: #065f46;">Portefeuille Livreur (Retrait Mobile Money sans frais)</span>
+    </div>
+    <div class="payout-row" style="margin-top: 8px; padding-top: 8px; border-top: 1.5px solid #a7f3d0;">
+      <strong style="color: #064e3b; font-size: 13px;">MONTANT TOTAL ENCAISSÉ PAR LE COURSIER :</strong>
+      <span class="payout-total">+ ${driverFee.toLocaleString('fr-FR')} FCFA</span>
+    </div>
+  </div>
+
+  <!-- Physical Delivery Validation -->
+  <div class="validation-strip">
+    <div>
+      <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase;">
+        Code Secret de Remise du Colis
+      </div>
+      <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+        Vérifié contradictoirement lors de la remise du colis au destinataire.
+      </div>
+    </div>
+    <div style="font-family: 'Courier New', monospace; font-size: 14px; font-weight: 900; color: #059669; background: #ecfdf5; border: 1.5px solid #a7f3d0; padding: 4px 10px; border-radius: 6px;">
+      ✓ CODE VALIDÉ
+    </div>
+  </div>
+
+  <div class="cert-footer">
+    <div>
+      BRAD'CI SAS • Direction Opérationnelle & Logistique • Abidjan, Côte d'Ivoire<br>
+      Bordereau certifié conforme valant décharge de livraison et justificatif de rémunération coursier.
+    </div>
+    <div class="stamp-box">
+      ✓ BORDEREAU CERTIFIÉ CONFORME
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+/**
  * 3. generateReceiptPDF(transactionData, auditLog, mode)
- * Point d'entrée universel respectant le mode Acheteur ou Vendeur
+ * Point d'entrée universel respectant strictement le rôle : Acheteur, Vendeur ou Livreur.
  */
 export function generateReceiptPDF(
   transactionData: TransactionAuditInput,
   auditLog: PaymentAuditLog,
-  mode: 'buyer' | 'seller' = 'buyer'
+  mode: 'buyer' | 'seller' | 'driver' = 'buyer'
 ): string {
+  if (mode === 'driver') {
+    return generateDriverReceiptPDF(transactionData, auditLog);
+  }
   if (mode === 'seller') {
     return generateSellerReceiptPDF(transactionData, auditLog);
   }

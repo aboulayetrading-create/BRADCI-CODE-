@@ -123,8 +123,8 @@ export const SecurityGuideView: React.FC = () => {
         </h2>
         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
           {translate(
-            "L'acheteur passe commande ou gagne une enchère sans aucun débit préalable. Le livreur achemine le colis et signale son arrivée par GPS. L'acheteur examine le produit, initie son paiement direct via le service de son choix (Wave, Orange Money, MTN MoMo, Moov Money, Carte), puis transmet son code secret OTP au livreur pour clôturer la livraison avec répartition automatique des fonds.",
-            "The buyer places an order or wins an auction without upfront debit. The driver transports the package and reports GPS arrival. The buyer inspects the item, initiates direct payment via their chosen service (Wave, Orange Money, MTN MoMo, Moov Money, Card), and provides the secret OTP code to complete delivery with automatic split payout."
+            "L'acheteur passe commande ou gagne une enchère sans aucun débit préalable. Le livreur achemine le colis et signale son arrivée par GPS. L'acheteur examine le produit, initie son paiement direct via le service de son choix (Wave, Orange Money, MTN MoMo, Moov Money, Carte), puis transmet son Code Secret de Remise au livreur pour clôturer la livraison avec répartition automatique des fonds.",
+            "The buyer places an order or wins an auction without upfront debit. The driver transports the package and reports GPS arrival. The buyer inspects the item, initiates direct payment via their chosen service (Wave, Orange Money, MTN MoMo, Moov Money, Card), and provides the secret delivery code to complete delivery with automatic split payout."
           )}
         </p>
 
@@ -138,7 +138,7 @@ export const SecurityGuideView: React.FC = () => {
             <span className="text-[11px] text-slate-400">{translate("Wave, Orange, MTN, Moov, Carte", "Wave, Orange, MTN, Moov, Card")}</span>
           </div>
           <div className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800 text-center">
-            <span className="text-emerald-400 font-mono font-black text-sm block">3. {translate("Validation OTP Livreur", "Driver OTP Validation")}</span>
+            <span className="text-emerald-400 font-mono font-black text-sm block">3. {translate("Validation par Code Secret", "Secret Code Validation")}</span>
             <span className="text-[11px] text-slate-400">{translate("Répartition atomique immédiate", "Immediate atomic split payout")}</span>
           </div>
         </div>

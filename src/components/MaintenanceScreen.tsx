@@ -35,7 +35,12 @@ export const MaintenanceScreen: React.FC = () => {
     <div className="min-h-screen bg-[#080C14] text-slate-100 flex flex-col items-center justify-center p-4 selection:bg-amber-500 selection:text-slate-950">
       <div className="w-full max-w-xl text-center space-y-6">
         <div className="flex justify-center mb-2">
-          <BradCiLogo size="lg" />
+          <BradCiLogo 
+            variant="full" 
+            size="lg" 
+            showSubtitle={true} 
+            subtitleText="ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS" 
+          />
         </div>
 
         <div className="p-8 rounded-3xl bg-[#0C121E] border border-amber-500/30 shadow-2xl space-y-5 relative overflow-hidden">

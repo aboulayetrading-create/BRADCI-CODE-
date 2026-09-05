@@ -32,7 +32,7 @@ export function generateWhatsAppNudgeLink(refereePhone: string, refereeName: str
 Pour que nous débloquions chacun nos 1 000 FCFA de solde d'achat cadeau :
 👉 Publie ton 1er article aux enchères ou effectue ton 1er achat sécurisé avec remise en main propre.
 
-Dès la 1ère livraison validée par code OTP, nos 1 000 FCFA basculeront instantanément en solde utilisable. À très vite sur BRAD'CI !`;
+Dès la 1ère livraison validée par Code Secret, nos 1 000 FCFA basculeront instantanément en solde utilisable. À très vite sur BRAD'CI !`;
 
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
 }
@@ -239,7 +239,7 @@ export function generateReferralKycApprovedEmailHtml(payload: ReferralNotificati
         </div>
         <div class="card-row">
           <span class="card-label">Condition de déblocage :</span>
-          <span class="card-value" style="color: #38BDF8;">1ère livraison validée par code OTP</span>
+          <span class="card-value" style="color: #38BDF8;">1ère livraison validée par Code Secret</span>
         </div>
       </div>
 
@@ -290,6 +290,6 @@ export function generateReferralKycApprovedEmailHtml(payload: ReferralNotificati
 export function generateReferralKycApprovedPushMessage(payload: ReferralNotificationPayload): { title: string; body: string } {
   return {
     title: `🎉 +1 000 FCFA en attente ! KYC de ${payload.refereeName} validé`,
-    body: `Relancez votre filleul pour qu'il effectue son 1er achat ou 1ère vente avec validation OTP afin de débloquer vos 1 000 FCFA utilisables !`
+    body: `Relancez votre filleul pour qu'il effectue son 1er achat ou 1ère vente avec validation par Code Secret afin de débloquer vos 1 000 FCFA utilisables !`
   };
 }

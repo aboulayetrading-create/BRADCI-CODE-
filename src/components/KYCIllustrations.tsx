@@ -1,7 +1,7 @@
 import React from 'react';
 
 // Crisp SVG Vector Drawings for KYC Exemplary Demonstrations
-// Styled like professional banking, fintech & courier apps (Yango, Uber, Wave, Revolut)
+// Styled like professional banking, fintech & courier apps (Wave, Revolut)
 
 export const CNIVectorDrawing: React.FC<{ className?: string; isGood?: boolean }> = ({ 
   className = "w-full h-40",

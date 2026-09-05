@@ -404,7 +404,7 @@ export function generateCartInvoiceHTML(
       </div>
 
       <div class="otp-box">
-        <div style="font-size: 11px; color: #166534; font-weight: bold;">CODE OTP MAÎTRE DE LIVRAISON CLIENT (À REMETTRE AU LIVREUR APRÈS CONTRÔLE)</div>
+        <div style="font-size: 11px; color: #166534; font-weight: bold;">CODE SECRET DE LIVRAISON CLIENT (À REMETTRE AU LIVREUR APRÈS CONTRÔLE)</div>
         <div style="font-size: 28px; font-weight: 900; letter-spacing: 6px; color: #15803d; font-family: monospace; margin: 4px 0;">
           ${order.masterDeliveryOtp}
         </div>

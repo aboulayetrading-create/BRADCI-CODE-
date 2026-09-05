@@ -182,10 +182,10 @@ export const AdminMessageModal: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => setMessage('Avertissement : Merci de respecter les consignes de remise en main propre avec code OTP.')}
+              onClick={() => setMessage('Avertissement : Merci de respecter les consignes de remise en main propre avec Code Secret de livraison.')}
               className="text-[10px] bg-slate-900 hover:bg-slate-800 text-slate-300 px-2 py-1 rounded-lg border border-slate-800 transition-colors"
             >
-              ⚠️ Consigne Sécurité OTP
+              ⚠️ Consigne Code Secret
             </button>
           </div>
 

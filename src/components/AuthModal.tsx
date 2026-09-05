@@ -25,6 +25,7 @@ import {
 import { UserRole } from '../types';
 import { getTranslation } from '../utils/translations';
 import { ALL_COMMUNE_NAMES } from '../data/communes';
+import { Logo } from './Logo';
 
 export const AuthModal: React.FC = () => {
   const { 
@@ -127,7 +128,7 @@ export const AuthModal: React.FC = () => {
       setEnteredOtp(res.otpCode); // Pre-fill mock OTP for smooth UX
       setAuthView('otp_verify');
       addToast(
-        translate('📧 Code OTP Envoyé', '📧 OTP Code Sent'), 
+        translate('📧 Code de Sécurité Envoyé', '📧 Security Code Sent'), 
         translate(`Code de sécurité [${res.otpCode}] transmis à l'adresse ${email}`, `Security code [${res.otpCode}] delivered to ${email}`), 
         'info'
       );
@@ -213,23 +214,30 @@ export const AuthModal: React.FC = () => {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Header */}
+        {/* Header with Official Logo */}
         <div className="text-center mb-5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto mb-2 text-amber-400">
-            {authView === 'register' && cleanEnteredRefCode ? (
-              <Gift className="w-6 h-6 text-amber-400 animate-pulse" />
-            ) : (
-              <Lock className="w-6 h-6" />
-            )}
+          <div className="flex justify-center mb-2">
+            <Logo 
+              variant="full" 
+              size="md" 
+              showSubtitle={true}
+              subtitleText="ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS" 
+            />
           </div>
-          <h3 className="text-lg sm:text-xl font-extrabold text-white font-display">
+          {authView === 'register' && cleanEnteredRefCode && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold mb-2 animate-pulse">
+              <Gift className="w-3.5 h-3.5 text-amber-400" />
+              <span>{translate("Code Parrain Actif appliqué !", "Active Sponsor Code applied!")}</span>
+            </div>
+          )}
+          <h3 className="text-base sm:text-lg font-extrabold text-white font-display">
             {authView === 'register' 
-              ? translate("Inscription Sécurisée BRAD'CI", "Secure Registration BRAD'CI")
+              ? translate("Inscription Sécurisée", "Secure Registration")
               : authView === 'otp_verify'
-              ? translate("Validation Email (OTP)", "Email Validation (OTP)")
+              ? translate("Validation par Code de Sécurité", "Security Code Validation")
               : authView === 'google_complete'
               ? translate("Finalisation du Profil Google", "Complete Google Profile")
-              : translate("Connexion Sécurisée BRAD'CI", "Secure Sign In BRAD'CI")}
+              : translate("Espace de Connexion", "Sign In Portal")}
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
             {authView === 'otp_verify' 
@@ -436,7 +444,7 @@ export const AuthModal: React.FC = () => {
                     </div>
                     <div className="flex items-start gap-1.5">
                       <span className="text-emerald-400 font-bold">3.</span>
-                      <span><strong>{translate("1ère Livraison Validée OTP :", "1st OTP Delivery Validated:")}</strong> {translate("Dès votre 1er achat ou vente avec confirmation par code OTP, vos 1 000 FCFA sont instantanément utilisables pour vos achats !", "Upon your 1st OTP-confirmed purchase or sale, your 1,000 FCFA becomes fully spendable!")}</span>
+                      <span><strong>{translate("1ère Livraison Validée :", "1st Delivery Validated:")}</strong> {translate("Dès votre 1er achat ou vente avec confirmation par code secret, vos 1 000 FCFA sont instantanément utilisables pour vos achats !", "Upon your 1st secret code-confirmed purchase or sale, your 1,000 FCFA becomes fully spendable!")}</span>
                     </div>
                   </div>
                 </div>
@@ -544,7 +552,7 @@ export const AuthModal: React.FC = () => {
                 required
               />
               <span className="text-[9px] text-amber-400/90 block mt-0.5">
-                {translate("* Ne pourra plus être modifiée après validation OTP.", "* Cannot be changed once verified via OTP.")}
+                {translate("* Ne pourra plus être modifiée après validation de votre compte.", "* Cannot be changed once account is verified.")}
               </span>
             </div>
 
@@ -649,7 +657,7 @@ export const AuthModal: React.FC = () => {
               type="submit"
               className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>{translate("Créer mon Compte & Recevoir l'OTP Email", "Create Account & Receive Email OTP")}</span>
+              <span>{translate("Créer mon Compte & Recevoir le Code par Email", "Create Account & Receive Verification Code")}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -673,7 +681,7 @@ export const AuthModal: React.FC = () => {
                 {translate("Code de Vérification Email Transmis", "Email Verification Code Sent")}
               </span>
               <p className="text-[11px] text-slate-300 mt-1">
-                {translate("Un code OTP de sécurité à 6 chiffres a été envoyé à l'adresse :", "A 6-digit security OTP code was delivered to:")}
+                {translate("Un code de sécurité à 6 chiffres a été envoyé à l'adresse :", "A 6-digit security code was delivered to:")}
                 <strong className="text-white block mt-0.5">{otpTargetEmail}</strong>
               </p>
               <div className="mt-2 p-1.5 bg-slate-950/80 rounded-lg border border-slate-800 inline-block">
@@ -686,7 +694,7 @@ export const AuthModal: React.FC = () => {
 
             <div>
               <label className="text-xs text-slate-300 font-medium block mb-1 text-center">
-                {translate("Entrez le code OTP à 6 chiffres :", "Enter the 6-digit OTP code:")}
+                {translate("Entrez le code de sécurité à 6 chiffres :", "Enter the 6-digit security code:")}
               </label>
               <input
                 type="text"

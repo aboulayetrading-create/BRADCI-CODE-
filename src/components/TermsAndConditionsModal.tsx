@@ -80,7 +80,7 @@ export const TermsAndConditionsModal: React.FC = () => {
               <span>{translate("Séquestre Wave/MoMo", "Wave/MoMo Escrow")}</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-snug">
-              {translate("Fonds 100% sécurisés. Déblocage uniquement après validation OTP en main propre lors de la livraison.", "Funds 100% protected. Released only after physical OTP delivery validation.")}
+              {translate("Fonds 100% sécurisés. Déblocage uniquement après validation par Code Secret en main propre lors de la livraison.", "Funds 100% protected. Released only after physical secret code delivery validation.")}
             </p>
           </div>
 

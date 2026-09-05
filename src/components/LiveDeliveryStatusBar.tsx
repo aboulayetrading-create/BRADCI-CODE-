@@ -245,7 +245,7 @@ export const LiveDeliveryStatusBar: React.FC = () => {
                       <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/40 px-3 py-1.5 rounded-xl">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                         <span className="text-xs text-emerald-300 font-bold">
-                          Code OTP à donner au livreur : <strong className="font-mono-num text-sm text-white bg-slate-950 px-2 py-0.5 rounded ml-1 border border-emerald-500/30">{activeJob.deliveryOtpCode}</strong>
+                          Code Secret à donner au livreur : <strong className="font-mono-num text-sm text-white bg-slate-950 px-2 py-0.5 rounded ml-1 border border-emerald-500/30">{activeJob.deliveryOtpCode}</strong>
                         </span>
                       </div>
                     ) : activeJob.inspectionStatus === 'client_confirmed_bad' ? (
@@ -254,7 +254,7 @@ export const LiveDeliveryStatusBar: React.FC = () => {
                         className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shadow-lg flex items-center gap-1.5 animate-pulse"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Confirmer le Refus & Déclencher Retour OTP</span>
+                        <span>Confirmer le Refus & Déclencher le Retour Sécurisé</span>
                       </button>
                     ) : (
                       <div className="px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-1.5">
@@ -268,7 +268,7 @@ export const LiveDeliveryStatusBar: React.FC = () => {
                 {activeJob.status === 'returning' && (
                   <div className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300 flex items-center gap-2">
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Retour en cours • OTP Retour : <strong className="font-mono text-white bg-slate-950 px-1.5 py-0.5 rounded">{activeJob.returnOtpCode || '4921'}</strong></span>
+                    <span>Retour en cours • Code Secret de Retour : <strong className="font-mono text-white bg-slate-950 px-1.5 py-0.5 rounded">{activeJob.returnOtpCode || '4921'}</strong></span>
                   </div>
                 )}
               </>
@@ -313,7 +313,7 @@ export const LiveDeliveryStatusBar: React.FC = () => {
               <ul className="list-disc pl-4 space-y-1 text-[11px]">
                 <li>La valeur de l'article ({activeJob.itemValue?.toLocaleString('fr-FR') || '0'} FCFA) est immédiatement recréditée sur votre solde disponible Wave.</li>
                 <li>Les frais de livraison ({activeJob.deliveryFee.toLocaleString('fr-FR')} FCFA) restent acquis au livreur pour son déplacement.</li>
-                <li>Un code OTP Retour sera généré pour le livreur.</li>
+                <li>Un Code Secret de Retour sera généré pour le livreur.</li>
               </ul>
             </div>
 

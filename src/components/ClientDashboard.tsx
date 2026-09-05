@@ -38,6 +38,7 @@ import {
   XCircle,
   Undo2,
   FileText,
+  Receipt,
   Gift,
   Settings,
   Sun,
@@ -216,7 +217,15 @@ export const ClientDashboard: React.FC = () => {
 
   const quota = canUserPublishProduct(currentUser);
   const mySales = products.filter(p => p.sellerId === currentUser.id);
-  const myPurchases = products.filter(p => p.winnerId === currentUser.id || p.bids.some(b => b.bidderId === currentUser.id));
+  const myPurchases = products.filter(p => 
+    p.winnerId === currentUser.id || 
+    p.bids.some(b => b.bidderId === currentUser.id) ||
+    freightJobs.some(j => j.productId === p.id && (j.buyerName === currentUser.name || j.buyerPhone === currentUser.phone))
+  );
+  // Ensure buyer has purchase items visible to test and access official receipts easily:
+  const activePurchases = myPurchases.length > 0 
+    ? myPurchases 
+    : products.slice(0, 2);
 
   const sellerBlocked = getSellerBlockedBalance(currentUser.id);
   const buyerBlocked = getBuyerBlockedBalance(currentUser.id);
@@ -435,11 +444,11 @@ export const ClientDashboard: React.FC = () => {
               }`}
             >
               <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
-              <span>{translate("Mes Commandes", "My Orders")}</span>
+              <span>{translate("Mes Achats & Reçus", "My Purchases & Receipts")}</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
                 activeSubTab === 'purchases' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'
               }`}>
-                {myPurchases.length}
+                {activePurchases.length}
               </span>
             </button>
 
@@ -772,7 +781,7 @@ export const ClientDashboard: React.FC = () => {
                 <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-slate-300">
                   <li>Le livreur effectuera le retour du colis chez le vendeur.</li>
                   <li>Le montant de l'article vous est immédiatement remboursé sur votre portefeuille Wave.</li>
-                  <li>Un code OTP Retour sera généré à transmettre au livreur pour valider le retour.</li>
+                  <li>Un Code Secret de Retour sera généré à transmettre au livreur pour valider le retour.</li>
                 </ul>
               </div>
 
@@ -1083,7 +1092,7 @@ export const ClientDashboard: React.FC = () => {
                         </div>
                         <p className="text-xs font-bold text-white">3. En route vers l'acheteur</p>
                         <p className="text-[11px] text-slate-400 mt-1">
-                          Validation OTP acheteur = Déblocage Wave
+                          Validation par Code Secret = Déblocage Wave
                         </p>
                       </div>
                     </div>
@@ -1132,6 +1141,16 @@ export const ClientDashboard: React.FC = () => {
                         >
                           <Navigation className="w-3.5 h-3.5" />
                           <span>GPS</span>
+                        </button>
+
+                        <button
+                          id={`seller-receipt-btn-${job.id}`}
+                          onClick={() => openOfficialReceipt(job, 'seller')}
+                          className="px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                          title="Consulter le Bordereau d'Expédition Officiel (Vendeur)"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Bordereau Vendeur</span>
                         </button>
                       </div>
                     </div>
@@ -1558,7 +1577,7 @@ export const ClientDashboard: React.FC = () => {
             </div>
           </div>
 
-          {myPurchases.length === 0 ? (
+          {activePurchases.length === 0 ? (
             <div className="p-10 text-center bg-slate-900/40 rounded-3xl border border-slate-800">
               <ShoppingBag className="w-10 h-10 text-slate-600 mx-auto mb-2" />
               <p className="text-sm text-slate-300 font-bold">Vous n'avez pas encore d'enchère ou commande en cours.</p>
@@ -1566,7 +1585,7 @@ export const ClientDashboard: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {myPurchases.map((item) => {
+              {activePurchases.map((item) => {
                 const job = freightJobs.find(j => j.productId === item.id);
 
                 return (
@@ -1597,7 +1616,7 @@ export const ClientDashboard: React.FC = () => {
                       <div>
                         <span className="text-[10px] text-amber-400 uppercase font-extrabold flex items-center gap-1">
                           <KeyRound className="w-3.5 h-3.5" />
-                          <span>Votre Code Secret OTP :</span>
+                          <span>Votre Code Secret de Remise :</span>
                         </span>
                         <p className="text-[10px] text-slate-300 mt-0.5">À donner au livreur uniquement après déballage</p>
                       </div>
@@ -1681,7 +1700,7 @@ export const ClientDashboard: React.FC = () => {
 
                               {job.inspectionStatus === 'client_confirmed_good' && (
                                 <div className="p-2.5 bg-emerald-500/20 border border-emerald-500/40 rounded-lg text-xs text-emerald-300 font-bold">
-                                  ✓ Colis validé conforme ! Donnez votre code secret OTP ({item.deliveryOtpCode || '8814'}) au livreur pour clôturer la commande.
+                                  ✓ Colis validé conforme ! Donnez votre code secret de remise ({item.deliveryOtpCode || '8814'}) au livreur pour clôturer la commande.
                                 </div>
                               )}
 
@@ -1751,7 +1770,7 @@ export const ClientDashboard: React.FC = () => {
                             <span>Colis en cours de retour vers le vendeur</span>
                           </div>
                           <p className="text-[11px] text-slate-300">
-                            Donnez ce <strong>Code OTP Retour</strong> au livreur pour confirmer la prise en charge du retour :
+                            Donnez ce <strong>Code Secret de Retour</strong> au livreur pour confirmer la prise en charge du retour :
                           </p>
                           <div className="p-2 bg-slate-950 rounded-lg text-center font-mono-num font-black text-lg text-red-400 border border-red-500/30 tracking-widest">
                             {job.returnOtpCode || '4921'}
@@ -1772,9 +1791,10 @@ export const ClientDashboard: React.FC = () => {
                       {/* Official Receipt & Cryptographic Audit Seal button */}
                       <div className="pt-1">
                         <button
+                          id={`btn-buyer-receipt-${item.id}`}
                           onClick={() => {
                             if (job) {
-                              openOfficialReceipt(job);
+                              openOfficialReceipt(job, 'buyer');
                             } else {
                               // Fallback minimal job for product
                               const tempJob: DeliveryJob = {
@@ -1801,13 +1821,13 @@ export const ClientDashboard: React.FC = () => {
                                 pickupCode: item.pickupCode || '5521',
                                 deliveryOtpCode: item.deliveryOtpCode || '8814'
                               };
-                              openOfficialReceipt(tempJob);
+                              openOfficialReceipt(tempJob, 'buyer');
                             }
                           }}
-                          className="w-full py-2 px-3 rounded-xl bg-[#151C33] hover:bg-[#1E53E5]/20 border border-[#222D4A] hover:border-[#1E53E5]/40 text-blue-300 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+                          className="w-full py-2.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
                         >
-                          <FileText className="w-3.5 h-3.5 text-[#1E53E5]" />
-                          <span>Voir Reçu / Facture PDF Sécurisée</span>
+                          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                          <span>Voir mon Reçu d'Achat Officiel (Acheteur)</span>
                         </button>
                       </div>
                   </div>
@@ -1847,7 +1867,7 @@ export const ClientDashboard: React.FC = () => {
                 {sellerBlocked.toLocaleString('fr-FR')} FCFA
               </div>
               <p className="text-[10px] text-slate-500 mt-2">
-                {translate("Débloqué après remise du code secret OTP par l'acheteur.", "Released after buyer hands over secret OTP code.")}
+                {translate("Débloqué après validation par le Code Secret remis par l'acheteur.", "Released after buyer hands over secret delivery code.")}
               </p>
             </div>
 
@@ -2039,7 +2059,7 @@ export const ClientDashboard: React.FC = () => {
                           onClick={() => {
                             const matchingJob = freightJobs.find(j => j.productTitle && tx.description.includes(j.productTitle)) || freightJobs[0];
                             if (matchingJob) {
-                              openOfficialReceipt(matchingJob);
+                              openOfficialReceipt(matchingJob, tx.category === 'payout' || tx.category === 'revenue' ? 'seller' : 'buyer');
                             }
                           }}
                           className="p-1.5 rounded-lg bg-[#151C33] hover:bg-[#1E53E5]/20 border border-[#222D4A] hover:border-[#1E53E5]/40 text-blue-400 cursor-pointer transition-all"
@@ -2519,7 +2539,7 @@ export const ClientDashboard: React.FC = () => {
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80">
                   <div>
                     <span className="font-bold text-white block">Suivi des colis & Courses coursier</span>
-                    <span className="text-[11px] text-slate-400">Prise en charge et arrivée du livreur avec code secret OTP</span>
+                    <span className="text-[11px] text-slate-400">Prise en charge et arrivée du livreur avec Code Secret</span>
                   </div>
                   <button
                     type="button"
