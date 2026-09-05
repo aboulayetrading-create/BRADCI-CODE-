@@ -276,12 +276,12 @@ export const Navbar: React.FC = () => {
             id="navbar-actions-bar" 
             className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 justify-end py-1 pl-1"
           >
-            {/* Shopping Cart Button - STRICTLY EXCLUDED FOR DRIVERS (User requirement: no cart for couriers) */}
+            {/* Shopping Cart Button - Hidden on mobile (< md), visible on desktop (>= md) */}
             {!isDriver && (
               <button
                 id="btn-navbar-cart"
                 onClick={() => setCartModalOpen(true)}
-                className="relative h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 flex items-center gap-1.5 shadow-sm"
+                className="relative hidden md:flex h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center gap-1.5 shadow-sm"
                 title={translate("Mon Panier Multi-Articles", "My Multi-Item Cart")}
               >
                 <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
@@ -294,12 +294,12 @@ export const Navbar: React.FC = () => {
               </button>
             )}
 
-            {/* For Drivers: Quick Yango Pro Style Master Availability Switch */}
+            {/* For Drivers: Quick Yango Pro Style Master Availability Switch (Hidden on mobile as it's in bottom bar) */}
             {isDriver && (
               <button
                 id="navbar-driver-status-toggle"
                 onClick={toggleDriverAvailability}
-                className={`h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all border shadow-sm ${
+                className={`hidden md:flex h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl font-black text-xs items-center gap-1.5 transition-all border shadow-sm ${
                   currentUser.driverAvailability !== 'offline'
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
                     : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
@@ -313,11 +313,11 @@ export const Navbar: React.FC = () => {
               </button>
             )}
 
-            {/* Notification Bell Button */}
+            {/* Notification Bell Button - Hidden on mobile (available in mobile bottom nav & drawer) */}
             <button
               id="btn-navbar-notifications"
               onClick={() => setNotificationsModalOpen(true)}
-              className="relative h-8 sm:h-9 w-8 sm:w-9 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 flex items-center justify-center"
+              className="relative hidden md:flex h-8 sm:h-9 w-8 sm:w-9 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center justify-center"
               title={translate("Notifications", "Notifications")}
             >
               <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
@@ -345,12 +345,12 @@ export const Navbar: React.FC = () => {
               </span>
             </button>
 
-            {/* Quick Publish Product Button - STRICTLY EXCLUDED FOR DRIVERS */}
+            {/* Quick Publish Product Button - Hidden on mobile (available in mobile bottom nav & drawer) */}
             {!isDriver && (
               <button
                 id="btn-publish-product"
                 onClick={handleSellClick}
-                className="h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-lg bg-[#FF5B00] hover:bg-[#E05000] text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[#FF5B00]/30 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
+                className="hidden md:flex h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-lg bg-[#FF5B00] hover:bg-[#E05000] text-white font-bold text-xs items-center gap-1.5 shadow-md shadow-[#FF5B00]/30 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
                 title={translate("Mettre un article en vente (Gratuit & Illimité)", "Post item for sale (Free & Unlimited)")}
               >
                 <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
@@ -646,6 +646,83 @@ export const Navbar: React.FC = () => {
               </div>
             ) : (
               <>
+                {/* Mobile Drawer Quick Primary Actions */}
+                <div className="px-2 space-y-1.5 pb-2">
+                  {/* Notifications in drawer */}
+                  <button
+                    id="btn-mobile-drawer-notifications"
+                    onClick={() => { setNotificationsModalOpen(true); setMobileMenuOpen(false); }}
+                    className="w-full text-left p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/30 text-slate-200 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>{translate("Notifications & Alertes", "Notifications & Alerts")}</span>
+                    </div>
+                    {unreadNotificationsCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[10px]">
+                        {unreadNotificationsCount} {translate("nouvelle(s)", "new")}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-500">0</span>
+                    )}
+                  </button>
+
+                  {/* Vendre in drawer */}
+                  {!isDriver && (
+                    <button
+                      id="btn-mobile-drawer-sell"
+                      onClick={() => { handleSellClick(); setMobileMenuOpen(false); }}
+                      className="w-full text-left p-2.5 rounded-xl bg-[#FF5B00]/15 border border-[#FF5B00]/30 hover:bg-[#FF5B00]/25 text-[#FF5B00] text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <PlusCircle className="w-4 h-4 text-[#FF5B00] shrink-0" />
+                        <span>{translate("Vendre un article (Gratuit & Illimité)", "Sell an item (Free & Unlimited)")}</span>
+                      </div>
+                      <span className="bg-[#FF5B00] text-white text-[9px] px-2 py-0.5 rounded font-black">
+                        {translate("Vendre", "Sell")}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Panier in drawer */}
+                  {!isDriver && (
+                    <button
+                      id="btn-mobile-drawer-cart"
+                      onClick={() => { setCartModalOpen(true); setMobileMenuOpen(false); }}
+                      className="w-full text-left p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/30 text-slate-200 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ShoppingCart className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>{translate("Mon Panier Multi-Articles", "My Multi-Item Cart")}</span>
+                      </div>
+                      {cart.length > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[10px]">
+                          {cart.reduce((s, i) => s + i.quantity, 0)} {translate("article(s)", "item(s)")}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500">{translate("Vide", "Empty")}</span>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Factures & Reçus Comptables in drawer */}
+                  <button
+                    id="btn-mobile-drawer-receipts"
+                    onClick={() => {
+                      setActiveTab('dashboard_client');
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('bradci_open_subtab', { detail: 'history' }));
+                      }, 60);
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-emerald-500/30 text-slate-200 text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                  >
+                    <Receipt className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>{translate("Reçus & Factures Comptables (PDF)", "Official Receipts & Invoices (PDF)")}</span>
+                  </button>
+                </div>
+
+                {/* Section Navigation Tabs */}
                 <div className="grid grid-cols-3 gap-2 px-2 pb-2">
                   <button
                     onClick={() => { setActiveTab('explore'); setMobileMenuOpen(false); }}
@@ -681,7 +758,7 @@ export const Navbar: React.FC = () => {
                   </button>
                 </div>
 
-                {currentUser && (
+                {currentUser ? (
                   <div className="px-2 space-y-1">
                     {currentUser.role === 'client' && (
                       <button
@@ -731,6 +808,17 @@ export const Navbar: React.FC = () => {
                         <span>{translate("Se Déconnecter", "Sign Out")}</span>
                       </button>
                     </div>
+                  </div>
+                ) : (
+                  <div className="px-2 pt-2 border-t border-slate-800">
+                    <button
+                      id="btn-mobile-drawer-login"
+                      onClick={() => { setAuthModalOpen(true); setMobileMenuOpen(false); }}
+                      className="w-full py-2.5 px-3.5 bg-[#FF5B00] hover:bg-[#E05000] text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-[#FF5B00]/25 transition-all cursor-pointer"
+                    >
+                      <User className="w-4 h-4 shrink-0" />
+                      <span>{translate("Connexion / Créer un Compte", "Sign In / Register")}</span>
+                    </button>
                   </div>
                 )}
               </>

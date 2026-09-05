@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Bike, 
@@ -23,7 +23,6 @@ import {
   Package,
   Layers,
   Star,
-  Users,
   Activity,
   ArrowUpRight,
   Receipt,
@@ -33,22 +32,25 @@ import {
   Headphones,
   Camera,
   Timer,
-  Zap
+  Zap,
+  Bell,
+  Volume2,
+  VolumeX,
+  X
 } from 'lucide-react';
 import { DeliveryJob, VehicleType, PaymentMethod } from '../types';
-import { COMMUNE_NAMES_ABIDJAN, COMMUNE_NAMES_ENVIRONS, getCommuneBadgeInfo } from '../data/communes';
+import { COMMUNE_NAMES_ABIDJAN, COMMUNE_NAMES_ENVIRONS, getCommuneBadgeInfo, calculateCommuneDistanceKm } from '../data/communes';
 import { GoogleMapsEmbed } from './GoogleMapsEmbed';
 import { KYCGateBanner } from './KYCGateBanner';
 import { DriverActiveMissionCockpit } from './DriverActiveMissionCockpit';
+import { playDriverNewOrderRingtone } from '../utils/voiceNavigator';
 
 export const DriverDashboard: React.FC = () => {
   const { 
     currentUser, 
-    users,
     freightJobs, 
     canDriverTakeDeliveries,
     toggleDriverAvailability,
-    switchDriverAccount,
     driverAcceptJob,
     driverConfirmPickup,
     driverDeclareArrival,
@@ -69,7 +71,10 @@ export const DriverDashboard: React.FC = () => {
     setActiveDriverTab,
     assignTestJobToDriver,
     openOfficialReceipt,
-    setFreightJobs
+    setFreightJobs,
+    unreadNotificationsCount,
+    setNotificationsModalOpen,
+    userLocation
   } = useApp();
 
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState<string>('Tous');
@@ -122,9 +127,6 @@ export const DriverDashboard: React.FC = () => {
     return () => window.removeEventListener('bradci_driver_tab', handleDriverTab);
   }, []);
 
-  // All available driver accounts in system
-  const availableDriverAccounts = users.filter(u => u.role === 'driver');
-
   if (!currentUser || currentUser.role !== 'driver') {
     return (
       <div id="driver-access-restricted" className="p-8 max-w-lg mx-auto text-center bg-slate-900/60 rounded-3xl border border-red-500/30">
@@ -133,27 +135,6 @@ export const DriverDashboard: React.FC = () => {
         <p className="text-xs text-slate-300 mt-2">
           Cet espace et la bourse de fret sont strictement réservés aux livreurs agréés BRAD'CI.
         </p>
-        <div className="mt-4 pt-4 border-t border-slate-800">
-          <p className="text-xs text-slate-400 mb-3">Sélectionnez un compte livreur disponible pour accéder :</p>
-          <div className="flex flex-col gap-2">
-            {availableDriverAccounts.map((acc) => (
-              <button
-                key={acc.id}
-                onClick={() => switchDriverAccount(acc.id)}
-                className="w-full p-2.5 rounded-xl bg-slate-800 hover:bg-emerald-600/20 border border-slate-700 hover:border-emerald-500/40 text-left flex items-center justify-between transition-all"
-              >
-                <div className="flex items-center gap-2.5">
-                  <img src={acc.avatar} alt={acc.name} className="w-8 h-8 rounded-full object-cover" />
-                  <div>
-                    <span className="text-xs font-bold text-white block">{acc.name}</span>
-                    <span className="text-[10px] text-slate-400">{acc.driverPlan === 'vip_pass' ? 'Pass VIP Illimité' : 'Essai 5 Courses'}</span>
-                  </div>
-                </div>
-                <span className="text-[11px] font-bold text-emerald-400">Activer →</span>
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     );
   }
@@ -204,19 +185,80 @@ export const DriverDashboard: React.FC = () => {
     setFreightJobs(prev => [testCompletedJob, ...prev]);
   };
 
-  const availableJobs = freightJobs.filter(j => {
-    const matchesStatus = j.status === 'available';
+  const driverCommune = currentUser?.gpsLocation?.commune || userLocation?.commune || 'Cocody';
+
+  // Driver Ringtone Setting (Sound alert for new orders)
+  const [orderRingtoneEnabled, setOrderRingtoneEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('bradci_driver_ringtone') !== 'false';
+  });
+  const [proximityOnly, setProximityOnly] = useState<boolean>(false);
+  const prevAvailableJobsCountRef = useRef<number>(0);
+  const isInitialMountRef = useRef<boolean>(true);
+
+  const toggleOrderRingtone = () => {
+    const next = !orderRingtoneEnabled;
+    setOrderRingtoneEnabled(next);
+    localStorage.setItem('bradci_driver_ringtone', String(next));
+    if (next) {
+      playDriverNewOrderRingtone();
+    }
+  };
+
+  // Enrich all available jobs with real road proximity relative to driver's location
+  const enrichedAvailableJobs = freightJobs
+    .filter(j => j.status === 'available')
+    .map(job => {
+      const pickupDistKm = calculateCommuneDistanceKm(driverCommune, job.pickupCommune);
+      const approachTimeMin = Math.max(2, Math.round(pickupDistKm * 2.2));
+      const isNearby = pickupDistKm <= 5.0;
+      const isImmediateSector = pickupDistKm <= 3.0;
+      return {
+        ...job,
+        pickupDistKm,
+        approachTimeMin,
+        isNearby,
+        isImmediateSector
+      };
+    });
+
+  // Filter available jobs with proximity support
+  const availableJobs = enrichedAvailableJobs.filter(j => {
     const matchesVehicle = selectedVehicleFilter === 'Tous' || j.requiredVehicle === selectedVehicleFilter;
     const matchesZone = selectedZoneFilter === 'Toutes' || 
-      j.pickupCommune.toLowerCase().includes(selectedZoneFilter.toLowerCase()) || 
-      j.dropoffCommune.toLowerCase().includes(selectedZoneFilter.toLowerCase());
+      (selectedZoneFilter === 'Proximite' ? j.isNearby : (
+        j.pickupCommune.toLowerCase().includes(selectedZoneFilter.toLowerCase()) || 
+        j.dropoffCommune.toLowerCase().includes(selectedZoneFilter.toLowerCase())
+      ));
     const matchesSearch = orderSearchQuery === '' ||
       j.productTitle.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
       j.pickupCommune.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
       j.dropoffCommune.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
       j.id.toLowerCase().includes(orderSearchQuery.toLowerCase());
-    return matchesStatus && matchesVehicle && matchesZone && matchesSearch;
+    const matchesProximity = !proximityOnly || j.isNearby;
+
+    return matchesVehicle && matchesZone && matchesSearch && matchesProximity;
+  }).sort((a, b) => {
+    if (proximityOnly || selectedZoneFilter === 'Proximite') {
+      return a.pickupDistKm - b.pickupDistKm; // closest first
+    }
+    return 0;
   });
+
+  // Trigger sound alert when new orders appear in the available pool
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      prevAvailableJobsCountRef.current = availableJobs.length;
+      return;
+    }
+
+    if (availableJobs.length > prevAvailableJobsCountRef.current) {
+      if (orderRingtoneEnabled) {
+        playDriverNewOrderRingtone();
+      }
+    }
+    prevAvailableJobsCountRef.current = availableJobs.length;
+  }, [availableJobs.length, orderRingtoneEnabled]);
 
   const getVehicleIcon = (v: VehicleType) => {
     switch (v) {
@@ -343,6 +385,80 @@ export const DriverDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* 2. Driver Navigation Tabs (Directly below Profile Photo & Live Status Header) */}
+        <div 
+          id="driver-dashboard-nav-bar"
+          aria-label="Navigation Espace Livreur"
+          className="flex items-center gap-2 overflow-x-auto scrollbar-none p-1.5 bg-slate-900/90 rounded-2xl border border-slate-800"
+        >
+          <button
+            id="driver-tab-available-orders"
+            onClick={() => setActiveDriverTab('available_orders')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
+              activeDriverTab === 'available_orders'
+                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black'
+                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            <span>Bourse aux Courses</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-num ${
+              activeDriverTab === 'available_orders' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-800 text-emerald-400'
+            }`}>
+              {availableJobs.length}
+            </span>
+          </button>
+
+          <button
+            id="driver-tab-active-mission"
+            onClick={() => setActiveDriverTab('active_mission')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+              activeDriverTab === 'active_mission'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 font-black'
+                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Navigation className="w-4 h-4 text-blue-400" />
+            <span>Mission en cours</span>
+            {myActiveJob && (
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[9px] animate-pulse">
+                LIVE
+              </span>
+            )}
+          </button>
+
+          <button
+            id="driver-tab-history"
+            onClick={() => setActiveDriverTab('history')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+              activeDriverTab === 'history'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
+                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Receipt className="w-4 h-4" />
+            <span>Gain</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-num ${
+              activeDriverTab === 'history' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-800 text-amber-400'
+            }`}>
+              {myCompletedJobs.length}
+            </span>
+          </button>
+
+          <button
+            id="driver-tab-profile"
+            onClick={() => setActiveDriverTab('profile')}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+              activeDriverTab === 'profile'
+                ? 'bg-slate-800 text-white border border-slate-700 font-black'
+                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <FileCheck className="w-4 h-4 text-emerald-400" />
+            <span>Véhicule & Documents</span>
+          </button>
+        </div>
+
         {/* Driver Withdrawal Modal */}
         {withdrawalModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
@@ -456,37 +572,6 @@ export const DriverDashboard: React.FC = () => {
             </div>
           </div>
         )}
-
-        {/* Available Accounts Quick Switcher */}
-        <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Users className="w-4 h-4 text-emerald-400" />
-            <span className="font-semibold text-slate-300">Comptes Livreurs Disponibles sur la plateforme :</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {availableDriverAccounts.map((driverAcc) => {
-              const isSelected = driverAcc.id === currentUser.id;
-              return (
-                <button
-                  key={driverAcc.id}
-                  id={`switch-driver-account-${driverAcc.id}`}
-                  onClick={() => switchDriverAccount(driverAcc.id)}
-                  className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all border ${
-                    isSelected
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm ring-1 ring-emerald-500/30 font-bold'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <img src={driverAcc.avatar} alt={driverAcc.name} className="w-4 h-4 rounded-full object-cover" />
-                  <span>{driverAcc.name.split(' ')[0]}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    ({driverAcc.driverPlan === 'vip_pass' ? 'VIP' : `${driverAcc.trialDeliveriesRemaining || 0}/5`})
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       {/* 2. 4 Clean High-Impact KPI Cards (Executive Professional Grid) */}
@@ -636,135 +721,162 @@ export const DriverDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Driver Navigation Tabs (Clean Yango Pro Segmented Bar) */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto scrollbar-none">
-        <button
-          id="driver-tab-available-orders"
-          onClick={() => setActiveDriverTab('available_orders')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 ${
-            activeDriverTab === 'available_orders'
-              ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black'
-              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-          }`}
-        >
-          <Package className="w-4 h-4" />
-          <span>Bourse aux Courses</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-num ${
-            activeDriverTab === 'available_orders' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-800 text-emerald-400'
-          }`}>
-            {availableJobs.length}
-          </span>
-        </button>
-
-        <button
-          id="driver-tab-active-mission"
-          onClick={() => setActiveDriverTab('active_mission')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-            activeDriverTab === 'active_mission'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 font-black'
-              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-          }`}
-        >
-          <Navigation className="w-4 h-4 text-blue-400" />
-          <span>Mission en cours</span>
-          {myActiveJob && (
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[9px] animate-pulse">
-              LIVE
-            </span>
-          )}
-        </button>
-
-        <button
-          id="driver-tab-history"
-          onClick={() => setActiveDriverTab('history')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-            activeDriverTab === 'history'
-              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
-              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-          }`}
-        >
-          <Receipt className="w-4 h-4" />
-          <span>Gain</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono-num ${
-            activeDriverTab === 'history' ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-slate-800 text-amber-400'
-          }`}>
-            {myCompletedJobs.length}
-          </span>
-        </button>
-
-        <button
-          id="driver-tab-profile"
-          onClick={() => setActiveDriverTab('profile')}
-          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
-            activeDriverTab === 'profile'
-              ? 'bg-slate-800 text-white border border-slate-700 font-black'
-              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-          }`}
-        >
-          <FileCheck className="w-4 h-4 text-emerald-400" />
-          <span>Véhicule & Documents</span>
-        </button>
-      </div>
-
       {/* 6. TAB CONTENT: Available Orders / Bourse de Fret */}
       {activeDriverTab === 'available_orders' && (
         <div className="space-y-4">
-          {/* Filters Bar: Search, Zone & Vehicle */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-slate-900/60 border border-slate-800 p-4 rounded-2xl">
-            {/* Search Input */}
-            <div className="relative flex-1 w-full">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                id="driver-orders-search-input"
-                type="text"
-                value={orderSearchQuery}
-                onChange={(e) => setOrderSearchQuery(e.target.value)}
-                placeholder="Rechercher par article, référence, commune..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            {/* Zone & Vehicle Filters */}
-            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              {/* Zone Filter */}
-              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs text-slate-200">
-                <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <select
-                  id="driver-zone-filter-select"
-                  value={selectedZoneFilter}
-                  onChange={(e) => setSelectedZoneFilter(e.target.value)}
-                  className="bg-transparent text-white focus:outline-none text-xs font-medium cursor-pointer"
-                >
-                  <option value="Toutes" className="bg-slate-900 text-white font-bold">Toutes les Zones</option>
-                  <optgroup label="Grand Abidjan (13 Communes)" className="bg-slate-950 text-amber-400 font-bold">
-                    {COMMUNE_NAMES_ABIDJAN.map(c => (
-                      <option key={c} value={c} className="bg-slate-900 text-white font-normal">{c}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Villes Environs / Littoral" className="bg-slate-950 text-cyan-400 font-bold">
-                    {COMMUNE_NAMES_ENVIRONS.map(c => (
-                      <option key={c} value={c} className="bg-slate-900 text-cyan-200 font-normal">🌴 {c}</option>
-                    ))}
-                  </optgroup>
-                </select>
+          {/* Filters Bar: Search, Notification Bell, Sound Alert, Proximity & Vehicles */}
+          <div className="bg-slate-900/80 border border-slate-800 p-3.5 sm:p-4 rounded-2xl space-y-3 shadow-lg">
+            {/* Row 1: Search Input + Notification Bell + Ringtone Controls */}
+            <div className="flex items-center gap-2">
+              {/* Search Input */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  id="driver-orders-search-input"
+                  type="text"
+                  value={orderSearchQuery}
+                  onChange={(e) => setOrderSearchQuery(e.target.value)}
+                  placeholder="Rechercher par colis, commune, référence..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-8 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                />
+                {orderSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setOrderSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white text-xs p-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              {/* Vehicle filters */}
-              <div className="flex gap-1">
-                {['Tous', 'moto', 'voiture', 'cargo'].map((v) => (
-                  <button
-                    key={v}
-                    id={`driver-vehicle-filter-${v}`}
-                    onClick={() => setSelectedVehicleFilter(v)}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${
-                      selectedVehicleFilter === v
-                        ? 'bg-emerald-500 text-slate-950'
-                        : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
+              {/* Notification Bell Button (Synced with Buyer / Seller Design) */}
+              <button
+                id="driver-searchbar-notifications-btn"
+                type="button"
+                onClick={() => setNotificationsModalOpen(true)}
+                className="relative p-2.5 rounded-xl bg-slate-950 border border-slate-700 hover:border-emerald-500/60 text-slate-300 hover:text-white transition-all flex items-center justify-center shrink-0 group shadow-sm"
+                title="Centre de notifications & alertes de courses"
+              >
+                <Bell className="w-4 h-4 group-hover:scale-110 transition-transform text-slate-300" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white font-extrabold text-[10px] rounded-full flex items-center justify-center border-2 border-slate-950 animate-pulse shadow-md">
+                    {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Delivery Order Ringtone Controller */}
+              <div className="flex items-center gap-1 bg-slate-950 border border-slate-700 p-1 rounded-xl shrink-0">
+                <button
+                  id="driver-order-ringtone-toggle-btn"
+                  type="button"
+                  onClick={toggleOrderRingtone}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    orderRingtoneEnabled
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                  title={orderRingtoneEnabled ? "Sonnerie des courses active (cliquer pour couper)" : "Sonnerie coupée (cliquer pour activer)"}
+                >
+                  {orderRingtoneEnabled ? (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                      <span className="hidden sm:inline">Sonnerie On</span>
+                    </>
+                  ) : (
+                    <>
+                      <VolumeX className="w-3.5 h-3.5 text-slate-500" />
+                      <span className="hidden sm:inline">Muet</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  id="driver-order-ringtone-test-btn"
+                  type="button"
+                  onClick={() => playDriverNewOrderRingtone()}
+                  className="px-2 py-1.5 text-slate-400 hover:text-emerald-300 hover:bg-slate-900 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                  title="Tester la sonnerie d'alerte des courses livreur"
+                >
+                  <span>🎵</span>
+                  <span className="hidden md:inline text-[10px]">Tester</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Row 2: Proximity Radar & Geographic / Vehicle Filters */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Proximity Toggle Button (< 5 km) */}
+                <button
+                  id="driver-filter-proximity-btn"
+                  type="button"
+                  onClick={() => setProximityOnly(!proximityOnly)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    proximityOnly
+                      ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black'
+                      : 'bg-slate-950 text-slate-300 hover:text-white border border-slate-700'
+                  }`}
+                >
+                  <Zap className={`w-3.5 h-3.5 ${proximityOnly ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <span>À proximité (&lt; 5 km)</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    proximityOnly ? 'bg-slate-950/20 text-slate-950 font-black' : 'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {enrichedAvailableJobs.filter(j => j.isNearby).length}
+                  </span>
+                </button>
+
+                {/* Driver Current Position Tag */}
+                <div className="hidden lg:flex items-center gap-1 text-[11px] text-slate-400 px-2.5 py-1 bg-slate-950/50 rounded-xl border border-slate-800">
+                  <MapPin className="w-3 h-3 text-emerald-400" />
+                  <span>Votre base : <strong className="text-white">{driverCommune}</strong></span>
+                </div>
+              </div>
+
+              {/* Zone Filter & Vehicle Type Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Zone Filter */}
+                <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-700 px-2.5 py-1.5 rounded-xl text-xs text-slate-200">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <select
+                    id="driver-zone-filter-select"
+                    value={selectedZoneFilter}
+                    onChange={(e) => setSelectedZoneFilter(e.target.value)}
+                    className="bg-transparent text-white focus:outline-none text-xs font-medium cursor-pointer"
                   >
-                    {v === 'Tous' ? 'Tous' : (v === 'moto' ? '🏍️ Moto' : v === 'voiture' ? '🚗 Voiture' : '🚚 Cargo')}
-                  </button>
-                ))}
+                    <option value="Toutes" className="bg-slate-900 text-white font-bold">Toutes les Zones</option>
+                    <option value="Proximite" className="bg-slate-900 text-emerald-400 font-bold">🎯 Rayon Proche (&lt; 5 km)</option>
+                    <optgroup label="Grand Abidjan (13 Communes)" className="bg-slate-950 text-amber-400 font-bold">
+                      {COMMUNE_NAMES_ABIDJAN.map(c => (
+                        <option key={c} value={c} className="bg-slate-900 text-white font-normal">{c}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Villes Environs / Littoral" className="bg-slate-950 text-cyan-400 font-bold">
+                      {COMMUNE_NAMES_ENVIRONS.map(c => (
+                        <option key={c} value={c} className="bg-slate-900 text-cyan-200 font-normal">🌴 {c}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+
+                {/* Vehicle filters */}
+                <div className="flex gap-1">
+                  {['Tous', 'moto', 'voiture', 'cargo'].map((v) => (
+                    <button
+                      key={v}
+                      id={`driver-vehicle-filter-${v}`}
+                      onClick={() => setSelectedVehicleFilter(v)}
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${
+                        selectedVehicleFilter === v
+                          ? 'bg-emerald-500 text-slate-950'
+                          : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                      }`}
+                    >
+                      {v === 'Tous' ? 'Tous' : (v === 'moto' ? '🏍️ Moto' : v === 'voiture' ? '🚗 Voiture' : '🚚 Cargo')}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -794,7 +906,11 @@ export const DriverDashboard: React.FC = () => {
                   <div
                     key={job.id}
                     id={`available-order-card-${job.id}`}
-                    className="p-5 rounded-2xl bg-[#0C121E] border border-slate-800 hover:border-emerald-500/40 space-y-4 shadow-lg flex flex-col justify-between transition-all group"
+                    className={`p-5 rounded-2xl bg-[#0C121E] border ${
+                      job.isImmediateSector
+                        ? 'border-emerald-500/40 shadow-emerald-950/20 shadow-lg' 
+                        : 'border-slate-800 hover:border-emerald-500/40'
+                    } space-y-4 shadow-lg flex flex-col justify-between transition-all group`}
                   >
                     <div>
                       {/* Top Header */}
@@ -810,6 +926,23 @@ export const DriverDashboard: React.FC = () => {
                         </div>
                         <span className="text-base font-extrabold text-emerald-400 font-mono-num">
                           + {job.deliveryFee.toLocaleString('fr-FR')} F
+                        </span>
+                      </div>
+
+                      {/* Proximity Radar Pill */}
+                      <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-950/90 border border-slate-800/80 text-[11px] mb-2.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <MapPin className={`w-3.5 h-3.5 shrink-0 ${job.isImmediateSector ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
+                          <span className="truncate text-slate-300">
+                            {job.isImmediateSector ? (
+                              <strong className="text-emerald-300 font-bold">⚡ À {job.pickupDistKm} km (Secteur immédiat)</strong>
+                            ) : (
+                              <span>À <strong>{job.pickupDistKm} km</strong> de vous</span>
+                            )}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 shrink-0">
+                          ~{job.approachTimeMin} min approche
                         </span>
                       </div>
 

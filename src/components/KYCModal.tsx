@@ -31,21 +31,29 @@ import { UserRole, VehicleType } from '../types';
 import { getTranslation } from '../utils/translations';
 import { KYCDemoGuideModal } from './KYCDemoGuideModal';
 import { verifyFacialBiometrics, BiometricCheckResult } from '../utils/biometricVerification';
+import { 
+  CNIVectorDrawing, 
+  SelfieVectorDrawing, 
+  SelfieWithCardVectorDrawing, 
+  DriverLicenseVectorDrawing, 
+  VehicleRegVectorDrawing, 
+  KYC_DRAWING_DATA_URIS 
+} from './KYCIllustrations';
 
 interface KYCModalProps {
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-// Authentic demonstration photos for easy testing without camera hardware constraints
+// Authentic demonstration drawings conforming to fintech, banking & courier standards
 const DEMO_KYC_PHOTOS = {
-  cni: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80',
-  selfie: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80',
-  selfieWithId: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=800&q=80',
-  driverLicense: 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=800&q=80',
-  driverLicenseVerso: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80',
-  driverLicenseSelfie: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
-  vehicleReg: 'https://images.unsplash.com/photo-1553440569-bcc63803a83d?auto=format&fit=crop&w=800&q=80'
+  cni: KYC_DRAWING_DATA_URIS.cni,
+  selfie: KYC_DRAWING_DATA_URIS.selfie,
+  selfieWithId: KYC_DRAWING_DATA_URIS.selfieWithId,
+  driverLicense: KYC_DRAWING_DATA_URIS.driverLicense,
+  driverLicenseVerso: KYC_DRAWING_DATA_URIS.driverLicense,
+  driverLicenseSelfie: KYC_DRAWING_DATA_URIS.driverLicenseSelfie,
+  vehicleReg: KYC_DRAWING_DATA_URIS.vehicleReg
 };
 
 // Popular vehicle models and presets used in Abidjan & Yango Delivery fleets
@@ -515,6 +523,52 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
           </p>
         </div>
 
+        {/* Vector Drawing Exemplary Guide Banner for current step */}
+        <div className="mb-4 rounded-2xl bg-slate-950/80 border border-emerald-500/30 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Exemple de cadrage conforme (Dessin vectoriel professionnel)</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                let sampleUri = KYC_DRAWING_DATA_URIS.cni;
+                if (!isDriver) {
+                  if (currentStep === 1) sampleUri = KYC_DRAWING_DATA_URIS.cni;
+                  else if (currentStep === 2) sampleUri = KYC_DRAWING_DATA_URIS.selfie;
+                  else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.selfieWithId;
+                } else {
+                  if (currentStep === 1) sampleUri = KYC_DRAWING_DATA_URIS.cni;
+                  else if (currentStep === 2) sampleUri = KYC_DRAWING_DATA_URIS.selfie;
+                  else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.driverLicense;
+                  else if (currentStep === 4) sampleUri = KYC_DRAWING_DATA_URIS.vehicleReg;
+                }
+                if (currentStep === 1) setDocFrontPhoto(sampleUri);
+                else if (currentStep === 2) setSelfiePhoto(sampleUri);
+                else if (currentStep === 3) {
+                  if (isDriver) setDriverLicensePhoto(sampleUri);
+                  else setSelfieWithCardPhoto(sampleUri);
+                } else if (currentStep === 4 && isDriver) {
+                  setVehicleRegPhoto(sampleUri);
+                }
+              }}
+              className="text-[10px] bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold transition-all flex items-center gap-1"
+            >
+              <span>⚡ Utiliser cet exemple</span>
+            </button>
+          </div>
+
+          <div className="rounded-xl overflow-hidden bg-slate-900 border border-slate-800 p-1 flex items-center justify-center">
+            {currentStep === 1 && <CNIVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
+            {!isDriver && currentStep === 2 && <SelfieVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
+            {!isDriver && currentStep === 3 && <SelfieWithCardVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
+            {isDriver && currentStep === 2 && <SelfieVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
+            {isDriver && currentStep === 3 && <DriverLicenseVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
+            {isDriver && currentStep === 4 && <VehicleRegVectorDrawing vehicleType={vehicleType} className="w-full max-w-sm h-32" isGood={true} />}
+          </div>
+        </div>
+
         {/* Error Alert Box */}
         {errorMessage && (
           <div className="mb-4 p-3.5 rounded-2xl bg-red-500/15 border border-red-500/40 text-red-300 text-xs flex items-start gap-2.5 animate-in fade-in">
@@ -933,6 +987,36 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
               >
                 <Upload className="w-3.5 h-3.5 text-blue-400" />
                 <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  let sampleUri = KYC_DRAWING_DATA_URIS.cni;
+                  if (!isDriver) {
+                    if (currentStep === 1) sampleUri = KYC_DRAWING_DATA_URIS.cni;
+                    else if (currentStep === 2) sampleUri = KYC_DRAWING_DATA_URIS.selfie;
+                    else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.selfieWithId;
+                  } else {
+                    if (currentStep === 1) sampleUri = KYC_DRAWING_DATA_URIS.cni;
+                    else if (currentStep === 2) sampleUri = KYC_DRAWING_DATA_URIS.selfie;
+                    else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.driverLicense;
+                    else if (currentStep === 4) sampleUri = KYC_DRAWING_DATA_URIS.vehicleReg;
+                  }
+                  if (currentStep === 1) setDocFrontPhoto(sampleUri);
+                  else if (currentStep === 2) setSelfiePhoto(sampleUri);
+                  else if (currentStep === 3) {
+                    if (isDriver) setDriverLicensePhoto(sampleUri);
+                    else setSelfieWithCardPhoto(sampleUri);
+                  } else if (currentStep === 4 && isDriver) {
+                    setVehicleRegPhoto(sampleUri);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition-all"
+                title="Appliquer le schéma vectoriel d'exemple conforme"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>{translate("Appliquer Dessin Conforme", "Apply Compliant Drawing")}</span>
               </button>
             </div>
           )}

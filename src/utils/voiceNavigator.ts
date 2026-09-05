@@ -155,29 +155,76 @@ export function playGpsChime() {
   }
 }
 
-export function playOrderAlertSound() {
+// Authentic Multi-Tone Delivery Ringtone for incoming orders (Yango / Uber Eats / Deliveroo courier style)
+export function playDriverNewOrderRingtone() {
   try {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
     const ctx = new AudioContextClass();
-    
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'triangle';
-    osc1.frequency.setValueAtTime(784, ctx.currentTime); // G5
-    osc1.frequency.setValueAtTime(1046.5, ctx.currentTime + 0.15); // C6
-    
-    gain1.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.45);
-    
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    
-    osc1.start();
-    osc1.stop(ctx.currentTime + 0.45);
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    // Melodic notes sequence: E5 (659Hz) -> G5 (784Hz) -> B5 (987Hz) -> E6 (1318Hz)
+    // Repeat with 2 attention-grabbing pulse bursts
+    const notes = [
+      { freq: 659.25, time: 0.00, dur: 0.14 },
+      { freq: 783.99, time: 0.14, dur: 0.14 },
+      { freq: 987.77, time: 0.28, dur: 0.16 },
+      { freq: 1318.5, time: 0.44, dur: 0.35 },
+      // Second loop burst
+      { freq: 783.99, time: 0.90, dur: 0.12 },
+      { freq: 987.77, time: 1.02, dur: 0.14 },
+      { freq: 1318.5, time: 1.16, dur: 0.45 }
+    ];
+
+    notes.forEach(({ freq, time, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + time);
+
+      gain.gain.setValueAtTime(0.22, ctx.currentTime + time);
+      gain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + time + dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime + time);
+      osc.stop(ctx.currentTime + time + dur);
+    });
+  } catch (err) {
+    console.warn('Driver ringtone audio playback prevented by browser policy:', err);
+  }
+}
+
+export function playDriverProximityPing() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+    osc.frequency.exponentialRampToValueAtTime(1174.66, ctx.currentTime + 0.15); // D6
+
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
   } catch {
     // Audio restriction handling
   }
+}
+
+export function playOrderAlertSound() {
+  playDriverNewOrderRingtone();
 }
 
 export function playSuccessChime() {

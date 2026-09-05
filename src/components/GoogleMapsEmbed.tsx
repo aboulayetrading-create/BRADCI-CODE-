@@ -53,8 +53,9 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
 }) => {
   const [mapLayer, setMapLayer] = useState<'roadmap' | 'satellite'>('roadmap');
   const [navTheme, setNavTheme] = useState<'night' | 'day'>('night'); // Default to high-contrast night navigation
-  const [isVoiceEnabled, setIsVoiceEnabled] = useState<boolean>(true);
-  const [autoPlayVoice, setAutoPlayVoice] = useState<boolean>(true);
+  // Voice off by default: let official Google Maps handle voice navigation
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState<boolean>(false);
+  const [autoPlayVoice, setAutoPlayVoice] = useState<boolean>(false);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [routePlan, setRoutePlan] = useState<RoutePlan>(() => 
     generateAbidjanRoute(pickupCommune, dropoffCommune, isReturning)
@@ -248,6 +249,35 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
             <span className="hidden sm:inline">Google Maps</span>
           </a>
         </div>
+      </div>
+
+      {/* Official Google Maps Voice Guidance Direct Banner */}
+      <div className="bg-blue-950/40 border-b border-blue-500/30 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/30">
+            <Navigation className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-white flex items-center gap-2">
+              <span>Guidage Vocal Officiel Google Maps</span>
+              <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 font-semibold">
+                Voix GPS Native
+              </span>
+            </p>
+            <p className="text-[11px] text-slate-300">
+              Navigation vocale étape par étape assurée directement par Google Maps avec alertes de trafic en direct à Abidjan.
+            </p>
+          </div>
+        </div>
+        <a
+          href={routePlan.googleMapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 shrink-0 transition-all cursor-pointer hover:scale-105"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          <span>Lancer la Voix Off Google Maps</span>
+        </a>
       </div>
 
       {/* 2. Turn-by-Turn Dynamic Voice Guidance Banner */}

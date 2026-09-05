@@ -121,7 +121,7 @@ export const BradCiLogo: React.FC<BradCiLogoProps> = ({
 
       {/* Brand Name & Tagline */}
       <div className="flex flex-col min-w-0 justify-center">
-        <div className={`font-display ${textSizes[size]} font-black tracking-tight flex items-baseline leading-none select-none drop-shadow-sm`}>
+        <div className={`font-display ${textSizes[size]} font-black tracking-tight flex items-baseline leading-none select-none drop-shadow-sm whitespace-nowrap`}>
           <span className="text-white">BRAD</span>
           <span className="text-[#FF5B00] font-black">'</span>
           <span className="text-[#1E53E5] font-black ml-0.5">CI</span>

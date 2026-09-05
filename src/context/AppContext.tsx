@@ -137,8 +137,8 @@ interface AppContextType {
   submitReview: (data: { jobId: string; productId: string; productTitle: string; sellerRating: number; sellerComment: string; sellerQuickTags: string[]; driverRating: number; driverComment: string; driverQuickTags: string[] }) => void;
   
   // Official Receipt & Cryptographic Audit Suite
-  receiptModalData: { transactionData: any; auditLog: any } | null;
-  setReceiptModalData: (data: { transactionData: any; auditLog: any } | null) => void;
+  receiptModalData: { transactionData: any; auditLog: any; initialMode?: 'buyer' | 'seller' } | null;
+  setReceiptModalData: (data: { transactionData: any; auditLog: any; initialMode?: 'buyer' | 'seller' } | null) => void;
   openOfficialReceipt: (jobIdOrJob: string | DeliveryJob) => Promise<boolean>;
   
   // GPS & Location States (Mandatory GPS)

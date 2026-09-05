@@ -409,7 +409,29 @@ export function calculateDeliveryFee(
   return Math.round((baseFee * vehicleMultiplier) / 100) * 100;
 }
 
-// Flat list of simple display labels for backward compatibility or quick selects
+// Calculate approximate road distance between two communes in Grand Abidjan (in km)
+export function calculateCommuneDistanceKm(commune1Name: string, commune2Name: string): number {
+  if (!commune1Name || !commune2Name) return 5.0;
+  const name1 = commune1Name.trim().toLowerCase();
+  const name2 = commune2Name.trim().toLowerCase();
+
+  const c1 = ALL_COMMUNES.find(c => c.name.toLowerCase() === name1 || name1.includes(c.name.toLowerCase()));
+  const c2 = ALL_COMMUNES.find(c => c.name.toLowerCase() === name2 || name2.includes(c.name.toLowerCase()));
+
+  if (!c1 || !c2) return 5.0;
+  if (c1.id === c2.id) return 1.4; // Intra-commune pickup proximity
+
+  const R = 6371; // Earth radius in km
+  const dLat = (c2.coords.lat - c1.coords.lat) * (Math.PI / 180);
+  const dLng = (c2.coords.lng - c1.coords.lng) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(c1.coords.lat * (Math.PI / 180)) * Math.cos(c2.coords.lat * (Math.PI / 180)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const roadDetourFactor = 1.35; // Bridges & expressways detour factor
+  return Math.round(R * c * roadDetourFactor * 10) / 10;
+}
 export const COMMUNE_NAMES_ABIDJAN = ALL_COMMUNES.filter(c => c.type === 'abidjan_intramuros').map(c => c.name);
 export const COMMUNE_NAMES_ENVIRONS = ALL_COMMUNES.filter(c => c.type === 'villes_environnantes').map(c => c.name);
 export const ALL_COMMUNE_NAMES = ALL_COMMUNES.map(c => c.name);

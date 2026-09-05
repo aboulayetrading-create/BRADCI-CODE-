@@ -54,6 +54,7 @@ import {
 import { Product, ShopProfile, PaymentMethod, DeliveryJob } from '../types';
 import { ReferralDashboard } from './ReferralDashboard';
 import { nativeBridge } from '../utils/nativeBridge';
+import { KYC_DRAWING_DATA_URIS } from './KYCIllustrations';
 
 export const ClientDashboard: React.FC = () => {
   const { 
@@ -164,8 +165,8 @@ export const ClientDashboard: React.FC = () => {
   // KYC Form state
   const [docType, setDocType] = useState<'cni' | 'passeport' | 'attestation'>('cni');
   const [docNumber, setDocNumber] = useState(currentUser?.kycDocumentNumber || 'CI0029481920');
-  const [docPhoto, setDocPhoto] = useState('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80');
-  const [selfiePhoto, setSelfiePhoto] = useState(currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80');
+  const [docPhoto, setDocPhoto] = useState(KYC_DRAWING_DATA_URIS.cni);
+  const [selfiePhoto, setSelfiePhoto] = useState(currentUser?.avatar || KYC_DRAWING_DATA_URIS.selfie);
   const [kycFeedback, setKycFeedback] = useState<{ isDuplicate?: boolean; message?: string } | null>(null);
 
   // Native Mobile Photo Captures (Logo & Banner)
@@ -365,6 +366,145 @@ export const ClientDashboard: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {/* 2. Professional Streamlined Tab Switcher (Directly below Profile Photo & Header) */}
+        <nav 
+          id="client-dashboard-nav-bar"
+          aria-label="Navigation Espace Personnel"
+          className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-1.5 shadow-xl"
+        >
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            <button
+              id="subtab-btn-sales"
+              onClick={() => setActiveSubTab('sales')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+                activeSubTab === 'sales'
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              <Package className="w-3.5 h-3.5 shrink-0" />
+              <span>{translate("Mes Ventes", "My Sales")}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
+                activeSubTab === 'sales' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-300'
+              }`}>
+                {mySales.length}
+              </span>
+            </button>
+
+            <button
+              id="subtab-btn-expeditions"
+              onClick={() => setActiveSubTab('expeditions')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+                activeSubTab === 'expeditions'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              <Truck className="w-3.5 h-3.5 shrink-0" />
+              <span>{translate("Expéditions", "Shipments")}</span>
+              {myExpeditions.length > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
+                  activeSubTab === 'expeditions' ? 'bg-white/20 text-white' : 'bg-blue-900/40 text-blue-300'
+                }`}>
+                  {myExpeditions.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              id="subtab-btn-shop"
+              onClick={() => setActiveSubTab('shop')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+                activeSubTab === 'shop'
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5 shrink-0" />
+              <span>{translate("Ma Boutique", "My Storefront")}</span>
+            </button>
+
+            <button
+              id="subtab-btn-purchases"
+              onClick={() => setActiveSubTab('purchases')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+                activeSubTab === 'purchases'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+              <span>{translate("Mes Commandes", "My Orders")}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
+                activeSubTab === 'purchases' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'
+              }`}>
+                {myPurchases.length}
+              </span>
+            </button>
+
+            <button
+              id="subtab-btn-transactions"
+              onClick={() => setActiveSubTab('transactions')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+                activeSubTab === 'transactions'
+                  ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5 shrink-0" />
+              <span>{translate("Finances & Retraits", "Finances & Payouts")}</span>
+            </button>
+
+            <button
+              id="subtab-btn-kyc"
+              onClick={() => setActiveSubTab('kyc')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+                activeSubTab === 'kyc'
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+              <span>{translate("Sécurité KYC", "KYC Safety")}</span>
+              {currentUser.kycStatus === 'verified' && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              )}
+              {currentUser.kycStatus === 'pending' && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              )}
+            </button>
+
+            <button
+              id="subtab-btn-referral"
+              onClick={() => setActiveSubTab('referral')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+                activeSubTab === 'referral'
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              <Gift className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span>{translate("Parrainage", "Referrals")}</span>
+              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
+                {currentUser.referralCount || 0}
+              </span>
+            </button>
+
+            <button
+              id="btn-subtab-settings"
+              onClick={() => setActiveSubTab('settings')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ml-auto ${
+                activeSubTab === 'settings'
+                  ? 'bg-slate-700 text-white shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              <Settings className="w-3.5 h-3.5 shrink-0" />
+              <span>{translate("Paramètres", "Settings")}</span>
+            </button>
+          </div>
+        </nav>
 
         {/* 4 Clean Metric & Financial KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -669,145 +809,6 @@ export const ClientDashboard: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* 2. Professional Streamlined Tab Switcher (No binders/classeurs) */}
-      <nav 
-        id="client-dashboard-nav-bar"
-        aria-label="Navigation Espace Personnel"
-        className="bg-[#0B111E] border border-slate-800/90 rounded-2xl p-1.5 shadow-xl"
-      >
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-          <button
-            id="subtab-btn-sales"
-            onClick={() => setActiveSubTab('sales')}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
-              activeSubTab === 'sales'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <Package className="w-3.5 h-3.5 shrink-0" />
-            <span>{translate("Mes Ventes", "My Sales")}</span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
-              activeSubTab === 'sales' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-300'
-            }`}>
-              {mySales.length}
-            </span>
-          </button>
-
-          <button
-            id="subtab-btn-expeditions"
-            onClick={() => setActiveSubTab('expeditions')}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
-              activeSubTab === 'expeditions'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <Truck className="w-3.5 h-3.5 shrink-0" />
-            <span>{translate("Expéditions", "Shipments")}</span>
-            {myExpeditions.length > 0 && (
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
-                activeSubTab === 'expeditions' ? 'bg-white/20 text-white' : 'bg-blue-900/40 text-blue-300'
-              }`}>
-                {myExpeditions.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            id="subtab-btn-shop"
-            onClick={() => setActiveSubTab('shop')}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
-              activeSubTab === 'shop'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <Store className="w-3.5 h-3.5 shrink-0" />
-            <span>{translate("Ma Boutique", "My Storefront")}</span>
-          </button>
-
-          <button
-            id="subtab-btn-purchases"
-            onClick={() => setActiveSubTab('purchases')}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
-              activeSubTab === 'purchases'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
-            <span>{translate("Mes Commandes", "My Orders")}</span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
-              activeSubTab === 'purchases' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'
-            }`}>
-              {myPurchases.length}
-            </span>
-          </button>
-
-          <button
-            id="subtab-btn-transactions"
-            onClick={() => setActiveSubTab('transactions')}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
-              activeSubTab === 'transactions'
-                ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <CreditCard className="w-3.5 h-3.5 shrink-0" />
-            <span>{translate("Finances & Retraits", "Finances & Payouts")}</span>
-          </button>
-
-          <button
-            id="subtab-btn-kyc"
-            onClick={() => setActiveSubTab('kyc')}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
-              activeSubTab === 'kyc'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span>{translate("Sécurité KYC", "KYC Safety")}</span>
-            {currentUser.kycStatus === 'verified' && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            )}
-            {currentUser.kycStatus === 'pending' && (
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            )}
-          </button>
-
-          <button
-            id="subtab-btn-referral"
-            onClick={() => setActiveSubTab('referral')}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
-              activeSubTab === 'referral'
-                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <Gift className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-            <span>{translate("Parrainage", "Referrals")}</span>
-            <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
-              {currentUser.referralCount || 0}
-            </span>
-          </button>
-
-          <button
-            id="btn-subtab-settings"
-            onClick={() => setActiveSubTab('settings')}
-            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ml-auto ${
-              activeSubTab === 'settings'
-                ? 'bg-slate-700 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <Settings className="w-3.5 h-3.5 shrink-0" />
-            <span>{translate("Paramètres", "Settings")}</span>
-          </button>
-        </div>
-      </nav>
 
       {/* SUB-TAB 1: MES VENTES */}
       {activeSubTab === 'sales' && (

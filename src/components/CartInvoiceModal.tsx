@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Receipt, 
@@ -19,8 +19,10 @@ import {
   Sparkles,
   Phone,
   Copy,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from 'lucide-react';
+import { downloadElementAsPdf } from '../utils/paymentAuditReceiptService';
 
 export const CartInvoiceModal: React.FC = () => {
   const { 
@@ -31,13 +33,35 @@ export const CartInvoiceModal: React.FC = () => {
   } = useApp();
 
   const printAreaRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   if (!cartInvoiceModalOrder) return null;
 
   const order = cartInvoiceModalOrder;
 
   const handlePrint = () => {
+    addToast('Impression', 'Ouverture de la fenêtre d\'impression...', 'info');
     window.print();
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!printAreaRef.current) return;
+    setIsGeneratingPdf(true);
+    addToast('Génération PDF', 'Création du fichier PDF officiel en cours...', 'info');
+    try {
+      const filename = `Facture_BRADCI_${order.id.toUpperCase()}.pdf`;
+      const ok = await downloadElementAsPdf(printAreaRef.current, filename);
+      if (ok) {
+        addToast('Téléchargement terminé', `La facture ${filename} a été générée.`, 'success');
+      } else {
+        window.print();
+      }
+    } catch (err) {
+      console.error(err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleCopyOtp = () => {
@@ -76,12 +100,26 @@ export const CartInvoiceModal: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 disabled:opacity-50"
+              title="Télécharger directement en fichier PDF"
+            >
+              {isGeneratingPdf ? (
+                <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5 text-amber-400" />
+              )}
+              <span className="hidden sm:inline">Télécharger PDF</span>
+            </button>
+
+            <button
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700"
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-blue-500/20"
               title="Imprimer ou enregistrer en PDF"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Imprimer / PDF</span>
+              <span className="hidden sm:inline">Imprimer</span>
             </button>
 
             <button
