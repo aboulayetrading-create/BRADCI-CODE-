@@ -28,6 +28,7 @@ import {
   FraudIncidentRecord,
   ReferralRecord,
   VehicleType,
+  DriverTab,
   CartItem,
   CartItemChannel,
   CartSellerGroup,
@@ -83,6 +84,7 @@ interface AppContextType {
   users: User[];
   products: Product[];
   freightJobs: DeliveryJob[];
+  setFreightJobs: React.Dispatch<React.SetStateAction<DeliveryJob[]>>;
   escrowRecords: EscrowRecord[];
   directPaymentRecords: DirectPaymentRecord[];
   kycRecords: KYCRecord[];
@@ -259,6 +261,9 @@ interface AppContextType {
   purgeExpiredSoldProduct: (productId: string) => void;
   sellerCancelAuction: (productId: string) => void;
   simulateFiveBids: (productId: string) => void;
+  activeDriverTab: DriverTab;
+  setActiveDriverTab: (tab: DriverTab) => void;
+  assignTestJobToDriver: (driverId?: string) => void;
   canDriverTakeDeliveries: (driver?: User | null) => { allowed: boolean; reason?: string; remaining: number };
   toggleDriverAvailability: () => void;
   switchDriverAccount: (driverId: string) => void;
@@ -385,8 +390,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [freightJobs, setFreightJobs] = useState<DeliveryJob[]>(() => {
     const saved = localStorage.getItem('bradci_freight');
-    return saved ? JSON.parse(saved) : INITIAL_FREIGHT_JOBS;
+    if (!saved) return INITIAL_FREIGHT_JOBS;
+    try {
+      const parsed: DeliveryJob[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map(j => j.id));
+      const missing = INITIAL_FREIGHT_JOBS.filter(j => !existingIds.has(j.id));
+      return [...parsed, ...missing];
+    } catch {
+      return INITIAL_FREIGHT_JOBS;
+    }
   });
+
+  const [activeDriverTab, setActiveDriverTabState] = useState<DriverTab>(() => {
+    return (localStorage.getItem('bradci_driver_active_subtab') as DriverTab) || 'available_orders';
+  });
+
+  const setActiveDriverTab = (tab: DriverTab) => {
+    setActiveDriverTabState(tab);
+    localStorage.setItem('bradci_driver_active_subtab', tab);
+  };
 
   const [escrowRecords, setEscrowRecords] = useState<EscrowRecord[]>(() => {
     const saved = localStorage.getItem('bradci_escrow');
@@ -2464,6 +2486,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addToast('Course Acceptée !', `Rendez-vous à ${updatedJob.pickupCommune} (${updatedJob.pickupAddress}) pour récupérer le colis.`, 'success');
     return true;
+  };
+
+  const assignTestJobToDriver = (driverId?: string) => {
+    const targetDriver = driverId 
+      ? users.find(u => u.id === driverId) 
+      : (currentUser?.role === 'driver' ? currentUser : users.find(u => u.role === 'driver'));
+    if (!targetDriver) return;
+
+    // Check if an available job already exists in freightJobs
+    const avail = freightJobs.find(j => j.status === 'available');
+    if (avail) {
+      driverAcceptJob(avail.id);
+      setActiveDriverTab('active_mission');
+      return;
+    }
+
+    // Create a fresh test job assigned to this driver
+    const newJob: DeliveryJob = {
+      id: 'job-test-' + Date.now(),
+      productId: 'prod-test-' + Date.now(),
+      productTitle: 'Sneakers Nike Air Jordan 4 "Retro White Cement"',
+      productImage: 'https://images.unsplash.com/photo-1552346154-21d32810aba3?w=600&auto=format&fit=crop&q=80',
+      sellerName: 'Boutique SneakerHub Abidjan',
+      sellerPhone: '+225 07 48 92 11 34',
+      pickupCommune: 'Cocody',
+      pickupAddress: 'Deux-Plateaux Vallons, Rue des Jardins',
+      pickupCoords: { lat: 5.3620, lng: -3.9910 },
+      buyerName: 'David Kouamé',
+      buyerPhone: '+225 05 99 88 77 66',
+      dropoffCommune: 'Marcory',
+      dropoffAddress: 'Zone 4, Boulevard de Marseille',
+      dropoffCoords: { lat: 5.2954, lng: -3.9847 },
+      requiredVehicle: 'moto',
+      deliveryFee: 3500,
+      itemValue: 120000,
+      status: 'in_transit',
+      assignedDriverId: targetDriver.id,
+      assignedDriverName: targetDriver.name,
+      assignedDriverPhone: targetDriver.phone,
+      pickupCode: '4491',
+      deliveryOtpCode: '8814',
+      distanceKm: 7.4,
+      etaMinutes: 12
+    };
+
+    setFreightJobs(prev => [newJob, ...prev]);
+    setActiveDriverTab('active_mission');
+    addToast('Nouvelle Mission Assignée !', `La course "${newJob.productTitle}" vous a été attribuée (+3 500 FCFA).`, 'success');
   };
 
   const driverConfirmPickup = (jobId: string, enteredCode: string): boolean => {
@@ -4969,6 +5039,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users,
         products,
         freightJobs,
+        setFreightJobs,
         escrowRecords,
         directPaymentRecords,
         kycRecords,
@@ -5133,6 +5204,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sellerCancelAuction,
         simulateFiveBids,
         canDriverTakeDeliveries,
+        activeDriverTab,
+        setActiveDriverTab,
+        assignTestJobToDriver,
         toggleDriverAvailability,
         switchDriverAccount,
         driverAcceptJob,

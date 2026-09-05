@@ -22,7 +22,11 @@ import {
   Bell,
   Building2,
   ShoppingCart,
-  Settings
+  Settings,
+  Power,
+  Package,
+  Receipt,
+  FileCheck
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -53,7 +57,11 @@ export const Navbar: React.FC = () => {
     setKycModalOpen,
     checkKycVerifiedOrPrompt,
     cart,
-    setCartModalOpen
+    setCartModalOpen,
+    toggleDriverAvailability,
+    freightJobs,
+    activeDriverTab,
+    setActiveDriverTab
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -68,6 +76,9 @@ export const Navbar: React.FC = () => {
   };
 
   const publishQuota = currentUser ? canUserPublishProduct(currentUser) : null;
+  const isDriver = currentUser?.role === 'driver';
+  const driverActiveMission = isDriver && freightJobs ? freightJobs.some(j => j.assignedDriverId === currentUser.id && j.status !== 'delivered' && j.status !== 'cancelled') : false;
+  const availableJobsCount = isDriver && freightJobs ? freightJobs.filter(j => j.status === 'available').length : 0;
 
   return (
     <header id="main-navbar" className="sticky top-0 z-40 bg-[#0B1021]/95 backdrop-blur-md border-b border-[#222D4A] transition-colors">
@@ -77,7 +88,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <button 
               id="nav-logo"
-              onClick={() => setActiveTab('explore')}
+              onClick={() => setActiveTab(isDriver ? 'dashboard_driver' : 'explore')}
               className="flex items-center text-left group focus:outline-none transition-transform active:scale-95 shrink-0"
             >
               <BradCiLogo size="md" />
@@ -91,131 +102,216 @@ export const Navbar: React.FC = () => {
           </div>
 
           {/* Desktop Navigation Links (Strict RBAC Routing) */}
-          <nav className="hidden md:flex items-center gap-0.5 lg:gap-1.5 shrink-0">
-            {/* Feed / Explore */}
-            <button
-              id="nav-tab-explore"
-              onClick={() => setActiveTab('explore')}
-              className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
-                activeTab === 'explore' 
-                  ? 'bg-slate-800 text-amber-400 font-semibold shadow-sm' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              {translate("Enchères", "Auctions")}
-            </button>
-
-            {/* B2B Liquidation Hub */}
-            <button
-              id="nav-tab-b2b"
-              onClick={() => setActiveTab('b2b_liquidation')}
-              className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
-                activeTab === 'b2b_liquidation' 
-                  ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/40 font-bold shadow-sm' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              <Building2 className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-blue-400 shrink-0" />
-              <span>{translate("Déstockage B2B", "B2B Liquidation")}</span>
-              <span className="hidden xl:inline-block text-[9px] bg-blue-500/30 text-cyan-300 font-extrabold px-1.5 py-0.2 rounded">LOTS</span>
-            </button>
-
-            {/* Client Dashboard (Only for Client role) */}
-            {currentUser?.role === 'client' && (
+          {isDriver ? (
+            <nav id="nav-desktop-driver" className="hidden md:flex items-center gap-1 lg:gap-1.5 shrink-0">
               <button
-                id="nav-tab-client-dashboard"
-                onClick={() => setActiveTab('dashboard_client')}
-                className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
-                  activeTab === 'dashboard_client' 
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold' 
+                id="nav-tab-driver-jobs"
+                onClick={() => {
+                  setActiveTab('dashboard_driver');
+                  setActiveDriverTab('available_orders');
+                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'available_orders' }));
+                }}
+                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'dashboard_driver' && activeDriverTab === 'available_orders'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Package className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{translate("Bourse aux Courses", "Available Orders")}</span>
+                {availableJobsCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 font-mono-num font-black text-[10px]">
+                    {availableJobsCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                id="nav-tab-driver-active"
+                onClick={() => {
+                  setActiveTab('dashboard_driver');
+                  setActiveDriverTab('active_mission');
+                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'active_mission' }));
+                }}
+                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'dashboard_driver' && activeDriverTab === 'active_mission'
+                    ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/50 shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Navigation className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span>{translate("Mission en cours", "Active Mission")}</span>
+                {driverActiveMission && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                )}
+              </button>
+
+              <button
+                id="nav-tab-driver-history"
+                onClick={() => {
+                  setActiveTab('dashboard_driver');
+                  setActiveDriverTab('history');
+                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'history' }));
+                }}
+                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'dashboard_driver' && activeDriverTab === 'history'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Receipt className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>{translate("Gain", "Earnings")}</span>
+              </button>
+
+              <button
+                id="nav-tab-driver-profile"
+                onClick={() => {
+                  setActiveTab('dashboard_driver');
+                  setActiveDriverTab('profile');
+                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'profile' }));
+                }}
+                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'dashboard_driver' && activeDriverTab === 'profile'
+                    ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <FileCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{translate("Véhicule & Documents", "Vehicle & Documents")}</span>
+              </button>
+            </nav>
+          ) : (
+            <nav className="hidden md:flex items-center gap-0.5 lg:gap-1.5 shrink-0">
+              {/* Feed / Explore */}
+              <button
+                id="nav-tab-explore"
+                onClick={() => setActiveTab('explore')}
+                className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
+                  activeTab === 'explore' 
+                    ? 'bg-slate-800 text-amber-400 font-semibold shadow-sm' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                 }`}
               >
-                <User className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-blue-400 shrink-0" />
-                <span>{translate("Mon Espace", "My Space")}</span>
+                {translate("Enchères", "Auctions")}
               </button>
-            )}
 
-            {/* Driver Dashboard (Only for Driver role - Strict RBAC) */}
-            {currentUser?.role === 'driver' && (
+              {/* B2B Liquidation Hub */}
               <button
-                id="nav-tab-driver-dashboard"
-                onClick={() => setActiveTab('dashboard_driver')}
+                id="nav-tab-b2b"
+                onClick={() => setActiveTab('b2b_liquidation')}
                 className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
-                  activeTab === 'dashboard_driver' 
-                    ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 font-semibold' 
+                  activeTab === 'b2b_liquidation' 
+                    ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/40 font-bold shadow-sm' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                 }`}
               >
-                <Bike className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-emerald-400 shrink-0" />
-                <span>{translate("Fret & GPS", "Freight & GPS")}</span>
+                <Building2 className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-blue-400 shrink-0" />
+                <span>{translate("Déstockage B2B", "B2B Liquidation")}</span>
+                <span className="hidden xl:inline-block text-[9px] bg-blue-500/30 text-cyan-300 font-extrabold px-1.5 py-0.2 rounded">LOTS</span>
               </button>
-            )}
 
-            {/* Admin Dashboard (Only for Admin role - Strict RBAC) */}
-            {currentUser?.role === 'admin' && (
+              {/* Client Dashboard (Only for Client role) */}
+              {currentUser?.role === 'client' && (
+                <button
+                  id="nav-tab-client-dashboard"
+                  onClick={() => setActiveTab('dashboard_client')}
+                  className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
+                    activeTab === 'dashboard_client' 
+                      ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold' 
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                  }`}
+                >
+                  <User className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-blue-400 shrink-0" />
+                  <span>{translate("Mon Espace", "My Space")}</span>
+                </button>
+              )}
+
+              {/* Admin Dashboard (Only for Admin role - Strict RBAC) */}
+              {currentUser?.role === 'admin' && (
+                <button
+                  id="nav-tab-admin-dashboard"
+                  onClick={() => setActiveTab('dashboard_admin')}
+                  className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
+                    activeTab === 'dashboard_admin' 
+                      ? 'bg-red-600/20 text-red-400 border border-red-500/30 font-semibold' 
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                  }`}
+                >
+                  <ShieldCheck className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-red-400 shrink-0" />
+                  <span>{translate("Back-Office", "Back-Office")}</span>
+                </button>
+              )}
+
+              {/* Tarifs & Pass */}
               <button
-                id="nav-tab-admin-dashboard"
-                onClick={() => setActiveTab('dashboard_admin')}
+                id="nav-tab-pricing"
+                onClick={() => setActiveTab('tarifs')}
                 className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
-                  activeTab === 'dashboard_admin' 
-                    ? 'bg-red-600/20 text-red-400 border border-red-500/30 font-semibold' 
+                  activeTab === 'tarifs' 
+                    ? 'bg-slate-800 text-amber-400 font-semibold' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                 }`}
               >
-                <ShieldCheck className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-red-400 shrink-0" />
-                <span>{translate("Back-Office", "Back-Office")}</span>
+                <Sparkles className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-amber-400 shrink-0" />
+                <span>{translate("Pass & Tarifs", "Pass & Rates")}</span>
               </button>
-            )}
 
-            {/* Tarifs & Pass */}
-            <button
-              id="nav-tab-pricing"
-              onClick={() => setActiveTab('tarifs')}
-              className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
-                activeTab === 'tarifs' 
-                  ? 'bg-slate-800 text-amber-400 font-semibold' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              <Sparkles className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-amber-400 shrink-0" />
-              <span>{translate("Pass & Tarifs", "Pass & Rates")}</span>
-            </button>
-
-            {/* À Propos & Sécurité */}
-            <button
-              id="nav-tab-about"
-              onClick={() => setActiveTab('about')}
-              className={`hidden lg:block px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
-                activeTab === 'about' 
-                  ? 'bg-slate-800 text-amber-400 font-semibold' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-              }`}
-            >
-              {translate("Séquestre", "Escrow")}
-            </button>
-          </nav>
+              {/* À Propos & Sécurité */}
+              <button
+                id="nav-tab-about"
+                onClick={() => setActiveTab('about')}
+                className={`hidden lg:block px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
+                  activeTab === 'about' 
+                    ? 'bg-slate-800 text-amber-400 font-semibold' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                {translate("Séquestre", "Escrow")}
+              </button>
+            </nav>
+          )}
 
           {/* Right Action Bar - Pure, focused, essential navigation only */}
           <div 
             id="navbar-actions-bar" 
             className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 justify-end py-1 pl-1"
           >
-            {/* Shopping Cart Button with Dynamic Item Counter */}
-            <button
-              id="btn-navbar-cart"
-              onClick={() => setCartModalOpen(true)}
-              className="relative h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 flex items-center gap-1.5 shadow-sm"
-              title={translate("Mon Panier Multi-Articles", "My Multi-Item Cart")}
-            >
-              <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
-              <span className="text-xs font-bold hidden sm:inline">{translate("Panier", "Cart")}</span>
-              {cart.length > 0 && (
-                <span className="min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[9px] sm:text-[10px] flex items-center justify-center animate-bounce shrink-0 shadow">
-                  {cart.reduce((s, i) => s + i.quantity, 0)}
+            {/* Shopping Cart Button - STRICTLY EXCLUDED FOR DRIVERS (User requirement: no cart for couriers) */}
+            {!isDriver && (
+              <button
+                id="btn-navbar-cart"
+                onClick={() => setCartModalOpen(true)}
+                className="relative h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 flex items-center gap-1.5 shadow-sm"
+                title={translate("Mon Panier Multi-Articles", "My Multi-Item Cart")}
+              >
+                <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+                <span className="text-xs font-bold hidden sm:inline">{translate("Panier", "Cart")}</span>
+                {cart.length > 0 && (
+                  <span className="min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[9px] sm:text-[10px] flex items-center justify-center animate-bounce shrink-0 shadow">
+                    {cart.reduce((s, i) => s + i.quantity, 0)}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* For Drivers: Quick Yango Pro Style Master Availability Switch */}
+            {isDriver && (
+              <button
+                id="navbar-driver-status-toggle"
+                onClick={toggleDriverAvailability}
+                className={`h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all border shadow-sm ${
+                  currentUser.driverAvailability !== 'offline'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
+                    : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
+                }`}
+                title={currentUser.driverAvailability !== 'offline' ? '🟢 En Service (Recevez des courses)' : '🔴 En Pause (Indisponible)'}
+              >
+                <Power className={`w-3.5 h-3.5 ${currentUser.driverAvailability !== 'offline' ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+                <span className="text-[11px] sm:text-xs">
+                  {currentUser.driverAvailability !== 'offline' ? '🟢 EN SERVICE' : '🔴 EN PAUSE'}
                 </span>
-              )}
-            </button>
+              </button>
+            )}
 
             {/* Notification Bell Button */}
             <button
@@ -249,19 +345,21 @@ export const Navbar: React.FC = () => {
               </span>
             </button>
 
-            {/* Quick Publish Product Button */}
-            <button
-              id="btn-publish-product"
-              onClick={handleSellClick}
-              className="h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-lg bg-[#FF5B00] hover:bg-[#E05000] text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[#FF5B00]/30 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
-              title={translate("Mettre un article en vente (Gratuit & Illimité)", "Post item for sale (Free & Unlimited)")}
-            >
-              <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
-              <span className="font-bold">{translate("Vendre", "Sell")}</span>
-              <span className="bg-black/25 text-white text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-mono-num font-black hidden xs:inline">
-                Gratuit
-              </span>
-            </button>
+            {/* Quick Publish Product Button - STRICTLY EXCLUDED FOR DRIVERS */}
+            {!isDriver && (
+              <button
+                id="btn-publish-product"
+                onClick={handleSellClick}
+                className="h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-lg bg-[#FF5B00] hover:bg-[#E05000] text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-[#FF5B00]/30 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
+                title={translate("Mettre un article en vente (Gratuit & Illimité)", "Post item for sale (Free & Unlimited)")}
+              >
+                <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
+                <span className="font-bold">{translate("Vendre", "Sell")}</span>
+                <span className="bg-black/25 text-white text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-mono-num font-black hidden xs:inline">
+                  Gratuit
+                </span>
+              </button>
+            )}
 
             {/* Auth / Profile Area */}
             {currentUser ? (
@@ -444,91 +542,97 @@ export const Navbar: React.FC = () => {
         {/* Mobile Dropdown Menu Drawer */}
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-slate-800/80 py-3 space-y-2 bg-[#080C14]/98 backdrop-blur-xl animate-in slide-in-from-top duration-200">
-            <div className="grid grid-cols-3 gap-2 px-2 pb-2">
-              <button
-                onClick={() => { setActiveTab('explore'); setMobileMenuOpen(false); }}
-                className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
-                  activeTab === 'explore' 
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-                    : 'bg-slate-900 text-slate-300 border-slate-800'
-                }`}
-              >
-                {translate("Enchères", "Auctions")}
-              </button>
-
-              <button
-                onClick={() => { setActiveTab('b2b_liquidation'); setMobileMenuOpen(false); }}
-                className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
-                  activeTab === 'b2b_liquidation' 
-                    ? 'bg-blue-600/30 text-cyan-300 border-blue-500/40' 
-                    : 'bg-slate-900 text-slate-300 border-slate-800'
-                }`}
-              >
-                {translate("Lots B2B", "B2B Lots")}
-              </button>
-
-              <button
-                onClick={() => { setActiveTab('tarifs'); setMobileMenuOpen(false); }}
-                className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
-                  activeTab === 'tarifs' 
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
-                    : 'bg-slate-900 text-slate-300 border-slate-800'
-                }`}
-              >
-                {translate("Pass & Tarifs", "Pass & Rates")}
-              </button>
-            </div>
-
-            {currentUser && (
-              <div className="px-2 space-y-1">
-                {currentUser.role === 'client' && (
+            {isDriver ? (
+              <div className="px-3 space-y-3">
+                {/* Driver Online / Offline master toggle */}
+                <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Power className={`w-4 h-4 ${currentUser.driverAvailability !== 'offline' ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
+                    <div>
+                      <span className="text-xs font-bold text-white block">Statut Chauffeur</span>
+                      <span className="text-[10px] text-slate-400">
+                        {currentUser.driverAvailability !== 'offline' ? 'Prêt à recevoir des courses' : 'En pause / Hors service'}
+                      </span>
+                    </div>
+                  </div>
                   <button
-                    onClick={() => { setActiveTab('dashboard_client'); setMobileMenuOpen(false); }}
-                    className="w-full text-left p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-400 text-xs font-bold flex items-center gap-2"
+                    onClick={toggleDriverAvailability}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all border ${
+                      currentUser.driverAvailability !== 'offline'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}
                   >
-                    <User className="w-4 h-4" />
-                    <span>{translate("Mon Espace Client & Séquestre", "Client Space & Escrow")}</span>
+                    {currentUser.driverAvailability !== 'offline' ? '🟢 En Service' : '🔴 En Pause'}
                   </button>
-                )}
+                </div>
 
-                {currentUser.role === 'driver' && (
+                {/* Driver quick grid */}
+                <div className="grid grid-cols-2 gap-2">
                   <button
-                    onClick={() => { setActiveTab('dashboard_driver'); setMobileMenuOpen(false); }}
-                    className="w-full text-left p-2.5 rounded-xl bg-emerald-600/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold flex items-center gap-2"
+                    onClick={() => { 
+                      setActiveTab('dashboard_driver'); 
+                      setActiveDriverTab('available_orders');
+                      window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'available_orders' }));
+                      setMobileMenuOpen(false); 
+                    }}
+                    className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold text-left flex flex-col gap-1 cursor-pointer"
                   >
-                    <Bike className="w-4 h-4" />
-                    <span>{translate("Espace Livreur (GPS & Bourse de Fret)", "Courier Space (GPS & Deliveries)")}</span>
+                    <div className="flex items-center justify-between">
+                      <Package className="w-4 h-4 text-emerald-400" />
+                      <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-mono-num font-black">
+                        {availableJobsCount}
+                      </span>
+                    </div>
+                    <span>Courses Dispos</span>
                   </button>
-                )}
 
-                {currentUser.role === 'admin' && (
                   <button
-                    onClick={() => { setActiveTab('dashboard_admin'); setMobileMenuOpen(false); }}
-                    className="w-full text-left p-2.5 rounded-xl bg-red-600/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-2"
+                    onClick={() => { 
+                      setActiveTab('dashboard_driver'); 
+                      setActiveDriverTab('active_mission');
+                      window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'active_mission' }));
+                      setMobileMenuOpen(false); 
+                    }}
+                    className="p-3 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-cyan-300 text-xs font-bold text-left flex flex-col gap-1 cursor-pointer"
                   >
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>{translate("Back-Office Super Admin", "Super Admin Back-Office")}</span>
+                    <div className="flex items-center justify-between">
+                      <Navigation className="w-4 h-4 text-cyan-400" />
+                      {driverActiveMission && <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />}
+                    </div>
+                    <span>Mission en cours</span>
                   </button>
-                )}
 
-                <button
-                  id="btn-mobile-settings"
-                  onClick={() => {
-                    setActiveTab('dashboard_client');
-                    setTimeout(() => {
-                      window.dispatchEvent(new CustomEvent('bradci_open_subtab', { detail: 'settings' }));
-                    }, 60);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full text-left p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-bold flex items-center gap-2"
-                >
-                  <Settings className="w-4 h-4 text-amber-400" />
-                  <span>{translate("Paramètres & Préférences", "Settings & Preferences")}</span>
-                </button>
+                  <button
+                    onClick={() => { 
+                      setActiveTab('dashboard_driver'); 
+                      setActiveDriverTab('history');
+                      window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'history' }));
+                      setMobileMenuOpen(false); 
+                    }}
+                    className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold text-left flex flex-col gap-1 cursor-pointer"
+                  >
+                    <Receipt className="w-4 h-4 text-amber-400" />
+                    <span>Gain</span>
+                  </button>
+
+                  <button
+                    onClick={() => { 
+                      setActiveTab('dashboard_driver'); 
+                      setActiveDriverTab('profile');
+                      window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'profile' }));
+                      setMobileMenuOpen(false); 
+                    }}
+                    className="p-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-200 text-xs font-bold text-left flex flex-col gap-1 cursor-pointer"
+                  >
+                    <FileCheck className="w-4 h-4 text-emerald-400" />
+                    <span>Véhicule & Docs</span>
+                  </button>
+                </div>
 
                 <div className="pt-2 border-t border-slate-800">
                   <button
-                    id="btn-mobile-logout"
+                    id="btn-mobile-driver-logout"
                     onClick={() => {
                       logout();
                       setMobileMenuOpen(false);
@@ -540,6 +644,96 @@ export const Navbar: React.FC = () => {
                   </button>
                 </div>
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-2 px-2 pb-2">
+                  <button
+                    onClick={() => { setActiveTab('explore'); setMobileMenuOpen(false); }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                      activeTab === 'explore' 
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                        : 'bg-slate-900 text-slate-300 border-slate-800'
+                    }`}
+                  >
+                    {translate("Enchères", "Auctions")}
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('b2b_liquidation'); setMobileMenuOpen(false); }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                      activeTab === 'b2b_liquidation' 
+                        ? 'bg-blue-600/30 text-cyan-300 border-blue-500/40' 
+                        : 'bg-slate-900 text-slate-300 border-slate-800'
+                    }`}
+                  >
+                    {translate("Lots B2B", "B2B Lots")}
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('tarifs'); setMobileMenuOpen(false); }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
+                      activeTab === 'tarifs' 
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                        : 'bg-slate-900 text-slate-300 border-slate-800'
+                    }`}
+                  >
+                    {translate("Pass & Tarifs", "Pass & Rates")}
+                  </button>
+                </div>
+
+                {currentUser && (
+                  <div className="px-2 space-y-1">
+                    {currentUser.role === 'client' && (
+                      <button
+                        onClick={() => { setActiveTab('dashboard_client'); setMobileMenuOpen(false); }}
+                        className="w-full text-left p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-400 text-xs font-bold flex items-center gap-2"
+                      >
+                        <User className="w-4 h-4" />
+                        <span>{translate("Mon Espace Client & Séquestre", "Client Space & Escrow")}</span>
+                      </button>
+                    )}
+
+                    {currentUser.role === 'admin' && (
+                      <button
+                        onClick={() => { setActiveTab('dashboard_admin'); setMobileMenuOpen(false); }}
+                        className="w-full text-left p-2.5 rounded-xl bg-red-600/10 border border-red-500/20 text-red-400 text-xs font-bold flex items-center gap-2"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>{translate("Back-Office Super Admin", "Super Admin Back-Office")}</span>
+                      </button>
+                    )}
+
+                    <button
+                      id="btn-mobile-settings"
+                      onClick={() => {
+                        setActiveTab('dashboard_client');
+                        setTimeout(() => {
+                          window.dispatchEvent(new CustomEvent('bradci_open_subtab', { detail: 'settings' }));
+                        }, 60);
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-bold flex items-center gap-2"
+                    >
+                      <Settings className="w-4 h-4 text-amber-400" />
+                      <span>{translate("Paramètres & Préférences", "Settings & Preferences")}</span>
+                    </button>
+
+                    <div className="pt-2 border-t border-slate-800">
+                      <button
+                        id="btn-mobile-logout"
+                        onClick={() => {
+                          logout();
+                          setMobileMenuOpen(false);
+                        }}
+                        className="w-full py-2.5 px-3.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-xl font-bold text-sm flex items-center justify-center gap-2 border border-red-500/20 transition-all"
+                      >
+                        <LogOut className="w-4 h-4 shrink-0" />
+                        <span>{translate("Se Déconnecter", "Sign Out")}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

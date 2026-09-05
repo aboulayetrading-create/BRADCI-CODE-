@@ -619,6 +619,8 @@ export interface SupportChatMessage {
 
 export type TimeFilter = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
 
+export type DriverTab = 'available_orders' | 'active_mission' | 'history' | 'profile';
+
 export type PaymentMethod = 'Wave' | 'Orange Money' | 'MTN MoMo' | 'Moov Money' | 'Carte Bancaire';
 
 export interface WithdrawalRequest {

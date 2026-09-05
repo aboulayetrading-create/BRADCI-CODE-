@@ -3,10 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navbar } from './components/Navbar';
-import { RoleSwitcherBar } from './components/RoleSwitcherBar';
 import { VisitorFeed } from './components/VisitorFeed';
 import { ClientDashboard } from './components/ClientDashboard';
 import { DriverDashboard } from './components/DriverDashboard';
@@ -56,6 +55,7 @@ import {
 
 const AppContent: React.FC = () => {
   const { 
+    currentUser,
     activeTab, 
     setActiveTab, 
     setPricingModalOpen, 
@@ -67,6 +67,13 @@ const AppContent: React.FC = () => {
     updateUserAvatar,
     translate
   } = useApp();
+
+  // If driver account is active, ensure driver stays strictly in the delivery dashboard
+  useEffect(() => {
+    if (currentUser?.role === 'driver' && (activeTab === 'explore' || activeTab === 'feed' || activeTab === 'b2b_liquidation' || activeTab === 'dashboard_client')) {
+      setActiveTab('dashboard_driver');
+    }
+  }, [currentUser?.role, activeTab, setActiveTab]);
 
   // If site is in maintenance mode and user is not an authenticated admin, show maintenance screen
   if (isMaintenanceMode && !isAdminAuthenticated && activeTab !== 'dashboard_admin') {
@@ -83,11 +90,6 @@ const AppContent: React.FC = () => {
       {/* 1. Main Navigation Bar */}
       <ErrorBoundary fallbackTitle="Navigation">
         <Navbar />
-      </ErrorBoundary>
-
-      {/* Rôles & Parcours Acteurs (Acheteur, Vendeur Déstockage, Livreur Express) */}
-      <ErrorBoundary fallbackTitle="Parcours Acteurs">
-        <RoleSwitcherBar />
       </ErrorBoundary>
 
       {/* 2. Persistent Live Delivery Status Bar (Buyer, Seller & Driver Dispatch Notification) */}

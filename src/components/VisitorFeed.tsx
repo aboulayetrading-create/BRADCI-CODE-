@@ -205,25 +205,7 @@ export const VisitorFeed: React.FC = () => {
               )}
             </p>
 
-            {/* 4 Feature Highlights */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-              <div className="bg-slate-900/70 border border-slate-800/80 p-2.5 sm:p-3 rounded-2xl">
-                <span className="text-amber-400 font-bold text-xs block">{translate("13 Communes + 4 Villes", "13 Communes + 4 Cities")}</span>
-                <span className="text-[11px] text-slate-400">{translate("Grand Abidjan & Littoral", "Greater Abidjan & Coast")}</span>
-              </div>
-              <div className="bg-slate-900/70 border border-slate-800/80 p-2.5 sm:p-3 rounded-2xl">
-                <span className="text-blue-400 font-bold text-xs block">{translate("Pass Standard 5 000 F", "Standard Pass 5,000 F")}</span>
-                <span className="text-[11px] text-slate-400">{translate("Comm. réduite 5%", "Reduced 5% comm.")}</span>
-              </div>
-              <div className="bg-slate-900/70 border border-slate-800/80 p-2.5 sm:p-3 rounded-2xl">
-                <span className="text-emerald-400 font-bold text-xs block">{translate("5 Courses Livreur", "5 Free Courier Runs")}</span>
-                <span className="text-[11px] text-slate-400">{translate("Essai gratuit offert", "Free trial included")}</span>
-              </div>
-              <div className="bg-slate-900/70 border border-slate-800/80 p-2.5 sm:p-3 rounded-2xl">
-                <span className="text-red-400 font-bold text-xs block">{translate("Unicité KYC", "KYC Identity Check")}</span>
-                <span className="text-[11px] text-slate-400">{translate("Sécurité 100% Anti-Fraude", "100% Anti-Fraud POD")}</span>
-              </div>
-            </div>
+
 
             {/* Fast action CTAs & Quick Filters */}
             <div className="flex flex-wrap items-center gap-2.5 mt-5">

@@ -5,6 +5,7 @@ import {
   Package, 
   ShoppingBag, 
   ShieldCheck, 
+  ShieldAlert, 
   PlusCircle, 
   Sparkles, 
   KeyRound, 
@@ -247,134 +248,234 @@ export const ClientDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header Profile Bar */}
-      <div className="p-6 rounded-3xl bg-[#0C121E] border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div 
-            onClick={() => setProfileAvatarModalOpen(true)}
-            className="relative group cursor-pointer"
-            title="Cliquez pour changer / importer votre photo de profil"
-          >
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-500/40 shadow-lg group-hover:opacity-85 transition-opacity"
-            />
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setProfileAvatarModalOpen(true); }}
-              className="absolute -bottom-1 -right-1 bg-amber-500 hover:bg-amber-400 text-slate-950 p-1.5 rounded-full shadow-lg border border-slate-900 transition-all hover:scale-110"
-              title="Changer / Importer ma photo de profil"
+      {/* 1. Professional Executive Profile & Operational Hub */}
+      <div className="rounded-3xl bg-[#0B111E] border border-slate-800/90 shadow-2xl p-5 sm:p-7 space-y-6">
+        {/* Top Profile Header Bar */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 pb-6 border-b border-slate-800/80">
+          <div className="flex items-center gap-4">
+            <div 
+              onClick={() => setProfileAvatarModalOpen(true)}
+              className="relative group cursor-pointer shrink-0"
+              title={translate("Modifier ma photo de profil", "Change profile photo")}
             >
-              <Camera className="w-3.5 h-3.5" />
-            </button>
-            {currentUser.isVIP && (
-              <div className="absolute -top-2 -right-2 bg-amber-400 text-slate-950 p-1 rounded-full shadow">
-                <Crown className="w-3.5 h-3.5 fill-slate-950" />
-              </div>
-            )}
-          </div>
-
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-extrabold text-white font-display">{currentUser.name}</h2>
-              <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded ${
-                currentUser.sellerPlan === 'pro'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : currentUser.sellerPlan === 'standard'
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-              }`}>
-                {currentUser.sellerPlan === 'pro' ? 'PASS BOUTIQUE VIP OR' :
-                 currentUser.sellerPlan === 'standard' ? 'PASS VENDEUR CERTIFIÉ' : 'COMPTE GRATUIT (ILLIMITÉ)'}
-              </span>
-              {currentUser.kycStatus === 'pending' && (
-                <span id="profile-header-kyc-pending-badge" className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-xs">
-                  <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                  <span>{translate("KYC en cours de vérification", "KYC under verification")}</span>
-                </span>
-              )}
-              {currentUser.kycStatus === 'verified' && (
-                <span id="profile-header-kyc-verified-badge" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{translate("Vérifié KYC", "KYC Verified")}</span>
-                </span>
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl object-cover border-2 border-amber-500/50 shadow-xl group-hover:opacity-85 transition-opacity"
+              />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setProfileAvatarModalOpen(true); }}
+                className="absolute -bottom-1 -right-1 bg-amber-500 hover:bg-amber-400 text-slate-950 p-1.5 rounded-full shadow-lg border-2 border-slate-950 transition-all hover:scale-110"
+                title={translate("Changer la photo", "Change photo")}
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
+              {currentUser.isVIP && (
+                <div className="absolute -top-2 -right-2 bg-amber-400 text-slate-950 p-1 rounded-full shadow">
+                  <Crown className="w-3.5 h-3.5 fill-slate-950" />
+                </div>
               )}
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">{currentUser.email} • {currentUser.phone}</p>
-            
+
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl sm:text-2xl font-extrabold text-white font-display tracking-tight">{currentUser.name}</h2>
+                <span className={`text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full border ${
+                  currentUser.sellerPlan === 'pro'
+                    ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                    : currentUser.sellerPlan === 'standard'
+                    ? 'bg-blue-500/15 text-blue-300 border-blue-500/40'
+                    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                }`}>
+                  {currentUser.sellerPlan === 'pro' ? '👑 VIP OR (2.5% comm.)' :
+                   currentUser.sellerPlan === 'standard' ? '✨ Pass Certifié (5% comm.)' : '🌱 Gratuit (10% comm.)'}
+                </span>
+
+                {currentUser.kycStatus === 'verified' ? (
+                  <span id="profile-header-kyc-verified-badge" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{translate("Vérifié KYC", "KYC Verified")}</span>
+                  </span>
+                ) : currentUser.kycStatus === 'pending' ? (
+                  <span id="profile-header-kyc-pending-badge" className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-xs">
+                    <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                    <span>{translate("KYC en cours de vérification", "KYC under verification")}</span>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setKycModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 hover:text-amber-400 transition-colors"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{translate("Vérifier KYC", "Verify KYC")}</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+                <span>{currentUser.email}</span>
+                <span>•</span>
+                <span>{currentUser.phone}</span>
+                <span>•</span>
+                <button
+                  onClick={() => setGpsModalOpen(true)}
+                  className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+                >
+                  <MapPin className="w-3 h-3" />
+                  <span>{userLocation?.commune || currentUser.gpsLocation?.commune || 'Abidjan'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Header CTAs */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
             <button
-              type="button"
-              onClick={() => setProfileAvatarModalOpen(true)}
-              className="text-[11px] text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 mt-1 transition-colors"
+              onClick={() => {
+                if (!checkKycVerifiedOrPrompt('sell')) return;
+                setNewProductModalOpen(true);
+              }}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5"
             >
-              <Camera className="w-3 h-3" />
-              <span>{translate("Modifier ma photo de profil (Caméra / Galerie)", "Change profile photo (Camera / Gallery)")}</span>
+              <PlusCircle className="w-4 h-4" />
+              <span>{translate("Publier un Article", "Post Item")}</span>
+            </button>
+
+            {currentUser.sellerPlan !== 'pro' && (
+              <button
+                onClick={() => {
+                  setTargetPlanForPricing(currentUser.sellerPlan === 'standard' ? 'pro' : 'standard');
+                  setPricingModalOpen(true);
+                }}
+                className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/30 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>{translate("Changer de Pass", "Upgrade Pass")}</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => setGpsModalOpen(true)}
+              className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5"
+              title={translate("Modifier ma zone GPS", "Change GPS zone")}
+            >
+              <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">{translate("Zone GPS", "GPS Zone")}</span>
             </button>
           </div>
         </div>
 
-        {/* Quota & Wallet Widget */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Status display for Basic / Standard / Pro */}
-          <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center gap-3">
-            <div>
-              <span className="text-[10px] text-slate-400 block uppercase font-bold">Publications :</span>
-              <span className="text-sm font-extrabold text-emerald-400 font-mono-num flex items-center gap-1">
-                <span>Illimitées (∞)</span>
-              </span>
+        {/* 4 Clean Metric & Financial KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* KPI 1: Solde Disponible Retrait */}
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/30 transition-colors flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translate("Solde Retrait", "Wallet Balance")}</span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                <CreditCard className="w-3.5 h-3.5" />
+              </div>
             </div>
-            {currentUser.sellerPlan !== 'pro' && (
-              <button
-                onClick={() => {
-                  setTargetPlanForPricing('standard');
-                  setPricingModalOpen(true);
-                }}
-                className="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 px-2 py-1 rounded-lg font-bold transition-colors flex items-center gap-1"
-                title="Passer au Pass Certifié pour réduire vos commissions et obtenir le badge officiel"
-              >
-                <Crown className="w-3 h-3 text-amber-400" />
-                <span>Passer au Sérieux</span>
-              </button>
-            )}
-          </div>
-
-          {/* Solde Disponible Retrait */}
-          <div className="p-3 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center gap-3">
             <div>
-              <span className="text-[10px] text-slate-400 block uppercase font-bold">Solde Disponible Retrait :</span>
-              <span className="text-sm font-extrabold text-emerald-400 font-mono-num">
+              <div className="text-xl font-extrabold text-emerald-400 font-mono-num">
                 {currentUser.walletBalance.toLocaleString('fr-FR')} FCFA
-              </span>
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {translate("Paiement Direct Wave / MoMo", "Direct POD Wave / MoMo")}
+              </div>
             </div>
-            {currentUser.walletBalance > 0 && (
+            {currentUser.walletBalance > 0 ? (
               <button
                 onClick={() => {
                   setWithdrawAmount(currentUser.walletBalance.toString());
                   setWithdrawalModalOpen(true);
                 }}
-                className="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg font-bold transition-all shadow-sm flex items-center gap-1"
+                className="w-full py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs transition-all shadow-sm flex items-center justify-center gap-1"
               >
-                <CreditCard className="w-3 h-3" />
-                <span>Retirer</span>
+                <span>{translate("Demander un Retrait", "Request Withdrawal")}</span>
+                <ArrowRight className="w-3 h-3" />
               </button>
+            ) : (
+              <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-500/70" />
+                <span>0 F frais de transfert</span>
+              </div>
             )}
           </div>
 
-          {/* Information Paiement Direct */}
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-3">
-            <div>
-              <span className="text-[10px] text-emerald-400 block uppercase font-bold flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                <span>Paiement Direct à la Livraison (POD) :</span>
-              </span>
-              <span className="text-xs font-semibold text-slate-200">
-                Paiement Mobile Money une fois le colis reçu
-              </span>
+          {/* KPI 2: Ventes & Catalogue */}
+          <div 
+            onClick={() => setActiveSubTab('sales')}
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-500/30 transition-colors cursor-pointer flex flex-col justify-between space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translate("Mes Ventes", "My Sales")}</span>
+              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
+                <Package className="w-3.5 h-3.5" />
+              </div>
             </div>
-            <span className="text-[9px] bg-emerald-500/20 text-emerald-200 px-2 py-0.5 rounded font-medium max-w-[110px] text-center leading-tight">
-              0% Blocage de fonds
-            </span>
+            <div>
+              <div className="text-xl font-extrabold text-white font-mono-num">
+                {mySales.length} {translate("article(s)", "item(s)")}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {myExpeditions.length > 0 ? `${myExpeditions.length} expédition(s) en cours` : 'Publication illimitée'}
+              </div>
+            </div>
+            <div className="text-[11px] text-amber-400 font-bold flex items-center gap-1">
+              <span>{translate("Gérer les annonces", "Manage listings")}</span>
+              <ChevronRight className="w-3 h-3" />
+            </div>
+          </div>
+
+          {/* KPI 3: Achats & Commandes */}
+          <div 
+            onClick={() => setActiveSubTab('purchases')}
+            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-blue-500/30 transition-colors cursor-pointer flex flex-col justify-between space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translate("Mes Commandes", "My Purchases")}</span>
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center border border-blue-500/20">
+                <ShoppingBag className="w-3.5 h-3.5" />
+              </div>
+            </div>
+            <div>
+              <div className="text-xl font-extrabold text-white font-mono-num">
+                {myPurchases.length} {translate("commande(s)", "order(s)")}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">
+                {translate("Garantie POD après inspection", "POD guaranteed after check")}
+              </div>
+            </div>
+            <div className="text-[11px] text-blue-400 font-bold flex items-center gap-1">
+              <span>{translate("Suivi des colis", "Track packages")}</span>
+              <ChevronRight className="w-3 h-3" />
+            </div>
+          </div>
+
+          {/* KPI 4: Zone GPS & Sécurité */}
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col justify-between space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{translate("Zone & Sécurité", "Zone & Safety")}</span>
+              <div className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center border border-slate-700">
+                <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-extrabold text-white truncate">
+                {userLocation?.commune || currentUser.gpsLocation?.commune || 'Grand Abidjan'}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5 truncate">
+                {userLocation?.address || currentUser.gpsLocation?.address || 'Côte d\'Ivoire'}
+              </div>
+            </div>
+            <button
+              onClick={() => setGpsModalOpen(true)}
+              className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 text-left"
+            >
+              <span>{translate("Modifier l'adresse", "Change address")}</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
           </div>
         </div>
       </div>
@@ -569,201 +670,176 @@ export const ClientDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* GPS Location & Safety Banner */}
-      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/30 via-slate-900 to-slate-900 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-            gpsPermissionStatus === 'granted' && userLocation 
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
-              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse'
-          }`}>
-            <Navigation className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-emerald-400">Position GPS d'Enlèvement & Livraison Validée</span>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-mono">
-                {userLocation?.commune || currentUser.gpsLocation?.commune || 'Abidjan'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-300 mt-0.5">
-              {userLocation?.address || currentUser.gpsLocation?.address || 'Grand Abidjan, Côte d\'Ivoire'}
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setGpsModalOpen(true)}
-          className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white border border-slate-700 flex items-center gap-1.5 transition-colors shrink-0"
-        >
-          <MapPin className="w-4 h-4 text-emerald-400" />
-          <span>Modifier Adresse GPS</span>
-        </button>
-      </div>
-
-      {/* Navigation Sub-Tabs */}
-      <div className="flex border-b border-slate-800 gap-1 sm:gap-2 overflow-x-auto pb-0.5">
-        <button
-          onClick={() => setActiveSubTab('sales')}
-          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
-            activeSubTab === 'sales'
-              ? 'border-amber-500 text-amber-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Package className="w-4 h-4" />
-          <span>{translate("Mes Ventes", "My Sales")} ({mySales.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('expeditions')}
-          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
-            activeSubTab === 'expeditions'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Truck className="w-4 h-4" />
-          <span>{translate("Suivi des Expéditions", "Shipment Tracking")} ({myExpeditions.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('shop')}
-          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
-            activeSubTab === 'shop'
-              ? 'border-amber-500 text-amber-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Store className="w-4 h-4" />
-          <span>{translate("Ma Boutique BRAD'CI", "My Storefront")}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('purchases')}
-          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
-            activeSubTab === 'purchases'
-              ? 'border-emerald-500 text-emerald-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <ShoppingBag className="w-4 h-4" />
-          <span>{translate("Mes Commandes & Colis", "My Orders & Packages")} ({myPurchases.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('transactions')}
-          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
-            activeSubTab === 'transactions'
-              ? 'border-purple-500 text-purple-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <CreditCard className="w-4 h-4" />
-          <span>{translate("Historique & Retraits", "History & Withdrawals")}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('kyc')}
-          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
-            activeSubTab === 'kyc'
-              ? 'border-amber-500 text-amber-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>{translate("Sécurité KYC", "KYC Security")}</span>
-          {currentUser.kycStatus === 'verified' && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-          )}
-          {currentUser.kycStatus === 'pending' && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30 flex items-center gap-1">
-              <Clock className="w-2.5 h-2.5 animate-pulse" />
-              <span>{translate("En cours", "In review")}</span>
+      {/* 2. Professional Streamlined Tab Switcher (No binders/classeurs) */}
+      <nav 
+        id="client-dashboard-nav-bar"
+        aria-label="Navigation Espace Personnel"
+        className="bg-[#0B111E] border border-slate-800/90 rounded-2xl p-1.5 shadow-xl"
+      >
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          <button
+            id="subtab-btn-sales"
+            onClick={() => setActiveSubTab('sales')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+              activeSubTab === 'sales'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5 shrink-0" />
+            <span>{translate("Mes Ventes", "My Sales")}</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
+              activeSubTab === 'sales' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-300'
+            }`}>
+              {mySales.length}
             </span>
-          )}
-        </button>
+          </button>
 
-        <button
-          onClick={() => setActiveSubTab('referral')}
-          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
-            activeSubTab === 'referral'
-              ? 'border-amber-500 text-amber-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Gift className="w-4 h-4 text-amber-400" />
-          <span>{translate("Parrainage & Bonus", "Referrals & Bonus")}</span>
-          <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
-            {currentUser.referralCount || 0}/10
-          </span>
-          {(currentUser.referralBalance || 0) > 0 && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          )}
-        </button>
+          <button
+            id="subtab-btn-expeditions"
+            onClick={() => setActiveSubTab('expeditions')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+              activeSubTab === 'expeditions'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5 shrink-0" />
+            <span>{translate("Expéditions", "Shipments")}</span>
+            {myExpeditions.length > 0 && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
+                activeSubTab === 'expeditions' ? 'bg-white/20 text-white' : 'bg-blue-900/40 text-blue-300'
+              }`}>
+                {myExpeditions.length}
+              </span>
+            )}
+          </button>
 
-        <button
-          id="btn-subtab-settings"
-          onClick={() => setActiveSubTab('settings')}
-          className={`pb-3 px-3 sm:px-4 text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
-            activeSubTab === 'settings'
-              ? 'border-amber-500 text-amber-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Settings className="w-4 h-4 text-amber-400" />
-          <span>{translate("Paramètres", "Settings")}</span>
-        </button>
-      </div>
+          <button
+            id="subtab-btn-shop"
+            onClick={() => setActiveSubTab('shop')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+              activeSubTab === 'shop'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+            }`}
+          >
+            <Store className="w-3.5 h-3.5 shrink-0" />
+            <span>{translate("Ma Boutique", "My Storefront")}</span>
+          </button>
+
+          <button
+            id="subtab-btn-purchases"
+            onClick={() => setActiveSubTab('purchases')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+              activeSubTab === 'purchases'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+            <span>{translate("Mes Commandes", "My Orders")}</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-black ${
+              activeSubTab === 'purchases' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-300'
+            }`}>
+              {myPurchases.length}
+            </span>
+          </button>
+
+          <button
+            id="subtab-btn-transactions"
+            onClick={() => setActiveSubTab('transactions')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+              activeSubTab === 'transactions'
+                ? 'bg-purple-600 text-white shadow-md shadow-purple-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5 shrink-0" />
+            <span>{translate("Finances & Retraits", "Finances & Payouts")}</span>
+          </button>
+
+          <button
+            id="subtab-btn-kyc"
+            onClick={() => setActiveSubTab('kyc')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+              activeSubTab === 'kyc'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+            <span>{translate("Sécurité KYC", "KYC Safety")}</span>
+            {currentUser.kycStatus === 'verified' && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            )}
+            {currentUser.kycStatus === 'pending' && (
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            )}
+          </button>
+
+          <button
+            id="subtab-btn-referral"
+            onClick={() => setActiveSubTab('referral')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+              activeSubTab === 'referral'
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+            }`}
+          >
+            <Gift className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+            <span>{translate("Parrainage", "Referrals")}</span>
+            <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold">
+              {currentUser.referralCount || 0}
+            </span>
+          </button>
+
+          <button
+            id="btn-subtab-settings"
+            onClick={() => setActiveSubTab('settings')}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ml-auto ${
+              activeSubTab === 'settings'
+                ? 'bg-slate-700 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+            }`}
+          >
+            <Settings className="w-3.5 h-3.5 shrink-0" />
+            <span>{translate("Paramètres", "Settings")}</span>
+          </button>
+        </div>
+      </nav>
 
       {/* SUB-TAB 1: MES VENTES */}
       {activeSubTab === 'sales' && (
         <div className="space-y-5">
-          {/* Seller Plan & Active Benefits Banner */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white flex items-center gap-2">
-                  <span>Formule Vendeur Active :</span>
-                  <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black uppercase ${
-                    currentUser.sellerPlan === 'pro'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : currentUser.sellerPlan === 'standard'
-                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  }`}>
-                    {currentUser.sellerPlan === 'pro' ? '👑 Pass Vendeur Or VIP (10 000 F/mois)' :
-                     currentUser.sellerPlan === 'standard' ? '✨ Pass Vendeur Certifié (5 000 F/mois)' : '🌱 Compte Basique Gratuit (0 FCFA)'}
-                  </span>
-                </span>
+          {/* Quick Header Bar */}
+          <div className="p-4 rounded-2xl bg-[#0B111E] border border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
+                <Package className="w-5 h-5" />
               </div>
-              <p className="text-xs text-slate-300 mt-1">
-                {currentUser.sellerPlan === 'pro' && '✓ Avantages VIP actifs : Commission record minimale à 2.5% sur ventes directes, Badge Prestige "Boutique Officielle Or VIP", Top Algorithme Abidjan & Support Dédié VIP 7j/7.'}
-                {currentUser.sellerPlan === 'standard' && '✓ Avantages Certifiés actifs : Commission réduite à 5% sur ventes directes, Badge officiel "Vendeur Certifié & Vérifié", Vitrine Boutique Personnalisée & Virements instantanés.'}
-                {(!currentUser.sellerPlan || currentUser.sellerPlan === 'basic') && 'Compte Basique : Publication illimitée gratuite (10% de commission). Passez au Pass Certifié (5%) ou Or VIP (2.5%) pour maximiser vos gains et inspirer confiance.'}
-              </p>
+              <div>
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <span>{translate("Mes Articles en Vente", "Items for Sale")}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono font-bold">
+                    {mySales.length}
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {currentUser.sellerPlan === 'pro' ? '👑 Pass VIP Or • Commission minimale 2.5%' :
+                   currentUser.sellerPlan === 'standard' ? '✨ Pass Certifié • Commission 5%' :
+                   '🌱 Pass Gratuit • Vente directe sécurisée POD (10%)'}
+                </p>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {currentUser.sellerPlan !== 'pro' && (
-                <button
-                  onClick={() => {
-                    setTargetPlanForPricing(currentUser.sellerPlan === 'standard' ? 'pro' : 'standard');
-                    setPricingModalOpen(true);
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-bold text-xs shadow-md hover:scale-105 transition-all flex items-center gap-1.5"
-                >
-                  <Crown className="w-3.5 h-3.5" />
-                  <span>{currentUser.sellerPlan === 'standard' ? 'Passer au Pass Or VIP' : 'Activer un Pass Vendeur'}</span>
-                </button>
-              )}
-
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setActiveSubTab('shop')}
-                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5"
+                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Store className="w-3.5 h-3.5 text-amber-400" />
-                <span>Gérer ma Boutique</span>
+                <span>{translate("Ma Boutique", "My Store")}</span>
               </button>
 
               <button
@@ -771,10 +847,10 @@ export const ClientDashboard: React.FC = () => {
                   if (!checkKycVerifiedOrPrompt('sell')) return;
                   setNewProductModalOpen(true);
                 }}
-                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg transition-all flex items-center gap-1.5"
+                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
               >
                 <PlusCircle className="w-4 h-4" />
-                <span>Publier un Article</span>
+                <span>{translate("Publier un Article", "Post Item")}</span>
               </button>
             </div>
           </div>

@@ -9,7 +9,11 @@ import {
   Navigation, 
   Sparkles,
   Bell,
-  ShoppingCart
+  ShoppingCart,
+  Package,
+  Receipt,
+  Power,
+  FileCheck
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -27,8 +31,17 @@ export const MobileBottomNav: React.FC = () => {
     cart,
     setCartModalOpen,
     checkKycVerifiedOrPrompt,
-    translate
+    translate,
+    toggleDriverAvailability,
+    freightJobs,
+    activeDriverTab,
+    setActiveDriverTab
   } = useApp();
+
+  const isDriver = currentUser?.role === 'driver';
+  const isOnline = currentUser?.isOnline ?? true;
+  const driverActiveJob = isDriver && freightJobs ? freightJobs.find(j => j.assignedDriverId === currentUser.id && j.status !== 'delivered' && j.status !== 'cancelled') : null;
+  const availableOrdersCount = isDriver && freightJobs ? freightJobs.filter(j => j.status === 'available').length : 0;
 
   const handleSellClick = () => {
     // Just-in-time KYC restriction: user cannot sell without verified KYC
@@ -53,6 +66,105 @@ export const MobileBottomNav: React.FC = () => {
     activeTab === 'dashboard_client' || 
     activeTab === 'dashboard_driver' || 
     activeTab === 'dashboard_admin';
+
+  // Couriers / Drivers get a dedicated "Yango Pro" delivery mobile bottom bar
+  if (isDriver) {
+    return (
+      <nav 
+        id="mobile-bottom-nav-driver" 
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B1021]/95 backdrop-blur-xl border-t border-[#222D4A] px-2 pt-1.5 pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
+      >
+        <div className="flex items-center justify-around max-w-lg mx-auto">
+          {/* 1. Bourse aux Courses */}
+          <button
+            id="btn-driver-mobile-orders"
+            onClick={() => {
+              setActiveTab('dashboard_driver');
+              setActiveDriverTab('available_orders');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'available_orders' }));
+            }}
+            className={`relative flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
+              activeDriverTab === 'available_orders' ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-emerald-400'
+            }`}
+          >
+            <Package className={`w-5 h-5 ${activeDriverTab === 'available_orders' ? 'text-emerald-400' : 'text-slate-400'}`} />
+            {availableOrdersCount > 0 && (
+              <span className="absolute top-0 right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-emerald-500 text-slate-950 font-mono-num font-black text-[9px] flex items-center justify-center border border-[#0B1021]">
+                {availableOrdersCount}
+              </span>
+            )}
+            <span className="text-[10px] mt-0.5 tracking-tight">Courses</span>
+          </button>
+
+          {/* 2. Cockpit GPS Active Mission */}
+          <button
+            id="btn-driver-mobile-mission"
+            onClick={() => {
+              setActiveTab('dashboard_driver');
+              setActiveDriverTab('active_mission');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'active_mission' }));
+            }}
+            className={`relative flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
+              activeDriverTab === 'active_mission' ? 'text-cyan-300 font-black' : 'text-slate-400 hover:text-blue-400'
+            }`}
+          >
+            <Navigation className={`w-5 h-5 ${activeDriverTab === 'active_mission' ? 'text-cyan-300' : 'text-slate-400'}`} />
+            {driverActiveJob && (
+              <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            )}
+            <span className="text-[10px] mt-0.5 tracking-tight">Mission</span>
+          </button>
+
+          {/* 3. Central Availability Switch (Yango Pro Style) */}
+          <button
+            id="btn-driver-mobile-availability"
+            onClick={toggleDriverAvailability}
+            className={`flex flex-col items-center justify-center -mt-4 w-12 h-12 rounded-2xl shadow-xl border-2 border-[#0B1021] active:scale-95 transition-all cursor-pointer ${
+              isOnline
+                ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/30'
+                : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}
+            title={isOnline ? 'En service - Cliquer pour passer en pause' : 'En pause - Cliquer pour passer en service'}
+          >
+            <Power className={`w-6 h-6 stroke-[2.5] ${isOnline ? 'text-slate-950' : 'text-red-400'}`} />
+            <span className="sr-only">Statut service</span>
+          </button>
+
+          {/* 4. Gains & Reçus */}
+          <button
+            id="btn-driver-mobile-earnings"
+            onClick={() => {
+              setActiveTab('dashboard_driver');
+              setActiveDriverTab('history');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'history' }));
+            }}
+            className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
+              activeDriverTab === 'history' ? 'text-amber-400 font-black' : 'text-slate-400 hover:text-amber-400'
+            }`}
+          >
+            <Receipt className={`w-5 h-5 ${activeDriverTab === 'history' ? 'text-amber-400' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Gains</span>
+          </button>
+
+          {/* 5. Véhicule & KYC */}
+          <button
+            id="btn-driver-mobile-profile"
+            onClick={() => {
+              setActiveTab('dashboard_driver');
+              setActiveDriverTab('profile');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'profile' }));
+            }}
+            className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
+              activeDriverTab === 'profile' ? 'text-white font-black' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <FileCheck className={`w-5 h-5 ${activeDriverTab === 'profile' ? 'text-emerald-400' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-0.5 tracking-tight">Véhicule</span>
+          </button>
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav 
