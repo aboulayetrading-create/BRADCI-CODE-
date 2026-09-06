@@ -29,7 +29,10 @@ import {
   Building2,
   FileText,
   Boxes,
-  ShoppingCart
+  ShoppingCart,
+  Package,
+  BellRing,
+  Zap
 } from 'lucide-react';
 import { PaymentMethod, VehicleType } from '../types';
 import { nativeBridge } from '../utils/nativeBridge';
@@ -64,7 +67,9 @@ export const ProductDetailModal: React.FC = () => {
     applyReferralBalanceToPurchase,
     addToast,
     addToCart,
-    setCartModalOpen
+    setCartModalOpen,
+    sellerSelectBidder,
+    triggerOutbidSimulation
   } = useApp();
 
   const [bidAmount, setBidAmount] = useState<number>(0);
@@ -73,6 +78,7 @@ export const ProductDetailModal: React.FC = () => {
   const [paymentChoice, setPaymentChoice] = useState<'delivery' | 'direct'>('delivery');
   const [restockAmount, setRestockAmount] = useState<number>(5);
   const [useShoppingBalance, setUseShoppingBalance] = useState<boolean>(true);
+  const [b2bQuantity, setB2bQuantity] = useState<number>(1);
 
   // Buyer Delivery Location States
   const [buyerCommune, setBuyerCommune] = useState<string>(userLocation?.commune || 'Marcory');
@@ -104,16 +110,28 @@ export const ProductDetailModal: React.FC = () => {
     previousPriceRef.current = currentModalPrice;
   }, [currentModalPrice, isProductShop]);
 
+  useEffect(() => {
+    if (productDetailModal) {
+      setB2bQuantity(1);
+    }
+  }, [productDetailModal?.id]);
+
   if (!productDetailModal) return null;
 
   const prod = productDetailModal;
-  const isShop = prod.listingType === 'shop' || Boolean(prod.shopId);
-  const isOutOfStock = Boolean(prod.isOutOfStock || (isShop && prod.stockQuantity !== undefined && prod.stockQuantity <= 0));
+  const isB2BLot = Boolean(prod.isB2BLot || prod.category === 'Déstockage B2B');
+  const isShop = prod.listingType === 'shop' || Boolean(prod.shopId) || isB2BLot;
+  const b2bUnitPrice = prod.b2bUnitPrice || (prod.b2bTotalUnitsCount ? Math.round(prod.currentPrice / prod.b2bTotalUnitsCount) : prod.currentPrice);
+  const b2bTotalStock = prod.b2bTotalUnitsCount || prod.stockQuantity || 1;
+  const activeB2bQuantity = Math.min(Math.max(1, b2bQuantity), b2bTotalStock);
+  const b2bTotalStockValue = b2bUnitPrice * b2bTotalStock;
+  const isOutOfStock = Boolean(prod.isOutOfStock || (isShop && !isB2BLot && prod.stockQuantity !== undefined && prod.stockQuantity <= 0) || (isB2BLot && b2bTotalStock <= 0));
   const isSeller = currentUser?.id === prod.sellerId;
   const communeBadge = getCommuneBadgeInfo(prod.commune);
   const minNextBid = prod.currentPrice + 5000;
   const currentBidCount = prod.bids.length;
-  const fixedPrice = prod.buyNowPrice || prod.currentPrice;
+  const baseItemPrice = isB2BLot ? (b2bUnitPrice * activeB2bQuantity) : (prod.buyNowPrice || prod.currentPrice);
+  const fixedPrice = baseItemPrice;
 
   // Real-time distance and courier delivery fee calculation
   const sellerCoords = prod.pickupCoords || getCommuneCoords(prod.commune);
@@ -178,7 +196,7 @@ export const ProductDetailModal: React.FC = () => {
     if (useShoppingBalance && shoppingDiscount > 0) {
       applyReferralBalanceToPurchase(shoppingDiscount);
     }
-    buyShopProductDirect(prod.id, selectedPaymentMethod);
+    buyShopProductDirect(prod.id, selectedPaymentMethod, isB2BLot ? activeB2bQuantity : 1);
   };
 
   const getVehicleIcon = (v: VehicleType) => {
@@ -222,7 +240,15 @@ export const ProductDetailModal: React.FC = () => {
 
               {/* Badges on detail image */}
               <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
-                {isShop ? (
+                {isB2BLot ? (
+                  <div className={`text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg shadow-lg border flex items-center gap-1.5 backdrop-blur-md ${
+                    prod.b2bSaleKind === 'liquidation'
+                      ? 'bg-gradient-to-r from-indigo-700 to-purple-800 border-indigo-400/40'
+                      : 'bg-gradient-to-r from-blue-600 to-cyan-700 border-blue-400/40'
+                  }`}>
+                    <span>{prod.b2bSaleKind === 'liquidation' ? '⚖️ Liquidation Totale' : '📦 Déstockage Surplus'}</span>
+                  </div>
+                ) : isShop ? (
                   <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg shadow-lg border border-emerald-400/40 flex items-center gap-1.5 backdrop-blur-md">
                     <Store className="w-3.5 h-3.5 text-emerald-100" />
                     <span>Boutique Officielle</span>
@@ -489,8 +515,17 @@ export const ProductDetailModal: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       <span className="text-[11px] text-slate-400 uppercase tracking-wider block font-semibold">
-                        {isShop ? 'Prix Boutique Garanti :' : 'Offre Actuelle en Direct :'}
+                        {isB2BLot 
+                          ? "Prix d'un Article (Unitaire) :" 
+                          : isShop 
+                            ? 'Prix Boutique Garanti :' 
+                            : 'Offre Actuelle en Direct :'}
                       </span>
+                      {isB2BLot && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[9px] font-black uppercase tracking-wider">
+                          <span>À la pièce ou tout le stock</span>
+                        </span>
+                      )}
                       {!isShop && prod.bids.length > 0 && (
                         <motion.span
                           key={`live-badge-${prod.currentPrice}`}
@@ -519,7 +554,7 @@ export const ProductDetailModal: React.FC = () => {
                     <div className="flex items-baseline overflow-hidden">
                       <AnimatePresence mode="popLayout">
                         <motion.span
-                          key={`price-${fixedPrice}`}
+                          key={`price-${isB2BLot ? b2bUnitPrice : fixedPrice}`}
                           initial={{ 
                             opacity: 0, 
                             y: -20, 
@@ -549,15 +584,27 @@ export const ProductDetailModal: React.FC = () => {
                                 : 'text-[#FF5B00] drop-shadow-sm'
                           }`}
                         >
-                          {fixedPrice.toLocaleString('fr-FR')} F
+                          {(isB2BLot ? b2bUnitPrice : fixedPrice).toLocaleString('fr-FR')} F
                         </motion.span>
                       </AnimatePresence>
-                      <span className="text-xs text-slate-400 ml-1.5 font-semibold">CFA</span>
+                      <span className="text-xs text-slate-400 ml-1.5 font-semibold">
+                        {isB2BLot ? "CFA / article" : "CFA"}
+                      </span>
                     </div>
                   </div>
 
                   <div className="text-right">
-                    {isShop ? (
+                    {isB2BLot ? (
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] text-cyan-300 font-bold flex items-center gap-1 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>{b2bTotalStock} en stock</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">
+                          Total stock : <strong className="text-emerald-400 font-mono-num">{b2bTotalStockValue.toLocaleString('fr-FR')} F</strong>
+                        </span>
+                      </div>
+                    ) : isShop ? (
                       <div className="flex flex-col items-end">
                         {isOutOfStock ? (
                           <span className="text-[10px] text-red-400 font-bold bg-red-500/10 border border-red-500/30 px-2 py-0.5 rounded flex items-center gap-1">
@@ -630,6 +677,35 @@ export const ProductDetailModal: React.FC = () => {
                 )}
               </motion.div>
 
+              {/* Option Vendeur : Vente directe anticipée dès 1 offre */}
+              {!isShop && currentBidCount > 0 && currentBidCount < 5 && isSeller && prod.status === 'active' && (
+                <div className="mt-3 p-3.5 bg-gradient-to-r from-emerald-500/20 via-teal-950/40 to-slate-900 border border-emerald-500/40 rounded-2xl text-xs space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold flex items-center gap-1.5 text-emerald-300">
+                      <Sparkles className="w-4 h-4 text-emerald-400" />
+                      <span>Option Vente Directe ({currentBidCount} offre{currentBidCount > 1 ? 's' : ''})</span>
+                    </p>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded font-bold">
+                      Pas besoin d'attendre 5 offres
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Vous avez reçu {currentBidCount} proposition(s). Vous n'êtes pas obligé d'attendre 5 personnes : vous pouvez vendre immédiatement à un acheteur de votre choix ou continuer d'attendre.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductDetailModal(null);
+                      setFiveBiddersModalProduct(prod);
+                    }}
+                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl font-black text-xs transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Gavel className="w-4 h-4" />
+                    <span>⚡ Vendre directement à un enchérisseur ({currentBidCount} offre{currentBidCount > 1 ? 's' : ''})</span>
+                  </button>
+                </div>
+              )}
+
               {/* Auction Specific Notice if 5 bids reached */}
               {!isShop && currentBidCount >= 5 && (
                 <div className="mt-3 p-3.5 bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-slate-900 border border-amber-500/40 rounded-2xl text-xs text-amber-200 space-y-2">
@@ -691,8 +767,24 @@ export const ProductDetailModal: React.FC = () => {
                               </span>
                             )}
                           </div>
-                          <div className="text-right font-mono-num font-black text-white">
-                            {b.amount.toLocaleString('fr-FR')} F
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono-num font-black text-white">
+                              {b.amount.toLocaleString('fr-FR')} F
+                            </span>
+                            {isSeller && prod.status === 'active' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setProductDetailModal(null);
+                                  sellerSelectBidder(prod.id, b.bidderId);
+                                }}
+                                className="px-2 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[10px] rounded-lg shadow transition-colors flex items-center gap-1 cursor-pointer"
+                                title="Vendre immédiatement à cet acheteur"
+                              >
+                                <span>⚡ Vendre</span>
+                              </button>
+                            )}
                           </div>
                         </motion.div>
                       ))
@@ -798,6 +890,82 @@ export const ProductDetailModal: React.FC = () => {
                       </div>
                     ) : (
                       <>
+                        {/* B2B / Déstockage / Liquidation Quantity Selector */}
+                        {isB2BLot && (
+                          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/60 via-slate-900 to-cyan-950/60 border border-cyan-500/40 space-y-3 mb-2.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Package className="w-4 h-4 text-cyan-400" />
+                                <span className="text-xs font-bold text-white">
+                                  {translate("Quantité à acheter (Déstockage / Liquidation) :", "Quantity to purchase (Liquidation / Clearance):")}
+                                </span>
+                              </div>
+                              <span className="text-[10px] bg-cyan-500/20 text-cyan-300 font-mono-num font-bold px-2 py-0.5 rounded border border-cyan-500/30">
+                                {b2bTotalStock} article{b2bTotalStock > 1 ? 's' : ''} dispo
+                              </span>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                              {/* Stepper Input */}
+                              <div className="flex items-center bg-slate-950 border border-slate-700 rounded-xl p-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setB2bQuantity(prev => Math.max(1, prev - 1))}
+                                  className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-black text-sm flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Diminuer la quantité"
+                                >
+                                  -
+                                </button>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={b2bTotalStock}
+                                  value={activeB2bQuantity}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    if (!isNaN(val)) {
+                                      setB2bQuantity(Math.min(Math.max(1, val), b2bTotalStock));
+                                    }
+                                  }}
+                                  className="w-16 bg-transparent text-center font-mono-num font-black text-white text-sm focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setB2bQuantity(prev => Math.min(b2bTotalStock, prev + 1))}
+                                  className="w-8 h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-black text-sm flex items-center justify-center transition-colors cursor-pointer"
+                                  title="Augmenter la quantité"
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              {/* Buy Entire Stock Button */}
+                              <button
+                                type="button"
+                                onClick={() => setB2bQuantity(b2bTotalStock)}
+                                className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                                  activeB2bQuantity === b2bTotalStock
+                                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black shadow-md shadow-cyan-500/25'
+                                    : 'bg-slate-900 hover:bg-slate-800 text-cyan-300 border-cyan-500/30'
+                                }`}
+                              >
+                                <Zap className="w-3.5 h-3.5" />
+                                <span>{translate(`Acheter tout le stock (${b2bTotalStock} pièces)`, `Buy entire lot (${b2bTotalStock} pcs)`)}</span>
+                              </button>
+                            </div>
+
+                            {/* Real-time Subtotal Breakdown */}
+                            <div className="flex items-center justify-between text-[11px] text-slate-300 pt-1.5 border-t border-cyan-500/20">
+                              <span>
+                                {activeB2bQuantity} pièce{activeB2bQuantity > 1 ? 's' : ''} × {b2bUnitPrice.toLocaleString('fr-FR')} FCFA
+                              </span>
+                              <span className="font-mono-num font-black text-cyan-300 text-xs">
+                                Sous-total : {(activeB2bQuantity * b2bUnitPrice).toLocaleString('fr-FR')} FCFA
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Buyer Delivery Address & Dynamic Courier Fee Section */}
                         <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2.5">
                           <div className="flex items-center justify-between">
@@ -965,10 +1133,27 @@ export const ProductDetailModal: React.FC = () => {
 
                           {/* Dynamic Cost Breakdown */}
                           <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
-                            <div className="flex justify-between text-slate-300">
-                              <span>📦 {translate("Prix de l'article", "Item Price")} :</span>
-                              <span className="font-mono-num font-bold text-white">{fixedPrice.toLocaleString('fr-FR')} FCFA</span>
-                            </div>
+                            {isB2BLot ? (
+                              <>
+                                <div className="flex justify-between text-slate-300">
+                                  <span>📦 {translate("Prix unitaire d'un article", "Unit Item Price")} :</span>
+                                  <span className="font-mono-num font-bold text-cyan-300">{b2bUnitPrice.toLocaleString('fr-FR')} FCFA</span>
+                                </div>
+                                <div className="flex justify-between text-slate-300">
+                                  <span>🔢 {translate("Quantité sélectionnée", "Selected Quantity")} :</span>
+                                  <span className="font-mono-num font-bold text-white">{activeB2bQuantity} / {b2bTotalStock}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-300">
+                                  <span>🛒 {translate("Sous-total articles", "Items Subtotal")} :</span>
+                                  <span className="font-mono-num font-bold text-white">{(b2bUnitPrice * activeB2bQuantity).toLocaleString('fr-FR')} FCFA</span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flex justify-between text-slate-300">
+                                <span>📦 {translate("Prix de l'article", "Item Price")} :</span>
+                                <span className="font-mono-num font-bold text-white">{fixedPrice.toLocaleString('fr-FR')} FCFA</span>
+                              </div>
+                            )}
                             <div className="flex justify-between text-amber-300 text-[11px]">
                               <span>🚚 {translate(`Frais Coursier (${prod.commune} ➔ ${buyerCommune}, ~${distKm} km)`, `Courier Fee (${prod.commune} ➔ ${buyerCommune}, ~${distKm} km)`)} :</span>
                               <span className="font-mono-num font-bold">+{calculatedDeliveryFee.toLocaleString('fr-FR')} FCFA</span>
@@ -1025,14 +1210,23 @@ export const ProductDetailModal: React.FC = () => {
                             type="button"
                             id="btn-modal-add-to-cart"
                             onClick={() => {
-                              addToCart(prod, 1, 'boutique');
+                              addToCart(
+                                prod, 
+                                isB2BLot ? activeB2bQuantity : 1, 
+                                isB2BLot ? (prod.b2bSaleKind === 'liquidation' ? 'liquidation' : 'destockage') : 'boutique'
+                              );
                               setProductDetailModal(null);
                               setCartModalOpen(true);
                             }}
                             className="flex-1 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-emerald-500/40 text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md"
                           >
                             <ShoppingCart className="w-4 h-4" />
-                            <span>{translate("Ajouter au Panier", "Add to Cart")}</span>
+                            <span>
+                              {isB2BLot 
+                                ? translate(`Ajouter au Panier (${activeB2bQuantity})`, `Add to Cart (${activeB2bQuantity})`)
+                                : translate("Ajouter au Panier", "Add to Cart")
+                              }
+                            </span>
                           </button>
 
                           <button
@@ -1054,6 +1248,45 @@ export const ProductDetailModal: React.FC = () => {
                   </div>
                 ) : (
                   <div>
+                    {/* Alerte Urgente si l'utilisateur a été dépassé sur cette enchère */}
+                    {(() => {
+                      const isUserLeading = prod.bids.some(b => b.isLeading && b.bidderId === currentUser?.id);
+                      const hasUserBid = prod.bids.some(b => b.bidderId === currentUser?.id);
+                      const isUserOutbid = hasUserBid && !isUserLeading && prod.status === 'active';
+
+                      if (!isUserOutbid) return null;
+
+                      return (
+                        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-red-500/25 via-red-950/40 to-amber-950/30 border-2 border-red-500/70 shadow-lg shadow-red-500/20 text-xs space-y-2 mb-3 animate-pulse">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-red-300 font-black text-xs sm:text-sm">
+                              <BellRing className="w-4 h-4 text-red-400 shrink-0 animate-bounce" />
+                              <span>Alerte Surenchère : Vous avez été dépassé !</span>
+                            </div>
+                            <span className="text-[10px] bg-red-500 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow">
+                              Reprenez la main
+                            </span>
+                          </div>
+                          <p className="text-slate-100 text-xs leading-relaxed">
+                            Un utilisateur a surenchéri à <strong className="text-amber-300 font-mono-num font-black text-sm">{prod.currentPrice.toLocaleString('fr-FR')} FCFA</strong>. Reprenez la main dès maintenant avant l'attribution !
+                          </p>
+                          <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                            <span className="text-[11px] text-slate-300 font-bold">Surenchérir vite :</span>
+                            {[5000, 10000, 25000, 50000].map(inc => (
+                              <button
+                                key={inc}
+                                type="button"
+                                onClick={() => handlePlaceBid(prod.currentPrice + inc)}
+                                className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-red-500 to-amber-500 hover:from-red-400 hover:to-amber-400 text-slate-950 font-black text-xs shadow-md transition-transform active:scale-95 cursor-pointer"
+                              >
+                                + {inc.toLocaleString('fr-FR')} F
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Buyer Delivery Address & Courier Fee for Auction */}
                     <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 mb-3">
                       <div className="flex items-center justify-between">
@@ -1149,6 +1382,20 @@ export const ProductDetailModal: React.FC = () => {
                       >
                         <Gavel className="w-4 h-4" />
                         <span>{translate("Enchérir", "Place Bid")}</span>
+                      </button>
+                    </div>
+
+                    {/* Bouton de test direct de l'alerte push de surenchère demandée */}
+                    <div className="pt-2">
+                      <button
+                        id="btn-simulate-outbid-modal"
+                        type="button"
+                        onClick={() => triggerOutbidSimulation(prod.id)}
+                        className="w-full py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                        title={translate("Tester la notification push instantanée sur mobile quand vous êtes dépassé", "Test instant mobile push notification when outbid")}
+                      >
+                        <BellRing className="w-3.5 h-3.5 text-red-400" />
+                        <span>{translate("Tester l'Alerte Push Surenchère (Mobile & PC)", "Test Instant Outbid Push Alert (Mobile & Desktop)")}</span>
                       </button>
                     </div>
                   </div>

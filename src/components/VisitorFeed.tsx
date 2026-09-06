@@ -14,7 +14,6 @@ import {
   Crown,
   TrendingUp, 
   ArrowRight,
-  Flame,
   CheckCircle2,
   Compass,
   Store,
@@ -38,7 +37,6 @@ import {
   getCommuneBadgeInfo 
 } from '../data/communes';
 import { InteractiveAbidjanMap } from './InteractiveAbidjanMap';
-import { Logo } from './Logo';
 
 export const VisitorFeed: React.FC = () => {
   const { 
@@ -184,93 +182,6 @@ export const VisitorFeed: React.FC = () => {
         </section>
       )}
 
-      {/* Hero Banner with Abidjan Vibe & Rules Showcase (standard) */}
-      {!isDriver && (
-        <section className="relative rounded-3xl overflow-hidden border border-slate-800 bg-gradient-to-br from-[#0C1424] via-[#090E1A] to-[#060A12] p-4 sm:p-7 lg:p-9 shadow-2xl">
-          {/* Glow ambient circles */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 max-w-4xl">
-            {/* Brand Logo & Grand Abidjan Pill */}
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-              <div className="bg-[#06102E]/80 border border-blue-500/30 rounded-2xl px-3 py-1.5 backdrop-blur-md shadow-md">
-                <Logo 
-                  variant="horizontal" 
-                  size="sm" 
-                  showSubtitle={true}
-                  subtitleText="ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS" 
-                />
-              </div>
-              <div className="inline-flex items-center gap-1.5 bg-emerald-500/15 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-extrabold border border-emerald-500/30 shadow-sm">
-                <Flame className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span>{translate("Grand Abidjan & Villes Balnéaires • Paiement Direct", "Greater Abidjan & Coastal Cities • Direct Pay")}</span>
-              </div>
-            </div>
-
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight font-display leading-[1.15]">
-              {translate("Achetez & Vendez aux Enchères avec ", "Buy & Sell with ")}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-400">
-                {translate("Paiement Direct à la Livraison", "Direct Pay on Delivery")}
-              </span>
-              {translate(" Garanti.", " Guaranteed.")}
-            </h1>
-
-            <p className="text-slate-300 text-xs sm:text-sm mt-3 leading-relaxed max-w-2xl">
-              {translate(
-                "La 1ère plateforme sécurisée de déstockage express couvrant les 13 communes d'Abidjan ainsi que Grand-Bassam, Assinie, Bingerville et Dabou. Payez facilement par Mobile Money (Wave, Orange Money, MTN MoMo, Moov, Carte) après vérification du colis.",
-                "The #1 secure express liquidation platform covering all 13 communes of Abidjan, as well as Grand-Bassam, Assinie, Bingerville, and Dabou. Pay easily via Mobile Money (Wave, Orange Money, MTN MoMo, Moov, Card) after parcel inspection."
-              )}
-            </p>
-
-
-
-            {/* Fast action CTAs & Quick Filters */}
-            <div className="flex flex-wrap items-center gap-2.5 mt-5">
-              <button
-                id="feed-btn-new-auction"
-                onClick={() => setNewProductModalOpen(true)}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center gap-2"
-              >
-                <Gavel className="w-4 h-4 text-slate-950" />
-                <span>{translate("Vendre aux Enchères", "Post Auction")}</span>
-              </button>
-
-              <button
-                id="feed-btn-pricing"
-                onClick={() => setPricingModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition-all flex items-center gap-2"
-              >
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>{translate("Pass Vendeur & Livreur", "Seller & Courier Passes")}</span>
-              </button>
-
-              <button
-                id="feed-btn-shops-quick"
-                onClick={() => setSelectedFeedType('shop')}
-                className="px-4 py-2.5 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 text-emerald-300 font-bold text-xs sm:text-sm transition-all flex items-center gap-2"
-              >
-                <Store className="w-4 h-4 text-emerald-400" />
-                <span>{translate("Boutiques Officielles", "Official Stores")}</span>
-              </button>
-
-              <button
-                id="feed-btn-toggle-map"
-                onClick={() => setIsMapExpanded(prev => !prev)}
-                className={`px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-bold transition-all flex items-center gap-2 ${
-                  isMapExpanded
-                    ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20'
-                    : 'bg-blue-950/60 hover:bg-blue-900/80 border-blue-500/40 text-blue-300'
-                }`}
-              >
-                <Compass className="w-4 h-4 text-blue-400 animate-spin" />
-                <span>{isMapExpanded ? translate('Fermer la Carte', 'Close Map') : translate('🗺️ Carte & Guidage GPS', '🗺️ Interactive Map & GPS')}</span>
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* Expanded Interactive Grand Abidjan Map Section */}
       {isMapExpanded && (
         <section className="animate-in fade-in slide-in-from-top-4 duration-300">
@@ -308,7 +219,7 @@ export const VisitorFeed: React.FC = () => {
             )}
           </div>
 
-          {/* Commune & Zone Selector */}
+          {/* Commune, Map Toggle & Quick Reset */}
           <div className="flex items-center gap-2 w-full md:w-auto">
             <div className="relative flex items-center bg-slate-900/95 border border-slate-800 hover:border-amber-500/40 rounded-xl px-3 py-2.5 text-xs text-slate-200 w-full md:w-auto shadow-inner transition-colors">
               <MapPin className="w-4 h-4 text-amber-400 shrink-0 mr-2" />
@@ -339,6 +250,22 @@ export const VisitorFeed: React.FC = () => {
                 </optgroup>
               </select>
             </div>
+
+            {/* Map toggle button */}
+            <button
+              id="feed-btn-toggle-map"
+              type="button"
+              onClick={() => setIsMapExpanded(prev => !prev)}
+              className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm ${
+                isMapExpanded
+                  ? 'bg-blue-600 border-blue-400 text-white shadow-blue-500/20'
+                  : 'bg-slate-900/95 hover:bg-slate-800 border-slate-800 hover:border-blue-500/40 text-blue-300'
+              }`}
+              title={translate("Afficher / Masquer la carte GPS", "Show / Hide GPS Map")}
+            >
+              <Compass className={`w-4 h-4 text-blue-400 ${isMapExpanded ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isMapExpanded ? translate('Fermer Carte', 'Close Map') : translate('Carte GPS', 'GPS Map')}</span>
+            </button>
 
             {/* Quick reset button if any filter is active */}
             {(searchQuery || selectedCategory !== 'Tous' || selectedCommune !== 'Toutes' || selectedFeedType !== 'all' || selectedVehicle !== 'Tous') && (
@@ -398,44 +325,6 @@ export const VisitorFeed: React.FC = () => {
                 selectedFeedType === 'shop' ? 'bg-black/30 text-emerald-200' : 'bg-emerald-950 text-emerald-300'
               }`}>
                 {products.filter(p => p.listingType === 'shop' || p.shopId).length}
-              </span>
-            </button>
-
-            <button
-              id="feed-filter-auctions"
-              type="button"
-              onClick={() => setSelectedFeedType('auction')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedFeedType === 'auction'
-                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 scale-[1.02]'
-                  : 'bg-slate-900/90 text-amber-400 hover:bg-slate-800 border border-amber-500/30'
-              }`}
-            >
-              <Gavel className="w-3.5 h-3.5" />
-              <span>{translate("🔨 Enchères Live", "🔨 Live Auctions")}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-extrabold ${
-                selectedFeedType === 'auction' ? 'bg-black/30 text-amber-200' : 'bg-slate-800 text-amber-400'
-              }`}>
-                {products.filter(p => p.listingType === 'auction' || (!p.listingType && !p.shopId)).length}
-              </span>
-            </button>
-
-            <button
-              id="feed-filter-five-bids"
-              type="button"
-              onClick={() => setSelectedFeedType('five_bids')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                selectedFeedType === 'five_bids'
-                  ? 'bg-gradient-to-r from-red-500 to-amber-500 text-slate-950 shadow-md shadow-amber-500/20 scale-[1.02]'
-                  : 'bg-slate-900/90 text-amber-300 hover:bg-slate-800 border border-amber-500/30'
-              }`}
-            >
-              <Crown className="w-3.5 h-3.5 text-amber-400" />
-              <span>{translate("🎯 5 Offres / Arbitrage", "🎯 5 Bids / Arbitration")}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-extrabold ${
-                selectedFeedType === 'five_bids' ? 'bg-black/30 text-amber-200' : 'bg-slate-800 text-amber-300'
-              }`}>
-                {products.filter(p => p.bids.length >= 5 || p.status === 'pending_choice').length}
               </span>
             </button>
 

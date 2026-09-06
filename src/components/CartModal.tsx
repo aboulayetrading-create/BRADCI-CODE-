@@ -377,7 +377,7 @@ export const CartModal: React.FC = () => {
                       {group.items.map((item) => (
                         <div 
                           key={item.id}
-                          className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between gap-3"
+                          className="p-2.5 sm:p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <img 
@@ -393,9 +393,14 @@ export const CartModal: React.FC = () => {
                                     Enchère
                                   </span>
                                 )}
-                                {item.channel === 'liquidation' && (
+                                {item.channel === 'destockage' && (
                                   <span className="px-1.5 py-0.2 rounded text-[9px] bg-blue-500/20 text-cyan-300 font-bold border border-blue-500/30">
-                                    B2B Lot
+                                    📦 Déstockage
+                                  </span>
+                                )}
+                                {item.channel === 'liquidation' && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">
+                                    ⚖️ Liquidation
                                   </span>
                                 )}
                               </div>
@@ -406,12 +411,12 @@ export const CartModal: React.FC = () => {
                           </div>
 
                           {/* Quantity selector & Delete */}
-                          <div className="flex items-center gap-3 shrink-0">
+                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800/50">
                             <div className="flex items-center rounded-xl bg-slate-900 border border-slate-700 p-0.5">
                               <button
                                 type="button"
                                 onClick={() => updateCartItemQuantity(item.id, item.quantity - 1)}
-                                className="w-6 h-6 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-all"
+                                className="w-6 h-6 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-all cursor-pointer"
                                 title="Diminuer"
                               >
                                 <Minus className="w-3 h-3" />
@@ -422,21 +427,21 @@ export const CartModal: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => updateCartItemQuantity(item.id, item.quantity + 1)}
-                                className="w-6 h-6 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-all"
+                                className="w-6 h-6 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-all cursor-pointer"
                                 title="Augmenter"
                               >
                                 <Plus className="w-3 h-3" />
                               </button>
                             </div>
 
-                            <span className="text-xs font-mono font-bold text-white min-w-[70px] text-right">
+                            <span className="text-xs sm:text-sm font-mono font-bold text-white min-w-[70px] text-right">
                               {(item.unitPrice * item.quantity).toLocaleString('fr-FR')} F
                             </span>
 
                             <button
                               type="button"
                               onClick={() => removeFromCart(item.id)}
-                              className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-all"
+                              className="text-slate-500 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-500/10 transition-all cursor-pointer"
                               title="Supprimer l'article"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -707,53 +712,60 @@ export const CartModal: React.FC = () => {
           </div>
         )}
 
-        {/* Modal Footer / Total Summary */}
+        {/* Modal Footer / Total Summary - Compacted to prioritize cart items display */}
         {cart.length > 0 && (
-          <div className="p-4 sm:p-6 bg-slate-900 border-t border-slate-800 shrink-0 space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Sous-total Articles :</span>
-                <span className="text-sm font-black text-white font-mono">
-                  {(optimization.itemsSubtotal || 0).toLocaleString('fr-FR')} F
-                </span>
-              </div>
+          <div 
+            id="cart-modal-footer"
+            className="p-2.5 sm:px-4 sm:py-3 bg-slate-900/95 border-t border-slate-800 shrink-0 space-y-2 backdrop-blur-md"
+          >
+            {/* Compact Totals Strip */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs">
+              <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Articles :</span>
+                  <span className="font-bold text-white font-mono text-xs">
+                    {(optimization.itemsSubtotal || 0).toLocaleString('fr-FR')} F
+                  </span>
+                </div>
 
-              <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Frais de Livraison :</span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-sm font-black text-emerald-400 font-mono">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Livraison :</span>
+                  <span className="font-bold text-emerald-400 font-mono text-xs">
                     {(optimization.optimizedDeliveryFee || 0).toLocaleString('fr-FR')} F
                   </span>
                   {(optimization.totalDeliverySavings || 0) > 0 && (
-                    <span className="text-[10px] text-slate-500 line-through">
+                    <span className="text-[9px] text-slate-500 line-through">
                       {(optimization.rawDeliveryFeeSum || 0).toLocaleString('fr-FR')} F
                     </span>
                   )}
                 </div>
+
+                {(referralDiscountToApply || 0) > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-amber-400 font-semibold uppercase">Remise :</span>
+                    <span className="font-bold text-amber-400 font-mono text-xs">
+                      -{(referralDiscountToApply || 0).toLocaleString('fr-FR')} F
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Remise Parrainage :</span>
-                <span className="text-sm font-black text-amber-400 font-mono">
-                  - {(referralDiscountToApply || 0).toLocaleString('fr-FR')} F
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
-                <span className="text-[10px] text-emerald-300 uppercase font-black block">Total Net à Régler :</span>
-                <span className="text-base font-black text-white font-mono">
+              <div className="flex items-center gap-2 ml-auto">
+                <span className="text-[10px] uppercase font-black text-emerald-400">Total Net :</span>
+                <span className="text-sm sm:text-base font-black text-white font-mono bg-emerald-500/15 px-2.5 py-0.5 rounded-lg border border-emerald-500/30">
                   {(finalTotalAmount || 0).toLocaleString('fr-FR')} FCFA
                 </span>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+            {/* Actions: Compact Buttons */}
+            <div className="flex items-center justify-between gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setCartModalOpen(false)}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-all border border-slate-700 text-center"
+                className="px-3 sm:px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-xs transition-all border border-slate-700/80 text-center shrink-0"
               >
-                Continuer mes Achats
+                {translate("Continuer mes Achats", "Continue Shopping")}
               </button>
 
               <button
@@ -761,14 +773,14 @@ export const CartModal: React.FC = () => {
                 type="button"
                 onClick={handleConfirmCheckout}
                 disabled={isSubmitting}
-                className="w-full sm:w-auto px-8 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-emerald-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-slate-950 font-black text-sm transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                className="flex-1 sm:flex-initial px-5 sm:px-7 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-emerald-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-slate-950 font-black text-xs sm:text-sm transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
-                  <span>Optimisation & Validation en cours...</span>
+                  <span>{translate("Validation en cours...", "Processing...")}</span>
                 ) : (
                   <>
-                    <span>Valider & Commander le Panier</span>
-                    <ArrowRight className="w-4 h-4 stroke-[3]" />
+                    <span>{translate("Commander le Panier", "Checkout Cart")}</span>
+                    <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
                   </>
                 )}
               </button>

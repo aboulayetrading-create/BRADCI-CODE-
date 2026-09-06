@@ -21,6 +21,7 @@ import {
   PaymentMethod,
   SentAdminMessage,
   AppNotification,
+  OutbidAlertInfo,
   AppLanguage,
   AppTheme,
   MapProvider,
@@ -60,6 +61,7 @@ import {
   voiceNavigator, 
   playOrderAlertSound, 
   playSuccessChime, 
+  playOutbidAlertSound,
   announceDriverIncomingOrder,
   announcePurchaseSuccess,
   announceSaleSuccess
@@ -71,6 +73,7 @@ import {
   getStoredAuditLogs
 } from '../utils/paymentAuditReceiptService';
 import { nativeBridge, NativePhotoSource, NativeCameraFacing } from '../utils/nativeBridge';
+import { sendOtpEmail } from '../services/resendEmailService';
 
 interface ToastNotification {
   id: string;
@@ -117,8 +120,10 @@ interface AppContextType {
   checkKycVerifiedOrPrompt: (action?: 'buy' | 'sell' | 'bid' | 'general') => boolean;
 
   // Auth & Email OTP & Google Profile
-  registerUser: (data: { firstName: string; lastName: string; city: string; email: string; phone: string; role: UserRole; password?: string; referralCode?: string }) => { success: boolean; otpCode: string };
-  verifyEmailOtp: (email: string, enteredOtp: string) => { success: boolean };
+  registerUser: (data: { firstName: string; lastName: string; city: string; email: string; phone: string; role: UserRole; password?: string; referralCode?: string }) => { success: boolean; otpCode: string; expiresAt: number };
+  verifyEmailOtp: (email: string, enteredOtp: string) => { success: boolean; error?: string };
+  requestEmailLoginOtp: (email: string) => Promise<{ success: boolean; otpCode?: string; expiresAt?: number; error?: string }>;
+  resendEmailOtp: (email: string) => Promise<{ success: boolean; otpCode?: string; expiresAt?: number; error?: string }>;
   loginWithEmail: (email: string, password?: string) => { success: boolean };
   loginWithGoogle: (role?: UserRole) => { success: boolean; needsProfileCompletion: boolean; user?: User };
   completeGoogleProfile: (data: { firstName: string; lastName: string; phone: string; city: string; role: UserRole; referralCode?: string }) => void;
@@ -187,7 +192,7 @@ interface AppContextType {
   setSelectedShopForView: (shop: ShopProfile | null) => void;
   updateShopProfile: (shopData: Partial<ShopProfile>) => void;
   getShopBySellerId: (sellerId: string) => ShopProfile | undefined;
-  buyShopProductDirect: (productId: string, paymentMethod?: PaymentMethod) => boolean;
+  buyShopProductDirect: (productId: string, paymentMethod?: PaymentMethod, customQuantity?: number) => boolean;
   
   // Profile Avatar & Identity
   profileAvatarModalOpen: boolean;
@@ -235,13 +240,30 @@ interface AppContextType {
   unreadNotificationsCount: number;
   notificationsModalOpen: boolean;
   setNotificationsModalOpen: (open: boolean) => void;
-  addNotification: (notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => void;
+  addNotification: (notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'> & { timestamp?: string }) => void;
   markNotificationAsRead: (notifId: string) => void;
+  toggleNotificationReadStatus: (notifId: string) => void;
+  deleteNotification: (notifId: string) => void;
   markAllNotificationsAsRead: () => void;
   clearAllNotifications: () => void;
   browserNotificationsEnabled: boolean;
+  pushToken: string;
   requestBrowserNotificationPermission: () => Promise<boolean>;
-  pushBrowserNotification: (title: string, body: string, icon?: string) => void;
+  pushBrowserNotification: (
+    title: string, 
+    body: string, 
+    icon?: string, 
+    customOptions?: {
+      tag?: string;
+      data?: any;
+      actions?: { action: string; title: string }[];
+      vibrate?: number[];
+    }
+  ) => void;
+  notifyOutbid: (productId: string, newAmount: number, outbidUserId?: string, bidderName?: string) => void;
+  triggerOutbidSimulation: (productId?: string, targetAmount?: number) => void;
+  activeOutbidAlert: OutbidAlertInfo | null;
+  dismissOutbidAlert: () => void;
 
   // Actions
   loginAsUser: (userId: string) => void;
@@ -480,6 +502,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedShopForView, setSelectedShopForView] = useState<ShopProfile | null>(null);
   const [receiptModalData, setReceiptModalData] = useState<{ transactionData: TransactionAuditInput; auditLog: PaymentAuditLog; initialMode?: 'buyer' | 'seller' | 'driver'; lockedMode?: 'buyer' | 'seller' | 'driver' } | null>(null);
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const addToast = useCallback((title: string, desc: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
+    setToasts(prev => [...prev, { id, title, desc, type }]);
+    setTimeout(() => {
+      removeToast(id);
+    }, 5000);
+  }, [removeToast]);
 
   // ================= SHOPPING CART & MULTI-ITEM ORDERS STATE =================
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -904,8 +938,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('bradci_reviews', JSON.stringify(reviews));
   }, [reviews]);
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    const saved = localStorage.getItem('bradci_app_notifications');
-    if (saved) return JSON.parse(saved);
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('bradci_app_notifications') : null;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    const today = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     return [
       {
         id: 'notif-welcome',
@@ -913,7 +952,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         title: '🎉 Bienvenue sur BRAD\'CI Fret & Enchères',
         message: 'Séquestre Wave / MoMo garanti, traçabilité GPS en direct et inspection contradictoire lors de la remise en main propre.',
         type: 'system',
-        timestamp: 'Il y a 5 min',
+        timestamp: `${today} à 08:30`,
         isRead: false,
         urgency: 'normal'
       },
@@ -924,11 +963,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         message: 'Le coursier Bakary Traoré a pris en charge votre colis à Cocody. Suivez son déplacement en direct.',
         type: 'delivery',
         jobId: 'job-1',
-        timestamp: 'Il y a 2 min',
+        timestamp: `${today} à 10:15`,
         isRead: false,
         urgency: 'high'
       }
     ];
+  });
+
+  const [pushToken, setPushToken] = useState<string>(() => {
+    return typeof window !== 'undefined' ? (localStorage.getItem('bradci_push_token') || '') : '';
   });
 
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState<boolean>(() => {
@@ -936,23 +979,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   useEffect(() => {
-    localStorage.setItem('bradci_app_notifications', JSON.stringify(notifications));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bradci_app_notifications', JSON.stringify(notifications));
+    }
   }, [notifications]);
 
-  const pushBrowserNotification = useCallback((title: string, body: string, icon = '/favicon.ico') => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+  const pushBrowserNotification = useCallback(async (
+    title: string, 
+    body: string, 
+    icon = './icon.png',
+    customOptions?: {
+      tag?: string;
+      data?: any;
+      actions?: { action: string; title: string }[];
+      vibrate?: number[];
+    }
+  ) => {
+    if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
+      return;
+    }
+
+    const options: NotificationOptions & { vibrate?: number[] } = {
+      body,
+      icon,
+      badge: icon,
+      tag: customOptions?.tag || 'bradci-' + Date.now(),
+      vibrate: customOptions?.vibrate || [200, 100, 200],
+      data: customOptions?.data || './',
+      ...((customOptions?.actions && 'actions' in Notification.prototype) ? { actions: customOptions.actions } : {})
+    };
+
+    // 1. Android Chrome & Mobile: showNotification via Service Worker is mandatory
+    if ('serviceWorker' in navigator) {
       try {
-        new Notification(title, {
-          body,
-          icon,
-          badge: icon,
-          tag: 'bradci-' + Date.now()
-        });
-      } catch (e) {
-        console.warn('Browser notification error:', e);
+        const registration = await navigator.serviceWorker.ready;
+        if (registration && 'showNotification' in registration) {
+          await registration.showNotification(title, options);
+          return;
+        }
+      } catch (err) {
+        console.warn('ServiceWorker showNotification failed, trying fallback:', err);
       }
     }
+
+    // 2. Desktop Fallback
+    try {
+      new Notification(title, options);
+    } catch (e) {
+      console.warn('Browser notification error:', e);
+    }
   }, []);
+
+  const addNotification = useCallback((notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'> & { timestamp?: string }) => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const formattedTimestamp = notif.timestamp || `${dateStr} à ${timeStr}`;
+
+    const newNotif: AppNotification = {
+      ...notif,
+      id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
+      timestamp: formattedTimestamp,
+      isRead: false
+    };
+
+    setNotifications(prev => [newNotif, ...prev]);
+    pushBrowserNotification(newNotif.title, newNotif.message);
+  }, [pushBrowserNotification]);
 
   const requestBrowserNotificationPermission = async (): Promise<boolean> => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -964,33 +1057,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const perm = await Notification.requestPermission();
       const granted = perm === 'granted';
       setBrowserNotificationsEnabled(granted);
+
       if (granted) {
-        pushBrowserNotification('🔔 Notifications Brad\'CI Activées !', 'Vous recevrez les alertes de courses, arrivées livreurs et séquestre en direct sur votre téléphone.');
-        addToast('Notifications Activées', 'Vous recevrez les alertes de livraison et de courses en temps réel.', 'success');
+        // Enregistrement du jeton (token) localement pour recevoir les alertes push
+        let existingToken = localStorage.getItem('bradci_push_token');
+        if (!existingToken) {
+          existingToken = 'bradci_push_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
+          localStorage.setItem('bradci_push_token', existingToken);
+        }
+        localStorage.setItem('bradci_push_registered', 'true');
+        localStorage.setItem('bradci_browser_notifications', 'true');
+        setPushToken(existingToken);
+
+        // Notification de test immédiate demandée par le cahier des charges
+        const testTitle = "Notifications BRAD'CI activées !";
+        const testBody = "Notifications BRAD'CI activées ! Vous recevrez désormais les alertes de vos enchères et livreurs.";
+
+        // Déclenche la notification système push
+        await pushBrowserNotification(testTitle, testBody, './icon.png');
+
+        // Ajoute également dans l'historique visuel in-app
+        addNotification({
+          title: testTitle,
+          message: testBody,
+          type: 'system',
+          urgency: 'high'
+        });
+
+        playSuccessChime();
+        addToast(testTitle, testBody, 'success');
+
+        if (voiceNavigator && !voiceNavigator.getIsMuted()) {
+          voiceNavigator.speak(testBody, language);
+        }
       } else {
         addToast('Notifications Refusées', 'Vous pouvez les réactiver dans les paramètres de votre navigateur.', 'info');
       }
       return granted;
     } catch (e) {
-      console.error(e);
+      console.error('Notification request permission error:', e);
       return false;
     }
   };
 
-  const addNotification = useCallback((notif: Omit<AppNotification, 'id' | 'timestamp' | 'isRead'>) => {
-    const newNotif: AppNotification = {
-      ...notif,
-      id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
-      timestamp: 'À l\'instant',
-      isRead: false
-    };
-
-    setNotifications(prev => [newNotif, ...prev]);
-    pushBrowserNotification(newNotif.title, newNotif.message);
-  }, [pushBrowserNotification]);
-
   const markNotificationAsRead = (notifId: string) => {
     setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, isRead: true } : n));
+  };
+
+  const toggleNotificationReadStatus = (notifId: string) => {
+    setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, isRead: !n.isRead } : n));
+  };
+
+  const deleteNotification = (notifId: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== notifId));
+    addToast('Notification Supprimée', 'La notification a été retirée de votre historique.', 'info');
   };
 
   const markAllNotificationsAsRead = () => {
@@ -1007,6 +1127,174 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) return !n.isRead;
     return !n.isRead && (n.recipientRole === 'all' || n.recipientRole === currentUser.role || n.recipientUserId === currentUser.id || n.recipientUserId === currentUser.name);
   }).length;
+
+  // -------------------------------------------------------------
+  // NOTIFICATIONS PUSH INSTANTANÉES DE SURENCHÈRE (OUTBID ENGINE)
+  // -------------------------------------------------------------
+  const [activeOutbidAlert, setActiveOutbidAlert] = useState<OutbidAlertInfo | null>(null);
+
+  const dismissOutbidAlert = useCallback(() => {
+    setActiveOutbidAlert(null);
+  }, []);
+
+  // Écouteur de clic sur notification native depuis le Service Worker
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'NOTIFICATION_CLICKED') {
+        const notifData = event.data.data;
+        if (notifData && typeof notifData === 'object' && notifData.productId) {
+          const targetProd = products.find(p => p.id === notifData.productId);
+          if (targetProd) {
+            setProductDetailModal(targetProd);
+          }
+        }
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+    };
+  }, [products]);
+
+  // Fonction centrale pour déclencher l'alerte push instantanée de surenchère
+  const notifyOutbid = useCallback((
+    productId: string, 
+    newAmount: number, 
+    outbidUserId?: string, 
+    bidderName: string = 'Un utilisateur'
+  ) => {
+    const prod = products.find(p => p.id === productId);
+    const prodTitle = prod ? prod.title : 'votre enchère';
+    const prodImage = prod?.images?.[0] || './icon.png';
+
+    // Formatage strict selon le cahier des charges :
+    // "Un utilisateur a surenchéri à 6 000 000 FCFA. Reprenez la main !"
+    const pushTitle = "🚨 Surenchère Détectée !";
+    const pushBody = `Un utilisateur a surenchéri à ${newAmount.toLocaleString('fr-FR')} FCFA. Reprenez la main !`;
+
+    // 1. Notification Push Système Navigateur & Mobile (Service Worker)
+    pushBrowserNotification(
+      pushTitle,
+      pushBody,
+      prodImage,
+      {
+        tag: `bradci-outbid-${productId}`,
+        vibrate: [300, 100, 300, 100, 300],
+        actions: [
+          { action: 'bid', title: '⚡ Reprendre la main' }
+        ],
+        data: {
+          url: './',
+          productId,
+          action: 'bid'
+        }
+      }
+    );
+
+    // 2. Vibration haptique sur smartphone
+    if (typeof window !== 'undefined' && 'navigator' in window && navigator.vibrate) {
+      try {
+        navigator.vibrate([300, 100, 300, 100, 300]);
+      } catch {
+        // Ignorer si bloqué par permission
+      }
+    }
+
+    // 3. Alerte sonore d'urgence & Annonce vocale
+    playOutbidAlertSound();
+    if (voiceNavigator && !voiceNavigator.getIsMuted()) {
+      voiceNavigator.announceOutbid(prodTitle, newAmount, language);
+    }
+
+    // 4. Notification In-App dans le Centre de Notifications
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    
+    const newNotif: AppNotification = {
+      id: 'outbid-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
+      recipientRole: 'client',
+      recipientUserId: outbidUserId || currentUser?.id || 'all',
+      title: `🚨 Surenchère : Vous avez été dépassé sur "${prodTitle}"`,
+      message: `Un utilisateur a surenchéri à ${newAmount.toLocaleString('fr-FR')} FCFA. Reprenez la main dès maintenant avant la clôture ou l'arbitrage !`,
+      type: 'outbid',
+      productId: productId,
+      timestamp: `${dateStr} à ${timeStr}`,
+      isRead: false,
+      urgency: 'critical'
+    };
+    setNotifications(prev => [newNotif, ...prev]);
+
+    // 5. Toast d'avertissement immédiat
+    addToast(
+      '🚨 Surenchère Détectée !',
+      `Un utilisateur a surenchéri à ${newAmount.toLocaleString('fr-FR')} FCFA. Reprenez la main !`,
+      'warning'
+    );
+
+    // 6. Bannière d'alerte flottante réactive en tête d'écran
+    setActiveOutbidAlert({
+      productId,
+      productTitle: prodTitle,
+      newAmount,
+      bidderName,
+      timestamp: `${dateStr} à ${timeStr}`
+    });
+  }, [products, pushBrowserNotification, currentUser, language, addToast]);
+
+  // Simulateur de surenchère instantanée pour tester la réception push sur mobile
+  const triggerOutbidSimulation = useCallback((customProductId?: string, targetAmount?: number) => {
+    let prod = products.find(p => p.id === (customProductId || 'b2b-lot-1'));
+    if (!prod || prod.listingType !== 'auction') {
+      prod = products.find(p => p.listingType === 'auction' && p.status === 'active') || products[0];
+    }
+    if (!prod) return;
+
+    // Montant cible par défaut : 6 000 000 FCFA tel qu'illustré dans la demande utilisateur
+    const newBidAmount = targetAmount || (prod.id === 'b2b-lot-1' ? 6000000 : prod.currentPrice + 50000);
+
+    const rivalBidders = [
+      { name: 'Dr. Amara Kouassi', commune: 'Cocody Ambassades', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100' },
+      { name: 'Amina Touré', commune: 'Plateau', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100' },
+      { name: 'Soro Bakary', commune: 'Marcory Zone 4', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100' },
+    ];
+    const rival = rivalBidders[Math.floor(Math.random() * rivalBidders.length)];
+
+    const rivalBid: Bid = {
+      id: 'bid-sim-' + Date.now(),
+      bidderId: 'usr-sim-' + Date.now(),
+      bidderName: rival.name,
+      bidderAvatar: rival.avatar,
+      bidderRating: 4.9,
+      bidderCommune: rival.commune,
+      bidderDistrict: rival.commune,
+      bidderDistanceKm: 6.2,
+      bidderPhone: '+225 07 00 11 22 33',
+      amount: newBidAmount,
+      timestamp: 'À l\'instant',
+      isLeading: true
+    };
+
+    const updatedBids = [
+      ...prod.bids.map(b => ({ ...b, isLeading: false })),
+      rivalBid
+    ];
+
+    const updatedProduct = {
+      ...prod,
+      currentPrice: newBidAmount,
+      bids: updatedBids
+    };
+
+    setProducts(prev => prev.map(p => p.id === prod.id ? updatedProduct : p));
+    if (productDetailModal?.id === prod.id) {
+      setProductDetailModal(updatedProduct);
+    }
+
+    // Déclenche l'alerte push instantanée
+    notifyOutbid(prod.id, newBidAmount, currentUser?.id, rival.name);
+  }, [products, productDetailModal, notifyOutbid, currentUser]);
 
   // Live heart-beat simulation for active visitors
   useEffect(() => {
@@ -1163,18 +1451,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Error reading URL params for referral:', err);
     }
   }, []);
-
-  const addToast = (title: string, desc: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
-    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
-    setToasts(prev => [...prev, { id, title, desc, type }]);
-    setTimeout(() => {
-      removeToast(id);
-    }, 5000);
-  };
-
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
 
   // Request GPS Location (Capacitor Geolocation with Browser Fallback)
   const requestGpsPermission = useCallback(async (forcePrompt = false): Promise<GPSLocation | null> => {
@@ -1516,7 +1792,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Direct Boutique Purchase with Pay on Delivery (POD) & Freight Dispatch
-  const buyShopProductDirect = (productId: string, paymentMethod: PaymentMethod = 'Wave'): boolean => {
+  const buyShopProductDirect = (productId: string, paymentMethod: PaymentMethod = 'Wave', customQuantity?: number): boolean => {
     if (!currentUser) {
       setAuthModalOpen(true);
       return false;
@@ -1540,17 +1816,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
+    const isB2B = Boolean(prod.isB2BLot || prod.category === 'Déstockage B2B');
+    const b2bTotalStock = prod.b2bTotalUnitsCount || prod.stockQuantity || 1;
+    const b2bUnitPrice = prod.b2bUnitPrice || (prod.b2bTotalUnitsCount ? Math.round(prod.currentPrice / prod.b2bTotalUnitsCount) : prod.currentPrice);
+    const availableStock = isB2B ? b2bTotalStock : (prod.stockQuantity !== undefined ? prod.stockQuantity : 1);
+
     // Check Out of Stock
-    if (prod.isOutOfStock || (prod.stockQuantity !== undefined && prod.stockQuantity <= 0)) {
+    if (prod.isOutOfStock || availableStock <= 0) {
       addToast(
         'Stock Épuisé',
-        'Cet article boutique est en rupture de stock. Nouveau stock disponible bientôt !',
+        'Cet article est en rupture de stock. Nouveau stock disponible bientôt !',
         'warning'
       );
       return false;
     }
 
-    const finalAmount = prod.buyNowPrice || prod.currentPrice;
+    const purchaseQty = customQuantity && customQuantity > 0 ? Math.min(customQuantity, availableStock) : 1;
+    const finalAmount = isB2B ? (b2bUnitPrice * purchaseQty) : (prod.buyNowPrice || prod.currentPrice);
     const buyerCommune = userLocation?.commune || currentUser.gpsLocation?.commune || 'Marcory';
     const buyerAddress = userLocation?.address || currentUser.gpsLocation?.address || `${buyerCommune}, Abidjan`;
     const buyerCoords = userLocation || currentUser.gpsLocation || getCommuneCoords(buyerCommune);
@@ -1565,7 +1847,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newJob: DeliveryJob = {
       id: 'job-shop-' + Date.now(),
       productId: prod.id,
-      productTitle: prod.title,
+      productTitle: isB2B ? `${prod.title} (x${purchaseQty})` : prod.title,
       productImage: prod.images[0],
       sellerName: prod.shopName || prod.sellerName,
       sellerPhone: '+225 07 48 92 11 34', // Protected until in-person handover
@@ -1592,15 +1874,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFreightJobs(prev => [newJob, ...prev]);
 
     // Stock Management Calculation
-    const currentStock = prod.stockQuantity !== undefined ? prod.stockQuantity : 1;
-    const nextStock = Math.max(0, currentStock - 1);
-    const nextSoldCount = (prod.soldCount || 0) + 1;
+    const nextStock = Math.max(0, availableStock - purchaseQty);
+    const nextSoldCount = (prod.soldCount || 0) + purchaseQty;
     const isNowOutOfStock = nextStock === 0;
     const outOfStockTimestamp = isNowOutOfStock ? new Date().toISOString() : undefined;
 
     const updatedProd: Product = {
       ...prod,
       stockQuantity: nextStock,
+      b2bTotalUnitsCount: isB2B ? nextStock : prod.b2bTotalUnitsCount,
       soldCount: nextSoldCount,
       isOutOfStock: isNowOutOfStock,
       outOfStockSince: outOfStockTimestamp,
@@ -1620,7 +1902,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addNotification({
         recipientRole: 'client',
         recipientUserId: prod.sellerId,
-        title: '⚠️ Rupture de Stock Boutique !',
+        title: '⚠️ Rupture de Stock !',
         message: `Votre article "${prod.title}" a écoulé toutes ses pièces (${nextSoldCount} vendus au total). Il est désormais affiché "Stock épuisé - Nouveau stock bientôt". Cliquez sur Réapprovisionner pour renseigner le nouveau stock sous 14 jours avant suppression automatique.`,
         type: 'system',
         productId: prod.id,
@@ -1635,8 +1917,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     addToast(
-      '🛍️ Commande Boutique Enregistrée !',
-      `Achat de "${prod.title}" pour ${finalAmount.toLocaleString('fr-FR')} FCFA. Paiement Direct à la Livraison lors de la remise en main propre.`,
+      '🛍️ Commande Enregistrée !',
+      isB2B
+        ? `Achat de ${purchaseQty} article(s) "${prod.title}" (${finalAmount.toLocaleString('fr-FR')} FCFA). Paiement direct à la livraison.`
+        : `Achat de "${prod.title}" pour ${finalAmount.toLocaleString('fr-FR')} FCFA. Paiement Direct à la Livraison lors de la remise en main propre.`,
       'success'
     );
     return true;
@@ -1649,12 +1933,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
-    if (product.isOutOfStock || (product.stockQuantity !== undefined && product.stockQuantity <= 0)) {
+    const isB2B = Boolean(product.isB2BLot || product.category === 'Déstockage B2B');
+    const availableStock = isB2B
+      ? (product.b2bTotalUnitsCount || product.stockQuantity || 99)
+      : (product.stockQuantity !== undefined ? product.stockQuantity : 99);
+
+    if (product.isOutOfStock || availableStock <= 0) {
       addToast('Stock Épuisé', 'Cet article est en rupture de stock.', 'warning');
       return false;
     }
 
-    const availableStock = product.stockQuantity !== undefined ? product.stockQuantity : 99;
     const existingIndex = cart.findIndex(item => item.productId === product.id);
 
     if (existingIndex >= 0) {
@@ -1675,11 +1963,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'success'
       );
     } else {
-      const newItem = createCartItemFromProduct(product, Math.min(quantity, availableStock), forcedChannel);
+      const safeQty = Math.min(quantity, availableStock);
+      const newItem = createCartItemFromProduct(product, safeQty, forcedChannel);
       setCart(prev => [newItem, ...prev]);
       addToast(
         '🛒 Ajouté au Panier !',
-        `"${product.title}" (${newItem.unitPrice.toLocaleString('fr-FR')} FCFA) ajouté à votre panier.`,
+        `"${product.title}" (${safeQty} pièce(s) • ${(newItem.unitPrice * safeQty).toLocaleString('fr-FR')} FCFA) ajouté à votre panier.`,
         'success'
       );
     }
@@ -1992,6 +2281,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ? calculateHaversineDistance(prod.pickupCoords.lat, prod.pickupCoords.lng, bidderCoords.lat, bidderCoords.lng)
       : 5.4;
 
+    const previousLeadingBid = prod.bids.find(b => b.isLeading);
+
     const newBid = {
       id: 'bid-' + Date.now(),
       bidderId: currentUser.id,
@@ -2035,6 +2326,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProducts(prev => prev.map(p => p.id === productId ? updatedProduct : p));
     if (productDetailModal?.id === productId) {
       setProductDetailModal(updatedProduct);
+    }
+
+    // 1. Alerte Push Immédiate à l'ancien enchérisseur dépassé
+    if (previousLeadingBid && previousLeadingBid.bidderId !== currentUser.id) {
+      notifyOutbid(prod.id, amount, previousLeadingBid.bidderId, currentUser.name);
+    }
+
+    // Notification envoyée au vendeur : Possibilité de vendre directement dès cette offre ou d'attendre
+    addNotification({
+      recipientRole: 'client',
+      recipientUserId: prod.sellerId || prod.sellerName,
+      title: `🔔 Nouvelle offre reçue (${updatedBids.length}/5) sur "${prod.title}"`,
+      message: `${currentUser.name} a placé une offre de ${amount.toLocaleString('fr-FR')} FCFA. Vous pouvez vendre directement à cet acheteur dès maintenant ou attendre d'autres enchérisseurs (jusqu'à 5).`,
+      type: 'bid',
+      productId: prod.id,
+      urgency: 'high'
+    });
+
+    // Déclencheur intelligent pour démonstration : surenchère automatique après 22 secondes
+    const currentUserId = currentUser.id;
+    const currentProdId = prod.id;
+    if (updatedBids.length < 5 && newStatus === 'active') {
+      setTimeout(() => {
+        setProducts(currentProducts => {
+          const target = currentProducts.find(p => p.id === currentProdId);
+          if (!target || target.status !== 'active' || target.bids.length >= 5) return currentProducts;
+          const currentLead = target.bids.find(b => b.isLeading);
+          if (currentLead && currentLead.bidderId === currentUserId) {
+            const rivalAmount = target.currentPrice + 50000;
+            const rivalBid: Bid = {
+              id: 'bid-auto-rival-' + Date.now(),
+              bidderId: 'usr-rival-auto',
+              bidderName: 'Dr. Amara Kouassi (Cocody)',
+              bidderAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
+              bidderRating: 4.9,
+              bidderCommune: 'Cocody',
+              bidderDistrict: 'Cocody',
+              bidderDistanceKm: 5.2,
+              bidderPhone: '+225 07 88 99 00 11',
+              amount: rivalAmount,
+              timestamp: 'À l\'instant',
+              isLeading: true
+            };
+            const updatedProdState = {
+              ...target,
+              currentPrice: rivalAmount,
+              bids: [...target.bids.map(b => ({ ...b, isLeading: false })), rivalBid]
+            };
+            setTimeout(() => {
+              notifyOutbid(target.id, rivalAmount, currentUserId, 'Dr. Amara Kouassi');
+            }, 100);
+            return currentProducts.map(p => p.id === currentProdId ? updatedProdState : p);
+          }
+          return currentProducts;
+        });
+      }, 22000);
     }
 
     addToast('Enchère Enregistrée !', `Vous menez l'enchère avec ${amount.toLocaleString('fr-FR')} FCFA`, 'success');
@@ -3941,6 +4288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     referralCode?: string;
   }) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes expiration
     const fullName = `${data.firstName.trim()} ${data.lastName.trim()}`;
     const generatedReferralCode = 'BRAD-' + Math.random().toString(36).substring(2, 6).toUpperCase();
 
@@ -3964,6 +4312,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       kycStatus: 'unverified',
       emailVerified: false,
       emailVerificationOtp: otpCode,
+      otpExpiresAt: expiresAt,
       productsPublishedCount: 0,
       rating: 5.0,
       createdAt: new Date().toISOString(),
@@ -4023,28 +4372,118 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPendingReferralCode(null);
     localStorage.removeItem('bradci_pending_sponsor_code');
 
-    return { success: true, otpCode };
+    return { success: true, otpCode, expiresAt };
   };
 
-  const verifyEmailOtp = (email: string, enteredOtp: string) => {
+  const verifyEmailOtp = (email: string, enteredOtp: string): { success: boolean; error?: string } => {
     const cleanEntered = enteredOtp.trim();
-    const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    const cleanEmail = email.trim().toLowerCase();
+    const user = users.find(u => u.email?.toLowerCase() === cleanEmail) || (currentUser?.email?.toLowerCase() === cleanEmail ? currentUser : null);
     
-    if (user && user.emailVerificationOtp && user.emailVerificationOtp !== cleanEntered) {
-      addToast('Code Secret Incorrect', 'Veuillez renseigner le code secret à 6 chiffres reçu par email.', 'error');
-      return { success: false };
+    if (!user) {
+      const errMsg = 'Aucun compte associé à cette adresse e-mail.';
+      addToast('Compte introuvable', errMsg, 'error');
+      return { success: false, error: errMsg };
     }
 
+    // Vérification de l'expiration du code OTP (5 minutes)
+    if (user.otpExpiresAt && Date.now() > user.otpExpiresAt) {
+      const errMsg = 'Code secret expiré. Les codes de sécurité expirent après 5 minutes. Veuillez demander un nouveau code.';
+      addToast('Code Expiré (5 min)', errMsg, 'error');
+      return { success: false, error: errMsg };
+    }
+
+    // Vérification de la correspondance du code
+    if (user.emailVerificationOtp && user.emailVerificationOtp !== cleanEntered) {
+      const errMsg = 'Code de sécurité incorrect. Veuillez renseigner le code à 6 chiffres reçu par e-mail.';
+      addToast('Code Secret Incorrect', errMsg, 'error');
+      return { success: false, error: errMsg };
+    }
+
+    // Stockage du jeton de session dans localStorage
+    const sessionToken = 'bradci_sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
+    localStorage.setItem('bradci_auth_token', sessionToken);
+    localStorage.setItem('bradci_current_user_id', user.id);
+
     const updated: User = {
-      ...(user || currentUser!),
-      emailVerified: true
+      ...user,
+      emailVerified: true,
+      emailVerificationOtp: undefined,
+      otpExpiresAt: undefined
     };
 
     setCurrentUser(updated);
     setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-    setKycModalOpen(true);
-    addToast('📧 Email Validé avec Succès !', 'Veuillez maintenant compléter votre vérification KYC pour activer vos privilèges.', 'success');
+
+    // Redirection vers l'accueil (Explore ou Driver Dashboard)
+    setActiveTab(updated.role === 'driver' ? 'dashboard_driver' : 'explore');
+
+    addToast('📧 Email Validé avec Succès !', 'Session sécurisée activée sur BRAD\'CI.', 'success');
     return { success: true };
+  };
+
+  const requestEmailLoginOtp = async (email: string): Promise<{ success: boolean; otpCode?: string; expiresAt?: number; error?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const user = users.find(u => u.email?.toLowerCase() === cleanEmail);
+    if (!user) {
+      const errMsg = "Aucun compte trouvé avec cette adresse e-mail. Veuillez d'abord vous inscrire.";
+      addToast('Compte introuvable', errMsg, 'error');
+      return { success: false, error: errMsg };
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    const updatedUser: User = {
+      ...user,
+      emailVerificationOtp: otpCode,
+      otpExpiresAt: expiresAt
+    };
+    setUsers(prev => prev.map(u => u.id === user.id ? updatedUser : u));
+
+    const emailResult = await sendOtpEmail(cleanEmail, otpCode);
+    if (!emailResult.success) {
+      const errMsg = emailResult.error || "Impossible d'envoyer l'e-mail via Resend.";
+      addToast("Erreur d'envoi", errMsg, 'error');
+      return { success: false, error: errMsg };
+    }
+
+    return { success: true, otpCode, expiresAt };
+  };
+
+  const resendEmailOtp = async (email: string): Promise<{ success: boolean; otpCode?: string; expiresAt?: number; error?: string }> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const user = users.find(u => u.email?.toLowerCase() === cleanEmail) || (currentUser?.email?.toLowerCase() === cleanEmail ? currentUser : null);
+    
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    if (user) {
+      const updatedUser: User = {
+        ...user,
+        emailVerificationOtp: otpCode,
+        otpExpiresAt: expiresAt
+      };
+      setUsers(prev => prev.map(u => u.id === user.id ? updatedUser : u));
+      if (currentUser?.id === user.id) {
+        setCurrentUser(updatedUser);
+      }
+    }
+
+    const emailResult = await sendOtpEmail(cleanEmail, otpCode);
+    if (!emailResult.success) {
+      const errMsg = emailResult.error || "Impossible de renvoyer l'e-mail de sécurité.";
+      addToast("Erreur d'envoi", errMsg, 'error');
+      return { success: false, error: errMsg };
+    }
+
+    addToast(
+      'Nouveau Code Envoyé',
+      `Un nouveau code de sécurité a été transmis à ${cleanEmail} (valide 5 min).`,
+      'info'
+    );
+
+    return { success: true, otpCode, expiresAt };
   };
 
   const loginWithEmail = (email: string, password?: string) => {
@@ -5163,11 +5602,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setNotificationsModalOpen,
         addNotification,
         markNotificationAsRead,
+        toggleNotificationReadStatus,
+        deleteNotification,
         markAllNotificationsAsRead,
         clearAllNotifications,
         browserNotificationsEnabled,
+        pushToken,
         requestBrowserNotificationPermission,
         pushBrowserNotification,
+        notifyOutbid,
+        triggerOutbidSimulation,
+        activeOutbidAlert,
+        dismissOutbidAlert,
 
         // Language, Theme, Voice, Map Provider
         language,
@@ -5197,6 +5643,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Auth & Email OTP & Google Profile
         registerUser,
         verifyEmailOtp,
+        requestEmailLoginOtp,
+        resendEmailOtp,
         loginWithEmail,
         loginWithGoogle,
         completeGoogleProfile,

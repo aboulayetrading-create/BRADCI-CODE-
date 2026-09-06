@@ -158,7 +158,7 @@ export async function sendOtpEmail(
   
   // Clé d'API Resend configurée dans les variables d'environnement
   const resendApiKey = (
-    import.meta.env.VITE_RESEND_API_KEY || 
+    (typeof import.meta !== 'undefined' && (import.meta as any).env ? (import.meta as any).env.VITE_RESEND_API_KEY : '') || 
     (typeof process !== 'undefined' && process.env ? process.env.RESEND_API_KEY : '') || 
     ''
   ) as string;

@@ -77,16 +77,30 @@ export const FiveBiddersModal: React.FC = () => {
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-400 px-3 py-1 rounded-full text-xs font-bold border border-amber-500/30 mb-2">
             <Gavel className="w-4 h-4" />
-            <span>{translate("Règle Métier des 5 Offres Déclenchée", "5-Bid Rule Triggered")}</span>
+            <span>
+              {bids.length >= 5 
+                ? translate("Règle Métier des 5 Offres Déclenchée", "5-Bid Rule Triggered")
+                : translate(`Vente Directe Anticipée (${bids.length} Offre${bids.length > 1 ? 's' : ''})`, `Early Direct Sale (${bids.length} Bid${bids.length > 1 ? 's' : ''})`)
+              }
+            </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-white font-display">
-            {translate("Arbitrage & Choix de l'Acheteur", "Arbitration & Buyer Selection")}
+            {bids.length >= 5
+              ? translate("Arbitrage & Choix de l'Acheteur", "Arbitration & Buyer Selection")
+              : translate("Vendre Directement sans Attendre", "Sell Directly Without Waiting")
+            }
           </h2>
           <p className="text-xs text-slate-400 mt-1 max-w-lg mx-auto">
-            {translate(
-              `Votre article "${prod.title}" a cumulé 5 offres. Choisissez à qui vous souhaitez vendre parmi les enchérisseurs disponibles.`,
-              `Your item "${prod.title}" reached 5 offers. Choose whom you want to award the sale to among available bidders.`
-            )}
+            {bids.length >= 5
+              ? translate(
+                  `Votre article "${prod.title}" a cumulé 5 offres. Choisissez à qui vous souhaitez vendre parmi les enchérisseurs disponibles.`,
+                  `Your item "${prod.title}" reached 5 offers. Choose whom you want to award the sale to among available bidders.`
+                )
+              : translate(
+                  `Pas obligé d'attendre 5 personnes ! Vous pouvez vendre dès maintenant à l'enchérisseur de votre choix parmi les ${bids.length} offre(s) reçue(s).`,
+                  `No need to wait for 5 people! You can sell right now to any bidder of your choice among the ${bids.length} offer(s) received.`
+                )
+            }
           </p>
           {declinedIds.length > 0 && (
             <div className="mt-2.5 inline-flex items-center gap-1.5 bg-red-500/15 border border-red-500/30 px-3 py-1 rounded-xl text-xs text-red-300">

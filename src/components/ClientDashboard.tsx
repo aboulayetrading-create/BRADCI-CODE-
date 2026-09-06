@@ -47,6 +47,7 @@ import {
   Globe,
   Volume2,
   VolumeX,
+  Mic,
   Bell,
   LogOut,
   Radio,
@@ -2451,6 +2452,32 @@ export const ClientDashboard: React.FC = () => {
                   "Enable spoken audio announcements for auction steps, courier dispatch and payment validations."
                 )}
               </p>
+
+              {/* Assistant Vocal IA Microphone direct launch */}
+              <div className="p-3.5 rounded-xl bg-slate-950/80 border border-amber-500/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                    <Mic className="w-4 h-4 text-amber-400 animate-pulse" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-white block truncate">
+                      {translate("Assistant Vocal IA (Microphone)", "AI Voice Assistant (Microphone)")}
+                    </span>
+                    <span className="text-[11px] text-slate-400 block truncate">
+                      {translate("Contrôlez l'application et posez vos questions à la voix", "Control the app and ask questions using your voice")}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  id="btn-settings-open-mic"
+                  onClick={() => window.dispatchEvent(new CustomEvent('bradci_open_support_mic'))}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/25 cursor-pointer shrink-0"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>{translate("Parler", "Speak")}</span>
+                </button>
+              </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
                 <button

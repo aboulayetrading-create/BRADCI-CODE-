@@ -10,6 +10,15 @@ if (typeof window !== 'undefined') {
   defineCustomElements(window);
 }
 
+// Register Service Worker for PWA and Mobile Push Notifications
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.info('Service Worker registration notice:', err);
+    });
+  });
+}
+
 // Global Unhandled Error & Promise Rejection Interceptors (Anti-White-Screen Shield)
 if (typeof window !== 'undefined') {
   window.onerror = (message, source, lineno, colno, error) => {

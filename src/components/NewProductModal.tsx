@@ -66,16 +66,13 @@ export const NewProductModal: React.FC = () => {
   const [buyNowPrice, setBuyNowPrice] = useState(25000);
   const [stockQuantity, setStockQuantity] = useState<number>(5);
   
-  // B2B Déstockage / Liquidation Lot States
+  // Déstockage / Liquidation States (Saisie directe du prix d'un article + Quantité en stock)
   const [isB2BLot, setIsB2BLot] = useState<boolean>(false);
   const [b2bSaleKind, setB2bSaleKind] = useState<'destockage' | 'liquidation'>('destockage');
   const [b2bLotType, setB2bLotType] = useState<'it_fleet' | 'fashion_stock' | 'appliances_stock' | 'office_furniture' | 'wholesale_mix'>('it_fleet');
-  const [b2bCompanyName, setB2bCompanyName] = useState<string>(currentUser?.companyName || 'SITEL Technologies CI SAS');
-  const [b2bTotalUnitsCount, setB2bTotalUnitsCount] = useState<number>(50);
-  const [b2bEstimatedPublicValue, setB2bEstimatedPublicValue] = useState<number>(5000000);
-  const [b2bWarehouseLocation, setB2bWarehouseLocation] = useState<string>('Marcory Zone 4 / Vridi');
-  const [b2bInspectionAllowed, setB2bInspectionAllowed] = useState<boolean>(true);
-  const [b2bInspectionHours, setB2bInspectionHours] = useState<string>('Du Lundi au Vendredi, 09h00 - 16h00');
+  const [b2bUnitPrice, setB2bUnitPrice] = useState<number>(10000); // Prix d'un seul article saisi par le vendeur
+  const [b2bTotalUnitsCount, setB2bTotalUnitsCount] = useState<number>(50); // Quantité d'articles en stock
+  const [b2bWarehouseLocation, setB2bWarehouseLocation] = useState<string>('');
 
   const [commune, setCommune] = useState(userLocation?.commune || 'Cocody');
   const [pickupAddress, setPickupAddress] = useState(userLocation?.address || 'Boulevard Latrille, Résidence Soleil');
@@ -340,14 +337,19 @@ export const NewProductModal: React.FC = () => {
       return;
     }
 
+    const totalStockValue = isB2BLot ? (Number(b2bUnitPrice) * Number(b2bTotalUnitsCount)) : 0;
+    const finalStartingPrice = isB2BLot ? Number(b2bUnitPrice) : Number(startingPrice);
+    const finalBuyNowPrice = isB2BLot ? Number(b2bUnitPrice) : (listingType === 'shop' ? Number(buyNowPrice) : undefined);
+    const finalStockQuantity = isB2BLot ? Number(b2bTotalUnitsCount) : Number(stockQuantity || 1);
+
     const success = publishProduct({
       title,
       category: isB2BLot ? 'Déstockage B2B' : category,
       description,
-      startingPrice: Number(startingPrice),
-      reservePrice: Number(reservePrice),
-      buyNowPrice: listingType === 'shop' ? Number(buyNowPrice) : undefined,
-      stockQuantity: Number(stockQuantity || 1),
+      startingPrice: finalStartingPrice,
+      reservePrice: isB2BLot ? totalStockValue : Number(reservePrice),
+      buyNowPrice: finalBuyNowPrice,
+      stockQuantity: finalStockQuantity,
       listingType,
       commune,
       pickupAddress,
@@ -359,24 +361,12 @@ export const NewProductModal: React.FC = () => {
       isBoosted: isBoosted,
       isB2BLot: isB2BLot,
       b2bSaleKind: isB2BLot ? b2bSaleKind : undefined,
+      b2bUnitPrice: isB2BLot ? Number(b2bUnitPrice) : undefined,
       commissionRate: isB2BLot ? 0.05 : undefined,
       b2bLotType: isB2BLot ? b2bLotType : undefined,
-      b2bCompanyName: isB2BLot ? b2bCompanyName : undefined,
       b2bTotalUnitsCount: isB2BLot ? Number(b2bTotalUnitsCount) : undefined,
-      b2bEstimatedPublicValueFCFA: isB2BLot ? Number(b2bEstimatedPublicValue) : undefined,
-      b2bWarehouseLocation: isB2BLot ? b2bWarehouseLocation : undefined,
-      b2bInspectionAllowed: isB2BLot ? b2bInspectionAllowed : undefined,
-      b2bInspectionHours: isB2BLot ? b2bInspectionHours : undefined,
-      b2bManifest: isB2BLot ? [
-        {
-          id: 'man-1',
-          designation: title,
-          quantity: Number(b2bTotalUnitsCount),
-          unitCondition: 'tres_bon_etat',
-          estimatedUnitValueFCFA: Math.round(Number(b2bEstimatedPublicValue) / (Number(b2bTotalUnitsCount) || 1)),
-          specsSummary: description.substring(0, 100)
-        }
-      ] : undefined
+      b2bEstimatedPublicValueFCFA: isB2BLot ? totalStockValue : undefined,
+      b2bWarehouseLocation: isB2BLot ? (b2bWarehouseLocation || pickupAddress) : undefined,
     });
 
     if (success) {
@@ -519,30 +509,30 @@ export const NewProductModal: React.FC = () => {
           </button>
         </div>
 
-        {/* B2B Lot Specific Form Options */}
+        {/* Déstockage & Liquidation Form Options - SIMPLIFIÉ : Sans documents d'entreprise, juste les produits en stock */}
         {isB2BLot && (
           <div className="p-4 rounded-2xl bg-[#091326] border border-blue-500/40 mb-5 space-y-3.5 animate-in fade-in">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
                 <Building2 className="w-4 h-4 text-blue-400" />
-                <span>Paramètres du Lot B2B & Enlèvement Entrepôt</span>
+                <span>Paramètres Déstockage / Liquidation (Produits en Stock)</span>
               </span>
               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1">
                 <span>Commission Brad'CI :</span>
-                <span className="font-black text-white">5% par article / lot</span>
+                <span className="font-black text-white">5% par vente</span>
               </span>
             </div>
 
             {/* Selector between Déstockage vs Liquidation */}
             <div className="space-y-1.5">
               <label className="block text-[11px] font-semibold text-slate-300">
-                Type de publication & Badge affiché sur l'annonce :
+                Type de mise en vente :
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setB2bSaleKind('destockage')}
-                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
                     b2bSaleKind === 'destockage'
                       ? 'bg-blue-600/30 border-blue-400 text-white shadow-md'
                       : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
@@ -564,7 +554,7 @@ export const NewProductModal: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setB2bSaleKind('liquidation')}
-                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                  className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
                     b2bSaleKind === 'liquidation'
                       ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-md'
                       : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white'
@@ -575,7 +565,7 @@ export const NewProductModal: React.FC = () => {
                       <span>⚖️ Liquidation</span>
                     </div>
                     <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                      Liquidation totale & parcs
+                      Liquidation de stock & clôture
                     </p>
                   </div>
                   <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500 text-white shrink-0">
@@ -588,84 +578,104 @@ export const NewProductModal: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Type de Lot
+                  Type d'articles en stock
                 </label>
                 <select
                   value={b2bLotType}
                   onChange={(e) => setB2bLotType(e.target.value as any)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
                 >
-                  <option value="it_fleet">Parc Informatique (PC portables, serveurs, écrans)</option>
-                  <option value="fashion_stock">Stock Mode / Chaussures / Vêtements en gros</option>
-                  <option value="appliances_stock">Électroménager / Téléviseurs / Climatiseurs</option>
-                  <option value="office_furniture">Mobilier de Bureau & Chaises ergonomiques</option>
-                  <option value="wholesale_mix">Grossiste / Lots Mixtes & Quincaillerie</option>
+                  <option value="it_fleet">Matériel Informatique & Téléphonie</option>
+                  <option value="fashion_stock">Stock Mode / Vêtements / Chaussures</option>
+                  <option value="appliances_stock">Électroménager & Téléviseurs</option>
+                  <option value="office_furniture">Mobilier de Bureau & Équipements</option>
+                  <option value="wholesale_mix">Marchandises Diverses & Gros Volumes</option>
                 </select>
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Nombre Total d'Unités dans le Lot
-                </label>
-                <input
-                  type="number"
-                  min="2"
-                  value={b2bTotalUnitsCount}
-                  onChange={(e) => setB2bTotalUnitsCount(Number(e.target.value))}
-                  placeholder="Ex: 50 ordinateurs ou 100 paires"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Nom de l'Entreprise ou Vendeur
-                </label>
-                <input
-                  type="text"
-                  value={b2bCompanyName}
-                  onChange={(e) => setB2bCompanyName(e.target.value)}
-                  placeholder="Ex: SITEL Technologies CI ou Grossiste Yopougon"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Valeur Marchande Estimée du Lot (FCFA)
-                </label>
-                <input
-                  type="number"
-                  min="50000"
-                  step="10000"
-                  value={b2bEstimatedPublicValue}
-                  onChange={(e) => setB2bEstimatedPublicValue(Number(e.target.value))}
-                  placeholder="Ex: 5000000"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                  Emplacement Entrepôt / Lieu de Stockage & Enlèvement
+                  Emplacement / Entrepôt de Retrait (Facultatif)
                 </label>
                 <input
                   type="text"
                   value={b2bWarehouseLocation}
                   onChange={(e) => setB2bWarehouseLocation(e.target.value)}
-                  placeholder="Ex: Zone Industrielle Marcory / Vridi - Hangar SITEL Logistique"
+                  placeholder="Ex: Hangar Zone 4, Magasin Adjamé, etc."
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500"
                 />
               </div>
+            </div>
 
-              <div className="sm:col-span-2 flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px]">
-                <span className="text-slate-300 font-medium">Visite & inspection physique autorisée avant clôture</span>
-                <input
-                  type="checkbox"
-                  checked={b2bInspectionAllowed}
-                  onChange={(e) => setB2bInspectionAllowed(e.target.checked)}
-                  className="w-4 h-4 accent-blue-500 rounded cursor-pointer"
-                />
+            {/* Saisie directe du prix d'un article + Quantité en stock + Calcul automatique du total */}
+            <div className="p-3.5 rounded-2xl bg-[#060D1E] border border-cyan-500/40 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold block mb-1 flex items-center justify-between">
+                    <span>Prix d'un article (FCFA) :</span>
+                    <span className="text-[10px] text-cyan-400 font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                      Prix Unitaire
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min="500"
+                    step="500"
+                    value={b2bUnitPrice}
+                    onChange={(e) => setB2bUnitPrice(Math.max(100, Number(e.target.value)))}
+                    placeholder="Ex: 10000"
+                    className="w-full bg-slate-900 border border-cyan-500/60 rounded-xl px-3 py-2 text-sm font-mono-num text-cyan-300 font-extrabold focus:outline-none focus:border-cyan-400"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Vous saisissez uniquement le prix d'une seule pièce.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-300 font-semibold block mb-1 flex items-center justify-between">
+                    <span>Nombre d'articles en stock :</span>
+                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">
+                      Quantité
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10000"
+                    value={b2bTotalUnitsCount}
+                    onChange={(e) => setB2bTotalUnitsCount(Math.max(1, Number(e.target.value)))}
+                    placeholder="Ex: 50"
+                    className="w-full bg-slate-900 border border-amber-500/60 rounded-xl px-3 py-2 text-sm font-mono-num text-amber-300 font-extrabold focus:outline-none focus:border-amber-400"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Total d'exemplaires disponibles à la vente.
+                  </span>
+                </div>
+              </div>
+
+              {/* Total calculé automatiquement en temps réel */}
+              <div className="p-3 rounded-xl bg-gradient-to-r from-blue-950/70 via-slate-900/90 to-cyan-950/70 border border-cyan-500/30 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                    Calcul Automatique du Stock Total :
+                  </span>
+                  <div className="text-xs text-slate-300 font-medium">
+                    <span className="font-mono-num text-cyan-300 font-bold">{b2bUnitPrice.toLocaleString('fr-FR')} F</span> / article × <span className="font-mono-num text-amber-300 font-bold">{b2bTotalUnitsCount} articles</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-emerald-400 block font-bold uppercase">Valeur Totale du Stock</span>
+                  <span className="text-base sm:text-lg font-mono-num font-extrabold text-emerald-300">
+                    {(b2bUnitPrice * b2bTotalUnitsCount).toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Les acheteurs pourront choisir la quantité exacte qu'ils souhaitent ou acheter tout le stock d'un seul coup.</span>
               </div>
             </div>
           </div>
@@ -784,7 +794,22 @@ export const NewProductModal: React.FC = () => {
             </div>
 
             {/* Prices & Stock according to listing type */}
-            {listingType === 'shop' ? (
+            {isB2BLot ? (
+              <div className="p-3.5 rounded-2xl bg-[#081226] border border-cyan-500/40 text-xs text-slate-300 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-cyan-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+                    <span>Configuration Déstockage / Liquidation confirmée</span>
+                  </span>
+                  <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded font-mono-num font-bold">
+                    {b2bTotalUnitsCount} articles en stock
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Prix d'un article : <strong className="text-white font-mono-num">{b2bUnitPrice.toLocaleString('fr-FR')} FCFA</strong> • Valeur totale calculée : <strong className="text-emerald-400 font-mono-num">{(b2bUnitPrice * b2bTotalUnitsCount).toLocaleString('fr-FR')} FCFA</strong>
+                </p>
+              </div>
+            ) : listingType === 'shop' ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>

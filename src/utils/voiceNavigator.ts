@@ -227,6 +227,35 @@ export function playOrderAlertSound() {
   playDriverNewOrderRingtone();
 }
 
+export function playOutbidAlertSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    
+    // Urgent dual tone alert: rising urgency for auction outbid
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(587.33, now); // D5
+    osc.frequency.setValueAtTime(880.00, now + 0.12); // A5
+    osc.frequency.setValueAtTime(1174.66, now + 0.24); // D6
+
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.5);
+  } catch {
+    // Audio restriction handling
+  }
+}
+
 export function playSuccessChime() {
   try {
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -261,20 +290,52 @@ class VoiceNavigatorService {
   private isSpeakingState: boolean = false;
   private rate: number = 1.05;
   private pitch: number = 1.0;
+  private cachedVoices: SpeechSynthesisVoice[] = [];
+  private resumeInterval: any = null;
 
   constructor() {
-    const savedVoiceState = localStorage.getItem('bradci_voice_enabled');
+    const savedVoiceState = typeof window !== 'undefined' ? localStorage.getItem('bradci_voice_enabled') : null;
     if (savedVoiceState !== null) {
       this.isMuted = savedVoiceState === 'false';
+    }
+    this.initVoices();
+  }
+
+  private initVoices() {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      this.cachedVoices = window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        this.cachedVoices = window.speechSynthesis.getVoices();
+      };
+    }
+  }
+
+  public unlockAudio() {
+    try {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        if (ctx.state === 'suspended') {
+          ctx.resume();
+        }
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.resume();
+      }
+    } catch {
+      // ignore
     }
   }
 
   public setMuted(muted: boolean) {
     this.isMuted = muted;
-    localStorage.setItem('bradci_voice_enabled', (!muted).toString());
-    if (muted && 'speechSynthesis' in window) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bradci_voice_enabled', (!muted).toString());
+    }
+    if (muted && typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       this.isSpeakingState = false;
+      this.clearResumeInterval();
     }
   }
 
@@ -283,12 +344,19 @@ class VoiceNavigatorService {
   }
 
   public isSpeaking(): boolean {
-    return this.isSpeakingState && ('speechSynthesis' in window) && window.speechSynthesis.speaking;
+    return this.isSpeakingState && (typeof window !== 'undefined' && 'speechSynthesis' in window) && window.speechSynthesis.speaking;
+  }
+
+  private clearResumeInterval() {
+    if (this.resumeInterval) {
+      clearInterval(this.resumeInterval);
+      this.resumeInterval = null;
+    }
   }
 
   public speak(text: string, lang: AppLanguage = 'fr', onEnd?: () => void) {
     if (this.isMuted) return;
-    if (!('speechSynthesis' in window)) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       console.warn('Speech synthesis not supported on this browser');
       return;
     }
@@ -296,17 +364,18 @@ class VoiceNavigatorService {
     try {
       playGpsChime();
       window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = lang === 'en' ? 'en-US' : 'fr-FR';
       utterance.rate = this.rate;
       utterance.pitch = this.pitch;
 
-      const voices = window.speechSynthesis.getVoices();
+      const voices = this.cachedVoices.length > 0 ? this.cachedVoices : window.speechSynthesis.getVoices();
       const matchedVoice = voices.find(v => 
         lang === 'en' 
-          ? v.lang.startsWith('en') 
-          : (v.lang.startsWith('fr') || v.lang.includes('FR'))
+          ? (v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Natural') || true))
+          : ((v.lang.startsWith('fr') || v.lang.includes('FR')) && (v.name.includes('Google') || v.name.includes('Thomas') || true))
       );
       if (matchedVoice) {
         utterance.voice = matchedVoice;
@@ -314,13 +383,25 @@ class VoiceNavigatorService {
 
       this.isSpeakingState = true;
 
+      // Chrome / Android keepalive interval to prevent freezing on utterances
+      this.clearResumeInterval();
+      this.resumeInterval = setInterval(() => {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+          window.speechSynthesis.resume();
+        } else {
+          this.clearResumeInterval();
+        }
+      }, 5000);
+
       utterance.onend = () => {
+        this.clearResumeInterval();
         this.currentUtterance = null;
         this.isSpeakingState = false;
         if (onEnd) onEnd();
       };
 
       utterance.onerror = () => {
+        this.clearResumeInterval();
         this.currentUtterance = null;
         this.isSpeakingState = false;
       };
@@ -329,16 +410,25 @@ class VoiceNavigatorService {
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.warn('Voice navigation error:', err);
+      this.clearResumeInterval();
       this.isSpeakingState = false;
     }
   }
 
   public stop() {
-    if ('speechSynthesis' in window) {
+    this.clearResumeInterval();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
     this.currentUtterance = null;
     this.isSpeakingState = false;
+  }
+
+  public announceVoiceActivated(lang: AppLanguage = 'fr') {
+    const msg = lang === 'en'
+      ? "BRAD'CI Voice Guidance activated. Live audio alerts for auctions and deliveries are now enabled."
+      : "Assistance vocale BRAD'CI activée. Annonces en direct des enchères et des livraisons en cours.";
+    this.speak(msg, lang);
   }
 
   // 1. Order Accepted / Commande Acceptée
@@ -420,6 +510,14 @@ class VoiceNavigatorService {
     this.speak(fullText, lang);
   }
 
+  // 10. Outbid Announcement / Annonce de surenchère en direct
+  public announceOutbid(productTitle: string, amount: number, lang: AppLanguage = 'fr') {
+    const msg = lang === 'en'
+      ? `Outbid alert! A user placed a higher bid of ${amount.toLocaleString()} CFA on ${productTitle}. Take back the lead now!`
+      : `Alerte surenchère ! Un utilisateur a surenchéri à ${amount.toLocaleString('fr-FR')} FCFA sur ${productTitle}. Reprenez la main !`;
+    this.speak(msg, lang);
+  }
+
   public playSuccessChime() {
     playOrderAlertSound();
   }
@@ -430,13 +528,6 @@ class VoiceNavigatorService {
 
   public playChime() {
     playOrderAlertSound();
-  }
-
-  public announceVoiceActivated(lang: AppLanguage = 'fr') {
-    const msg = lang === 'en'
-      ? "Brad'CI Voice Assistance active. Ready for live order announcements, 5-bid arbitration, and escrow updates."
-      : "Assistance vocale Brad'CI activée. Annonces en direct des enchères, livraisons, arbitrages des 5 offres et séquestre prêtes.";
-    this.speak(msg, lang);
   }
 
   public testVoice(lang: AppLanguage = 'fr') {

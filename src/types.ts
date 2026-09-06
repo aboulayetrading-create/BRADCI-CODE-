@@ -212,6 +212,7 @@ export interface Product {
   // B2B Déstockage & Liquidation
   isB2BLot?: boolean; // Vrai s'il s'agit d'un lot de liquidation / déstockage B2B
   b2bSaleKind?: B2BSaleKind; // 'destockage' (Surplus, fin de série) ou 'liquidation' (Liquidation totale, fermeture, parc)
+  b2bUnitPrice?: number; // Prix d'un article / unité en FCFA (calcul automatique du total = b2bUnitPrice * b2bTotalUnitsCount)
   b2bLotType?: B2BLotType;
   b2bCompanyName?: string;
   b2bTotalUnitsCount?: number; // Ex: 50 ordinateurs, 100 paires de chaussures
@@ -411,6 +412,7 @@ export interface CartItem {
   pickupCode: string; // 4-digit code for this seller
   isB2BLot?: boolean;
   b2bSaleKind?: B2BSaleKind;
+  b2bUnitPrice?: number;
   b2bTotalUnitsCount?: number;
   b2bCompanyName?: string;
 }
@@ -705,12 +707,21 @@ export interface AppNotification {
   userId?: string;
   title: string;
   message: string;
-  type: 'delivery' | 'inspection' | 'bid' | 'payment' | 'withdrawal' | 'system' | 'return' | 'fraud_strike' | 'stock_empty' | 'review' | 'referral';
+  type: 'delivery' | 'inspection' | 'bid' | 'outbid' | 'payment' | 'withdrawal' | 'system' | 'return' | 'fraud_strike' | 'stock_empty' | 'review' | 'referral';
   timestamp: string;
   isRead: boolean;
   jobId?: string;
   productId?: string;
   linkTo?: string;
   urgency?: 'normal' | 'high' | 'critical';
+}
+
+export interface OutbidAlertInfo {
+  productId: string;
+  productTitle: string;
+  newAmount: number;
+  previousAmount?: number;
+  bidderName?: string;
+  timestamp: string;
 }
 

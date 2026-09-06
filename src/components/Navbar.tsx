@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { BradCiLogo } from './BradCiLogo';
 import { 
@@ -26,7 +26,15 @@ import {
   Power,
   Package,
   Receipt,
-  FileCheck
+  FileCheck,
+  Volume2,
+  VolumeX,
+  Mic,
+  Sun,
+  Moon,
+  Globe,
+  SlidersHorizontal,
+  ChevronDown
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -49,6 +57,7 @@ export const Navbar: React.FC = () => {
     t,
     translate,
     theme,
+    setTheme,
     effectiveTheme,
     toggleTheme,
     voiceEnabled,
@@ -66,6 +75,17 @@ export const Navbar: React.FC = () => {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   const handleSellClick = () => {
     // Just-in-time KYC restriction: user cannot sell without verified KYC
@@ -82,14 +102,14 @@ export const Navbar: React.FC = () => {
 
   return (
     <header id="main-navbar" className="sticky top-0 z-40 bg-[#0B1021]/95 backdrop-blur-md border-b border-[#222D4A] transition-colors">
-      <div className="w-full max-w-[1800px] mx-auto px-1.5 sm:px-3 lg:px-6">
-        <div className="flex items-center justify-between h-13 sm:h-15 lg:h-[68px] gap-1 sm:gap-2 md:gap-3">
+      <div className="w-full max-w-[1800px] mx-auto px-2 sm:px-4 lg:px-6">
+        <div className="flex items-center justify-between h-14 sm:h-16 lg:h-[68px] gap-2 sm:gap-3 lg:gap-4">
           {/* Brand Logo & Tag */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button 
               id="nav-logo"
               onClick={() => setActiveTab(isDriver ? 'dashboard_driver' : 'explore')}
-              className="flex items-center text-left group focus:outline-none transition-transform active:scale-95 shrink-0"
+              className="flex items-center text-left group focus:outline-none transition-transform active:scale-95 shrink-0 cursor-pointer"
             >
               <BradCiLogo 
                 size="md" 
@@ -275,35 +295,35 @@ export const Navbar: React.FC = () => {
             </nav>
           )}
 
-          {/* Right Action Bar - Pure, focused, essential navigation only */}
+          {/* Right Action Bar - Organized, Executive, Clean & Responsive */}
           <div 
             id="navbar-actions-bar" 
-            className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 justify-end py-1 pl-1"
+            className="flex items-center gap-1.5 sm:gap-2 min-w-0 justify-end py-1"
           >
-            {/* Shopping Cart Button - Hidden on mobile (< md), visible on desktop (>= md) */}
+            {/* 1. Shopping Cart Button - Visible on Desktop, in drawer/bottom nav on Mobile */}
             {!isDriver && (
               <button
                 id="btn-navbar-cart"
                 onClick={() => setCartModalOpen(true)}
-                className="relative hidden md:flex h-8 sm:h-9 px-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center gap-1.5 shadow-sm"
+                className="relative hidden md:flex h-8.5 sm:h-9.5 px-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center gap-1.5 shadow-sm cursor-pointer"
                 title={translate("Mon Panier Multi-Articles", "My Multi-Item Cart")}
               >
-                <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+                <ShoppingCart className="w-4 h-4 text-amber-400 shrink-0" />
                 <span className="text-xs font-bold hidden sm:inline">{translate("Panier", "Cart")}</span>
                 {cart.length > 0 && (
-                  <span className="min-w-[17px] h-[17px] px-1 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[9px] sm:text-[10px] flex items-center justify-center animate-bounce shrink-0 shadow">
+                  <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[10px] flex items-center justify-center animate-bounce shrink-0 shadow">
                     {cart.reduce((s, i) => s + i.quantity, 0)}
                   </span>
                 )}
               </button>
             )}
 
-            {/* For Drivers: Quick Master Availability Switch (Hidden on mobile as it's in bottom bar) */}
+            {/* For Drivers: Quick Master Availability Switch */}
             {isDriver && (
               <button
                 id="navbar-driver-status-toggle"
                 onClick={toggleDriverAvailability}
-                className={`hidden md:flex h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-xl font-black text-xs items-center gap-1.5 transition-all border shadow-sm ${
+                className={`hidden md:flex h-8.5 sm:h-9.5 px-2.5 sm:px-3.5 rounded-xl font-black text-xs items-center gap-1.5 transition-all border shadow-sm cursor-pointer ${
                   currentUser.driverAvailability !== 'offline'
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
                     : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
@@ -317,57 +337,24 @@ export const Navbar: React.FC = () => {
               </button>
             )}
 
-            {/* Notification Bell Button - Hidden on mobile (available in mobile bottom nav & drawer) */}
+            {/* 2. Notification Bell Button - Visible on Desktop, in drawer on Mobile */}
             <button
               id="btn-navbar-notifications"
               onClick={() => setNotificationsModalOpen(true)}
-              className="relative hidden md:flex h-8 sm:h-9 w-8 sm:w-9 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center justify-center"
-              title={translate("Notifications", "Notifications")}
+              className="relative hidden md:flex h-8.5 sm:h-9.5 w-8.5 sm:w-9.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center justify-center cursor-pointer shadow-sm"
+              title={translate("Notifications & Alertes", "Notifications & Alerts")}
             >
-              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <Bell className="w-4 h-4 shrink-0" />
               {unreadNotificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[8px] sm:text-[9px] flex items-center justify-center border border-[#080C14] animate-pulse">
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[9px] flex items-center justify-center border border-[#080C14] animate-pulse">
                   {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
                 </span>
               )}
             </button>
 
-            {/* GPS Location Pill */}
-            <button
-              id="btn-navbar-gps"
-              onClick={() => setGpsModalOpen(true)}
-              className={`h-8 sm:h-9 px-2 sm:px-2.5 rounded-lg text-[11px] sm:text-xs font-bold border transition-all shrink-0 flex items-center gap-1 ${
-                gpsPermissionStatus === 'granted' && userLocation
-                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
-                  : 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20 animate-pulse'
-              }`}
-              title={translate("Position GPS (Abidjan & Banlieue)", "GPS Position (Abidjan & Suburbs)")}
-            >
-              <Navigation className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="truncate max-w-[50px] xs:max-w-[65px] sm:max-w-[85px] font-mono-num">
-                {userLocation ? userLocation.commune.split(' ')[0] : 'Abidjan'}
-              </span>
-            </button>
-
-            {/* Quick Publish Product Button - Hidden on mobile (available in mobile bottom nav & drawer) */}
-            {!isDriver && (
-              <button
-                id="btn-publish-product"
-                onClick={handleSellClick}
-                className="hidden md:flex h-8 sm:h-9 px-2.5 sm:px-3.5 rounded-lg bg-[#FF5B00] hover:bg-[#E05000] text-white font-bold text-xs items-center gap-1.5 shadow-md shadow-[#FF5B00]/30 transition-all hover:scale-[1.02] active:scale-[0.98] shrink-0 cursor-pointer"
-                title={translate("Mettre un article en vente (Gratuit & Illimité)", "Post item for sale (Free & Unlimited)")}
-              >
-                <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" />
-                <span className="font-bold">{translate("Vendre", "Sell")}</span>
-                <span className="bg-black/25 text-white text-[8px] sm:text-[9px] px-1 py-0.2 rounded font-mono-num font-black hidden xs:inline">
-                  Gratuit
-                </span>
-              </button>
-            )}
-
-            {/* Auth / Profile Area */}
+            {/* 3. Auth / Profile Area */}
             {currentUser ? (
-              <div className="relative shrink-0">
+              <div className="relative shrink-0" ref={profileRef}>
                 <button
                   id="user-profile-menu-btn"
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
@@ -794,6 +781,51 @@ export const Navbar: React.FC = () => {
                         <span>{translate("Back-Office Super Admin", "Super Admin Back-Office")}</span>
                       </button>
                     )}
+
+                    {/* Voix Off Toggle in Drawer */}
+                    <button
+                      id="btn-mobile-drawer-voice"
+                      type="button"
+                      onClick={() => {
+                        toggleVoice();
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        {voiceEnabled ? (
+                          <Volume2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        ) : (
+                          <VolumeX className="w-4 h-4 text-slate-500 shrink-0" />
+                        )}
+                        <span>{translate("Voix Off & Lecture Audio", "Voice Off & Audio Reading")}</span>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-black border ${
+                        voiceEnabled 
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}>
+                        {voiceEnabled ? translate("ACTIVÉE", "ENABLED") : translate("COUPÉE", "MUTED")}
+                      </span>
+                    </button>
+
+                    {/* Micro Assistant Vocal in Drawer */}
+                    <button
+                      id="btn-mobile-drawer-mic"
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        window.dispatchEvent(new CustomEvent('bradci_open_support_mic'));
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 text-amber-300 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Mic className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+                        <span>{translate("Micro Assistant Vocal IA", "AI Voice Mic Assistant")}</span>
+                      </div>
+                      <span className="bg-amber-500 text-slate-950 text-[9px] px-2 py-0.5 rounded font-black">
+                        {translate("PARLER", "SPEAK")}
+                      </span>
+                    </button>
 
                     <button
                       id="btn-mobile-settings"

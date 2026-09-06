@@ -578,47 +578,6 @@ export const InteractiveAbidjanMap: React.FC<InteractiveAbidjanMapProps> = ({
             </button>
           </div>
 
-          {/* Vehicle Type Switcher: Moto vs Voiture vs Cargo */}
-          {filterType !== 'auction' && (
-            <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
-              <button
-                onClick={() => setSimulatedDriverVehicle('moto')}
-                className={`px-2 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1 ${
-                  simulatedDriverVehicle === 'moto' 
-                    ? 'bg-emerald-600 text-white shadow' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Livreur à Moto (Rapide / Colis légers)"
-              >
-                <Bike className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Moto</span>
-              </button>
-              <button
-                onClick={() => setSimulatedDriverVehicle('voiture')}
-                className={`px-2 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1 ${
-                  simulatedDriverVehicle === 'voiture' || simulatedDriverVehicle === 'car'
-                    ? 'bg-amber-500 text-slate-950 shadow' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Livreur en Voiture (Colis sécurisés / Express)"
-              >
-                <Car className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Voiture</span>
-              </button>
-              <button
-                onClick={() => setSimulatedDriverVehicle('cargo')}
-                className={`px-2 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1 ${
-                  simulatedDriverVehicle === 'cargo'
-                    ? 'bg-purple-600 text-white shadow' 
-                    : 'text-slate-400 hover:text-white'
-                }`}
-                title="Livreur Cargo (Gros volumes / B2B)"
-              >
-                <Truck className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Cargo</span>
-              </button>
-            </div>
-          )}
 
           {/* Day / Night Theme Switcher for Delivery Couriers */}
           <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
@@ -721,37 +680,6 @@ export const InteractiveAbidjanMap: React.FC<InteractiveAbidjanMapProps> = ({
                   loading="lazy"
                   allowFullScreen
                 />
-                {/* Floating live GPS telemetry overlay (Hidden when in auction filter mode) */}
-                {filterType !== 'auction' && (
-                  <div className="absolute top-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs">
-                    <div className="flex items-center gap-1.5 font-bold">
-                      {simulatedDriverVehicle === 'voiture' || simulatedDriverVehicle === 'car' ? (
-                        <>
-                          <Car className="w-4 h-4 animate-pulse text-amber-400" />
-                          <span className="text-amber-400">Bakary T. (Voiture)</span>
-                        </>
-                      ) : simulatedDriverVehicle === 'cargo' ? (
-                        <>
-                          <Truck className="w-4 h-4 animate-pulse text-purple-400" />
-                          <span className="text-purple-400">Bakary T. (Cargo)</span>
-                        </>
-                      ) : (
-                        <>
-                          <Bike className="w-4 h-4 animate-bounce text-emerald-400" />
-                          <span className="text-emerald-400">Bakary T. (Moto)</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="w-px h-4 bg-slate-800" />
-                    <span className="font-mono-num text-amber-400 font-black">
-                      42 km/h
-                    </span>
-                    <div className="w-px h-4 bg-slate-800" />
-                    <span className="text-[11px] text-slate-300 font-bold">
-                      📍 {selectedCommune.name}
-                    </span>
-                  </div>
-                )}
               </div>
             ) : (
               <APIProvider 

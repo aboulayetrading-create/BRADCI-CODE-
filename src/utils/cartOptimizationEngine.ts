@@ -43,7 +43,10 @@ export function createCartItemFromProduct(
 
   // Prix unitaire selon le canal
   let unitPrice = product.currentPrice;
-  if (channel === 'boutique' && product.buyNowPrice) {
+  if (product.isB2BLot || product.category === 'Déstockage B2B') {
+    // Pour Déstockage / Liquidation : le prix unitaire d'un article
+    unitPrice = product.b2bUnitPrice || (product.b2bTotalUnitsCount ? Math.round(product.currentPrice / product.b2bTotalUnitsCount) : product.currentPrice);
+  } else if (channel === 'boutique' && product.buyNowPrice) {
     unitPrice = product.buyNowPrice;
   } else if (channel === 'enchere') {
     unitPrice = product.buyNowPrice || product.currentPrice;
@@ -51,7 +54,9 @@ export function createCartItemFromProduct(
 
   // Stock maximum disponible
   let maxStock = 1;
-  if (channel === 'boutique') {
+  if (product.isB2BLot || product.category === 'Déstockage B2B') {
+    maxStock = product.b2bTotalUnitsCount || product.stockQuantity || 50;
+  } else if (channel === 'boutique') {
     maxStock = product.stockQuantity !== undefined ? Math.max(1, product.stockQuantity) : 10;
   } else if (product.isB2BLot && product.b2bTotalUnitsCount) {
     maxStock = product.b2bTotalUnitsCount;

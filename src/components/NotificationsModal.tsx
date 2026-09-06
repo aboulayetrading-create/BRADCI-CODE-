@@ -14,7 +14,15 @@ import {
   Sparkles,
   Smartphone,
   Navigation,
-  RotateCcw
+  RotateCcw,
+  Clock,
+  Check,
+  Eye,
+  EyeOff,
+  Send,
+  Key,
+  Flame,
+  BellRing
 } from 'lucide-react';
 import { AppNotification } from '../types';
 
@@ -24,18 +32,26 @@ export const NotificationsModal: React.FC = () => {
     notificationsModalOpen, 
     setNotificationsModalOpen, 
     markNotificationAsRead, 
+    toggleNotificationReadStatus,
+    deleteNotification,
     markAllNotificationsAsRead, 
     clearAllNotifications,
     currentUser,
     browserNotificationsEnabled,
+    pushToken,
     requestBrowserNotificationPermission,
+    pushBrowserNotification,
     setGpsTrackingJob,
     freightJobs,
     setActiveTab,
-    translate
+    translate,
+    triggerOutbidSimulation,
+    setProductDetailModal,
+    products
   } = useApp();
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'delivery' | 'inspection'>('all');
+  const [copiedToken, setCopiedToken] = useState(false);
 
   if (!notificationsModalOpen) return null;
 
@@ -56,6 +72,14 @@ export const NotificationsModal: React.FC = () => {
 
   const handleNotificationClick = (notif: AppNotification) => {
     markNotificationAsRead(notif.id);
+    if (notif.type === 'outbid' && notif.productId) {
+      const targetProd = products.find(p => p.id === notif.productId);
+      if (targetProd) {
+        setProductDetailModal(targetProd);
+        setNotificationsModalOpen(false);
+        return;
+      }
+    }
     if (notif.jobId) {
       const job = freightJobs.find(j => j.id === notif.jobId);
       if (job) {
@@ -72,8 +96,23 @@ export const NotificationsModal: React.FC = () => {
     setNotificationsModalOpen(false);
   };
 
+  const handleTriggerTestPush = async () => {
+    const testTitle = "Notifications BRAD'CI activées !";
+    const testBody = "Notifications BRAD'CI activées ! Vous recevrez désormais les alertes de vos enchères et livreurs.";
+    await pushBrowserNotification(testTitle, testBody, './icon.png');
+  };
+
+  const handleCopyToken = () => {
+    if (!pushToken) return;
+    navigator.clipboard?.writeText?.(pushToken);
+    setCopiedToken(true);
+    setTimeout(() => setCopiedToken(false), 2000);
+  };
+
   const getNotifIcon = (notif: AppNotification) => {
     switch (notif.type) {
+      case 'outbid':
+        return <Flame className="w-4 h-4 text-red-400 animate-pulse" />;
       case 'delivery':
         return <Bike className="w-4 h-4 text-emerald-400" />;
       case 'inspection':
@@ -116,27 +155,68 @@ export const NotificationsModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Browser Push Banner */}
-        <div className="p-3.5 bg-gradient-to-r from-amber-500/10 via-slate-900 to-blue-500/10 border-b border-slate-800/80 flex items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-amber-400 shrink-0" />
-            <span className="text-slate-300">
-              {browserNotificationsEnabled 
-                ? translate('Notifications push autorisées sur ce téléphone/navigateur.', 'Push notifications active on this device/browser.')
-                : translate('Activez les notifications pour être alerté dès l\'arrivée du livreur.', 'Enable push notifications to be alerted when courier arrives.')}
-            </span>
+        {/* Browser Push Banner & Push Token Status */}
+        <div className="p-3.5 bg-gradient-to-r from-amber-500/10 via-slate-900 to-blue-500/10 border-b border-slate-800/80 space-y-2 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-slate-300">
+                {browserNotificationsEnabled 
+                  ? translate('Notifications push actives pour les enchères et livraisons.', 'Push notifications active for bids and deliveries.')
+                  : translate('Activez les notifications pour être alerté dès l\'arrivée du livreur.', 'Enable push notifications to be alerted when courier arrives.')}
+              </span>
+            </div>
+            {!browserNotificationsEnabled ? (
+              <button
+                onClick={requestBrowserNotificationPermission}
+                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] shrink-0 transition-all shadow-sm cursor-pointer"
+              >
+                {translate('Autoriser', 'Enable')}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleTriggerTestPush}
+                  className="px-2 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-[10px] font-bold flex items-center gap-1 transition-all"
+                  title="Envoyer une notification test standard"
+                >
+                  <Send className="w-2.5 h-2.5" />
+                  <span>Test Standard</span>
+                </button>
+                <button
+                  id="btn-test-push-outbid-notif-modal"
+                  onClick={() => {
+                    const firstAuction = products.find(p => p.status === 'active' && p.listingType === 'auction') || products[0];
+                    triggerOutbidSimulation(firstAuction ? firstAuction.id : undefined, 6000000);
+                  }}
+                  className="px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer animate-pulse"
+                  title="Simuler l'alerte push mobile instantanée: Un utilisateur a surenchéri à 6 000 000 FCFA. Reprenez la main !"
+                >
+                  <Flame className="w-2.5 h-2.5 text-red-400" />
+                  <span>Test Surenchère (6M)</span>
+                </button>
+                <span className="px-2 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold font-mono">
+                  ✓ {translate('ACTIF', 'ACTIVE')}
+                </span>
+              </div>
+            )}
           </div>
-          {!browserNotificationsEnabled ? (
-            <button
-              onClick={requestBrowserNotificationPermission}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] shrink-0 transition-all shadow-sm cursor-pointer"
-            >
-              {translate('Autoriser', 'Enable')}
-            </button>
-          ) : (
-            <span className="px-2 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold font-mono">
-              ✓ {translate('ACTIF', 'ACTIVE')}
-            </span>
+
+          {/* Device Push Token status indicator */}
+          {pushToken && (
+            <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/50 text-[10px] text-slate-400">
+              <div className="flex items-center gap-1.5 truncate">
+                <Key className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span className="text-slate-400">Jeton Push local :</span>
+                <code className="font-mono text-emerald-300 truncate max-w-[200px]">{pushToken}</code>
+              </div>
+              <button
+                onClick={handleCopyToken}
+                className="text-[10px] text-amber-400 hover:underline shrink-0"
+              >
+                {copiedToken ? 'Copié !' : 'Copier'}
+              </button>
+            </div>
           )}
         </div>
 
@@ -179,10 +259,11 @@ export const NotificationsModal: React.FC = () => {
             {unreadCount > 0 && (
               <button
                 onClick={markAllNotificationsAsRead}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition-colors flex items-center gap-1 text-[11px]"
                 title={translate("Tout marquer comme lu", "Mark all as read")}
               >
                 <CheckCheck className="w-4 h-4" />
+                <span className="hidden sm:inline">Tout lire</span>
               </button>
             )}
             {userNotifications.length > 0 && (
@@ -212,7 +293,7 @@ export const NotificationsModal: React.FC = () => {
                 onClick={() => handleNotificationClick(notif)}
                 className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:scale-[1.01] ${
                   !notif.isRead 
-                    ? 'bg-slate-900/90 border-amber-500/40 shadow-lg shadow-amber-500/5' 
+                    ? 'bg-slate-900/95 border-amber-500/50 shadow-lg shadow-amber-500/5' 
                     : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
                 }`}
               >
@@ -228,17 +309,67 @@ export const NotificationsModal: React.FC = () => {
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                       <h4 className={`text-xs font-bold truncate ${!notif.isRead ? 'text-white' : 'text-slate-300'}`}>
                         {notif.title}
                       </h4>
-                      <span className="text-[10px] text-slate-500 shrink-0 font-mono">
-                        {notif.timestamp}
-                      </span>
+
+                      {/* Statut explicite "Lue" ou "Non lue" */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {!notif.isRead ? (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[9.5px] font-extrabold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                            Non lue
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60 text-[9.5px] font-medium flex items-center gap-1">
+                            <Check className="w-3 h-3 text-slate-500" />
+                            Lue
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
+
+                    <p className="text-xs text-slate-300 leading-relaxed mb-2">
                       {notif.message}
                     </p>
+
+                    {/* Footer de l'élément : Date & Heure précises + Actions rapides */}
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/40">
+                      <div className="flex items-center gap-1 font-mono text-slate-400">
+                        <Clock className="w-3 h-3 text-slate-500" />
+                        <span>{notif.timestamp}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {/* Bouton pour basculer le statut Lu / Non Lu */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleNotificationReadStatus(notif.id);
+                          }}
+                          className="hover:text-amber-400 flex items-center gap-0.5 transition-colors p-1"
+                          title={notif.isRead ? "Marquer comme non lue" : "Marquer comme lue"}
+                        >
+                          {notif.isRead ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          <span className="hidden sm:inline">{notif.isRead ? "Non lue" : "Lue"}</span>
+                        </button>
+
+                        {/* Bouton pour supprimer */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteNotification(notif.id);
+                          }}
+                          className="hover:text-red-400 transition-colors p-1"
+                          title="Supprimer la notification"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
 
                     {notif.jobId && (
                       <div className="mt-2 flex items-center gap-2">
@@ -250,10 +381,6 @@ export const NotificationsModal: React.FC = () => {
                       </div>
                     )}
                   </div>
-
-                  {!notif.isRead && (
-                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 mt-1" />
-                  )}
                 </div>
               </div>
             ))

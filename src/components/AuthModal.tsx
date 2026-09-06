@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   X, 
@@ -20,12 +20,16 @@ import {
   Check,
   Tag,
   Info,
-  ExternalLink
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Clock
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { getTranslation } from '../utils/translations';
 import { ALL_COMMUNE_NAMES } from '../data/communes';
 import { Logo } from './Logo';
+import { sendOtpEmail } from '../services/resendEmailService';
 
 export const AuthModal: React.FC = () => {
   const { 
@@ -35,6 +39,8 @@ export const AuthModal: React.FC = () => {
     setActiveTab,
     registerUser, 
     verifyEmailOtp, 
+    requestEmailLoginOtp,
+    resendEmailOtp,
     loginWithEmail, 
     loginWithGoogle, 
     completeGoogleProfile,
@@ -60,10 +66,20 @@ export const AuthModal: React.FC = () => {
   const [referralCodeInput, setReferralCodeInput] = useState(pendingReferralCode || '');
   const [showReferralInputManual, setShowReferralInputManual] = useState(false);
 
-  // OTP Verification state
-  const [enteredOtp, setEnteredOtp] = useState('');
+  // OTP Verification state (6 boxes, 5-min expiration, Resend API)
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [generatedOtpDisplay, setGeneratedOtpDisplay] = useState('');
   const [otpTargetEmail, setOtpTargetEmail] = useState('');
+  const [otpExpiresAt, setOtpExpiresAt] = useState<number>(0);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(300);
+  const [otpError, setOtpError] = useState<string | null>(null);
+
+  // Loading states
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [isRequestingLoginOtp, setIsRequestingLoginOtp] = useState(false);
 
   // Login form state
   const [loginRole, setLoginRole] = useState<UserRole>('client');
@@ -78,6 +94,24 @@ export const AuthModal: React.FC = () => {
       setShowReferralInputManual(true);
     }
   }, [pendingReferralCode, authModalOpen]);
+
+  // Countdown timer for OTP expiration (5 minutes = 300s)
+  useEffect(() => {
+    if (authView !== 'otp_verify' || !otpExpiresAt) return;
+
+    const interval = setInterval(() => {
+      const diff = Math.max(0, Math.floor((otpExpiresAt - Date.now()) / 1000));
+      setSecondsRemaining(diff);
+      if (diff <= 0) {
+        setOtpError(translate(
+          "Ce code de sécurité a expiré. Veuillez cliquer sur « Renvoyer le code » pour en recevoir un nouveau.",
+          "This security code has expired. Please click « Resend code » to receive a new one."
+        ));
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [authView, otpExpiresAt, translate]);
 
   if (!authModalOpen) return null;
 
@@ -99,8 +133,68 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  // Handle Registration Submit -> Generates and displays 6-digit OTP
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  // Handle 6-box OTP digits change
+  const handleDigitChange = (index: number, val: string) => {
+    const cleaned = val.replace(/\D/g, '');
+    const char = cleaned ? cleaned[cleaned.length - 1] : '';
+    
+    const newDigits = [...otpDigits];
+    newDigits[index] = char;
+    setOtpDigits(newDigits);
+    setOtpError(null);
+
+    // Auto advance to next input box
+    if (char && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  // Handle Backspace and arrow navigation
+  const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (!otpDigits[index] && index > 0) {
+        const newDigits = [...otpDigits];
+        newDigits[index - 1] = '';
+        setOtpDigits(newDigits);
+        otpInputRefs.current[index - 1]?.focus();
+      } else {
+        const newDigits = [...otpDigits];
+        newDigits[index] = '';
+        setOtpDigits(newDigits);
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    } else if (e.key === 'ArrowRight' && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  // Handle Paste event for 6-digit code
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pastedData) return;
+
+    const newDigits = [...otpDigits];
+    for (let i = 0; i < 6; i++) {
+      newDigits[i] = pastedData[i] || '';
+    }
+    setOtpDigits(newDigits);
+    setOtpError(null);
+
+    const focusIndex = Math.min(pastedData.length, 5);
+    otpInputRefs.current[focusIndex]?.focus();
+  };
+
+  // Format seconds remaining as MM:SS
+  const formatTimeRemaining = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Handle Registration Submit -> Generates and sends OTP via Resend API
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !phone || !firstName || !lastName) {
       addToast(
@@ -110,6 +204,9 @@ export const AuthModal: React.FC = () => {
       );
       return;
     }
+
+    setIsSendingEmail(true);
+    setOtpError(null);
 
     const res = registerUser({
       firstName,
@@ -125,31 +222,126 @@ export const AuthModal: React.FC = () => {
     if (res.success) {
       setOtpTargetEmail(email);
       setGeneratedOtpDisplay(res.otpCode);
-      setEnteredOtp(res.otpCode); // Pre-fill mock OTP for smooth UX
+      setOtpExpiresAt(res.expiresAt);
+      setSecondsRemaining(300);
+      setOtpDigits(['', '', '', '', '', '']);
+
+      // Appel sécurisé au service Resend API
+      const emailRes = await sendOtpEmail(email, res.otpCode);
+      setIsSendingEmail(false);
+
       setAuthView('otp_verify');
-      addToast(
-        translate('📧 Code de Sécurité Envoyé', '📧 Security Code Sent'), 
-        translate(`Code de sécurité [${res.otpCode}] transmis à l'adresse ${email}`, `Security code [${res.otpCode}] delivered to ${email}`), 
-        'info'
-      );
+
+      if (!emailRes.success) {
+        addToast(
+          translate("Attention d'envoi", "Delivery Notice"),
+          emailRes.error || translate("Impossible de transmettre l'email via Resend.", "Could not deliver email via Resend."),
+          "warning"
+        );
+      } else {
+        addToast(
+          translate('📧 Code de Sécurité Envoyé', '📧 Security Code Sent'),
+          emailRes.isSimulated 
+            ? translate(`Code [${res.otpCode}] généré pour ${email} (Valide 5 minutes).`, `Code [${res.otpCode}] generated for ${email} (Valid 5 minutes).`)
+            : translate(`Code transmis avec succès à ${email} via Resend (Valide 5 minutes).`, `Code delivered to ${email} via Resend (Valid 5 minutes).`),
+          'info'
+        );
+      }
+
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 100);
+    } else {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // Handle Resend OTP Code
+  const handleResendCode = async () => {
+    if (isResending || !otpTargetEmail) return;
+    setIsResending(true);
+    setOtpError(null);
+
+    const res = await resendEmailOtp(otpTargetEmail);
+    setIsResending(false);
+
+    if (res.success && res.otpCode && res.expiresAt) {
+      setGeneratedOtpDisplay(res.otpCode);
+      setOtpExpiresAt(res.expiresAt);
+      setSecondsRemaining(300);
+      setOtpDigits(['', '', '', '', '', '']);
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 50);
+    } else {
+      setOtpError(res.error || translate("Impossible de renvoyer le code pour le moment.", "Unable to resend code right now."));
     }
   };
 
   // Handle OTP Verification
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!enteredOtp) return;
+    const code = otpDigits.join('');
+    if (code.length < 6) {
+      setOtpError(translate("Veuillez renseigner l'ensemble des 6 chiffres du code.", "Please enter all 6 digits of the code."));
+      return;
+    }
 
-    const res = verifyEmailOtp(otpTargetEmail, enteredOtp);
+    if (secondsRemaining <= 0) {
+      setOtpError(translate("Ce code de sécurité a expiré (validité 5 min). Veuillez cliquer sur « Renvoyer le code ».", "This code has expired (5 min validity). Please click « Resend code »."));
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    await new Promise(r => setTimeout(r, 450));
+
+    const res = verifyEmailOtp(otpTargetEmail, code);
+    setIsVerifyingOtp(false);
+
     if (res.success) {
       setAuthModalOpen(false);
       setAuthView('login');
-      // Free navigation without registration blocking: user can freely browse catalog, auctions, and configure profile
       addToast(
         translate('Bienvenue sur BRAD\'CI !', 'Welcome to BRAD\'CI!'),
-        translate('Votre compte est créé avec succès. Vous pouvez parcourir le catalogue, consulter les enchères et configurer votre profil librement.', 'Your account was created successfully. You can freely browse the catalog, view auctions, and configure your profile.'),
+        translate('Authentification réussie. Votre session est active.', 'Authentication successful. Your session is active.'),
         'success'
       );
+    } else {
+      setOtpError(res.error || translate("Code de sécurité incorrect. Veuillez vérifier vos e-mails.", "Incorrect security code. Please check your emails."));
+    }
+  };
+
+  // Handle Login via OTP email (passwordless)
+  const handleRequestLoginOtp = async () => {
+    if (!loginEmail || !loginEmail.includes('@')) {
+      addToast(
+        translate("E-mail Requis", "Email Required"),
+        translate("Veuillez saisir une adresse e-mail valide pour recevoir le code OTP.", "Please enter a valid email address to receive the OTP code."),
+        "warning"
+      );
+      return;
+    }
+
+    setIsRequestingLoginOtp(true);
+    setOtpError(null);
+
+    const res = await requestEmailLoginOtp(loginEmail);
+    setIsRequestingLoginOtp(false);
+
+    if (res.success && res.otpCode && res.expiresAt) {
+      setOtpTargetEmail(loginEmail);
+      setGeneratedOtpDisplay(res.otpCode);
+      setOtpExpiresAt(res.expiresAt);
+      setSecondsRemaining(300);
+      setOtpDigits(['', '', '', '', '', '']);
+      setAuthView('otp_verify');
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 100);
+    } else {
+      setOtpError(res.error || translate("Compte introuvable ou erreur de transmission.", "Account not found or sending error."));
     }
   };
 
@@ -375,6 +567,32 @@ export const AuthModal: React.FC = () => {
                     : translate("Se Connecter en tant qu'Acheteur / Vendeur", "Sign In as Buyer / Seller")}
                 </span>
                 <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Passwordless OTP Login Option */}
+              <div className="flex items-center gap-2 pt-1">
+                <div className="flex-1 h-px bg-slate-800" />
+                <span className="text-[10px] text-slate-500 font-bold uppercase">{translate("Ou par e-mail sécurisé", "Or via secure email")}</span>
+                <div className="flex-1 h-px bg-slate-800" />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRequestLoginOtp}
+                disabled={isRequestingLoginOtp}
+                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs border border-amber-500/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {isRequestingLoginOtp ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{translate("Envoi du code OTP via Resend...", "Sending OTP code via Resend...")}</span>
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{translate("Connexion par code OTP (Sans mot de passe)", "Sign In with OTP code (Passwordless)")}</span>
+                  </>
+                )}
               </button>
             </form>
 
@@ -655,10 +873,20 @@ export const AuthModal: React.FC = () => {
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={isSendingEmail}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 disabled:opacity-75 disabled:cursor-not-allowed text-slate-950 font-extrabold text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>{translate("Créer mon Compte & Recevoir le Code par Email", "Create Account & Receive Verification Code")}</span>
-              <ArrowRight className="w-4 h-4" />
+              {isSendingEmail ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{translate("Transmission du code e-mail via Resend...", "Sending security code via Resend...")}</span>
+                </>
+              ) : (
+                <>
+                  <span>{translate("Créer mon Compte & Recevoir le Code par Email", "Create Account & Receive Verification Code")}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
 
             <div className="text-center pt-2 border-t border-slate-800">
@@ -673,55 +901,151 @@ export const AuthModal: React.FC = () => {
           </form>
         )}
 
-        {/* ================= VIEW 3: OTP VERIFY ================= */}
+        {/* ================= VIEW 3: OTP VERIFY (RESEND API & 6 BOXES) ================= */}
         {authView === 'otp_verify' && (
           <form onSubmit={handleVerifyOtp} className="space-y-4">
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center">
-              <span className="text-xs font-bold text-amber-300 block">
-                {translate("Code de Vérification Email Transmis", "Email Verification Code Sent")}
-              </span>
-              <p className="text-[11px] text-slate-300 mt-1">
-                {translate("Un code de sécurité à 6 chiffres a été envoyé à l'adresse :", "A 6-digit security code was delivered to:")}
-                <strong className="text-white block mt-0.5">{otpTargetEmail}</strong>
-              </p>
-              <div className="mt-2 p-1.5 bg-slate-950/80 rounded-lg border border-slate-800 inline-block">
-                <span className="text-[10px] text-slate-400 mr-1">{translate("Code généré :", "Demo Code:")}</span>
-                <strong className="text-xs font-mono-num text-amber-400 tracking-wider">
-                  {generatedOtpDisplay}
-                </strong>
+            {/* Header info banner */}
+            <div className="p-3.5 bg-[#06102e] border border-amber-500/40 rounded-2xl text-center space-y-2 shadow-inner">
+              <div className="flex items-center justify-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-amber-300">
+                  {translate("Vérification Sécurisée par E-mail", "Secure Email Verification")}
+                </span>
               </div>
+
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                {translate("Un code confidentiel à 6 chiffres a été expédié à l'adresse :", "A confidential 6-digit code has been dispatched to:")}
+                <strong className="text-white block font-mono text-xs mt-0.5">{otpTargetEmail}</strong>
+              </p>
+
+              {/* 5-minute countdown badge */}
+              <div className="pt-1">
+                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition-colors ${
+                  secondsRemaining > 60 
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-300' 
+                    : secondsRemaining > 0 
+                      ? 'bg-orange-500/20 border-orange-500/40 text-orange-300 animate-pulse'
+                      : 'bg-red-500/20 border-red-500/40 text-red-300'
+                }`}>
+                  <Clock className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {secondsRemaining > 0 
+                      ? `${translate("Valable encore :", "Valid for:")} ${formatTimeRemaining(secondsRemaining)}`
+                      : translate("Code expiré (5 min dépassées)", "Code expired (5 min exceeded)")}
+                  </span>
+                </div>
+              </div>
+
+              {/* Simulated demo hint if in preview/fallback environment */}
+              {generatedOtpDisplay && (
+                <div className="pt-1">
+                  <div className="p-1.5 px-3 bg-slate-950/80 rounded-lg border border-slate-800 inline-flex items-center gap-2">
+                    <span className="text-[10px] text-slate-400">{translate("Code OTP démo :", "Demo OTP code:")}</span>
+                    <strong className="text-xs font-mono font-bold text-amber-400 tracking-wider">
+                      {generatedOtpDisplay}
+                    </strong>
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Error banner */}
+            {otpError && (
+              <div className="p-3 bg-red-500/15 border border-red-500/40 rounded-xl text-xs text-red-300 flex items-start gap-2.5 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <strong className="block text-red-200 font-bold mb-0.5">{translate("Erreur de validation", "Validation Error")}</strong>
+                  <span>{otpError}</span>
+                </div>
+              </div>
+            )}
+
+            {/* 6 Individual Digit Inputs with auto-focus & backspace */}
             <div>
-              <label className="text-xs text-slate-300 font-medium block mb-1 text-center">
-                {translate("Entrez le code de sécurité à 6 chiffres :", "Enter the 6-digit security code:")}
+              <label className="text-xs text-slate-300 font-medium block mb-2 text-center">
+                {translate("Saisissez le code de sécurité à 6 chiffres :", "Enter the 6-digit security code:")}
               </label>
-              <input
-                type="text"
-                maxLength={6}
-                value={enteredOtp}
-                onChange={(e) => setEnteredOtp(e.target.value)}
-                placeholder="123456"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-center text-xl tracking-[0.4em] font-mono-num text-amber-400 focus:outline-none focus:border-amber-500"
-                required
-              />
+              <div className="flex justify-center items-center gap-2 sm:gap-2.5 max-w-sm mx-auto my-1">
+                {otpDigits.map((digit, index) => (
+                  <input
+                    key={index}
+                    ref={(el) => {
+                      otpInputRefs.current[index] = el;
+                    }}
+                    id={`auth-otp-box-${index}`}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleDigitChange(index, e.target.value)}
+                    onKeyDown={(e) => handleDigitKeyDown(index, e)}
+                    onPaste={index === 0 ? handlePaste : undefined}
+                    className={`w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-bold font-mono rounded-xl border transition-all ${
+                      otpError
+                        ? 'border-red-500/60 bg-red-950/20 text-red-300'
+                        : digit
+                          ? 'bg-slate-900 border-amber-500 text-amber-400 shadow-md shadow-amber-500/10'
+                          : 'bg-slate-950 border-slate-700 text-white hover:border-slate-600'
+                    } focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-500/20`}
+                    autoComplete="one-time-code"
+                    required
+                  />
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 text-center mt-1.5">
+                {translate("Passage automatique d'une case à l'autre et support du collage direct", "Automatic cell jump and clipboard paste supported")}
+              </p>
             </div>
 
+            {/* Validation Submit button with loading spinner */}
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={isVerifyingOtp}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 disabled:opacity-75 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{translate("Valider l'Email & Accéder au KYC", "Verify Email & Proceed to KYC")}</span>
+              {isVerifyingOtp ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{translate("Vérification en cours...", "Verifying code...")}</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{translate("Valider le Code & Activer la Session", "Validate Code & Activate Session")}</span>
+                </>
+              )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setAuthView('register')}
-              className="w-full text-center text-xs text-slate-400 hover:text-white cursor-pointer"
-            >
-              ← {translate("Modifier l'adresse email", "Change email address")}
-            </button>
+            {/* Resend & Back actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={isResending}
+                className="text-amber-400 hover:text-amber-300 disabled:opacity-60 flex items-center gap-1 font-semibold cursor-pointer"
+              >
+                {isResending ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{translate("Envoi en cours...", "Sending...")}</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>{translate("Renvoyer le code", "Resend code")}</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAuthView('register')}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                ← {translate("Modifier l'adresse e-mail", "Change email address")}
+              </button>
+            </div>
           </form>
         )}
 

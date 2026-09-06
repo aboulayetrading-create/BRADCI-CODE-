@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { queryBradCiKnowledge, AIKnowledgeResponse } from '../utils/aiKnowledgeEngine';
-import { voiceNavigator, playSuccessChime } from '../utils/voiceNavigator';
+import { voiceNavigator, playSuccessChime, playGpsChime } from '../utils/voiceNavigator';
 
 interface Message {
   id: string;
@@ -100,8 +100,22 @@ export const AIChatSupport: React.FC = () => {
         setActiveTab(e.detail.tab);
       }
     };
+
+    const handleOpenSupportMic = async () => {
+      setIsOpen(true);
+      setActiveTab('ai');
+      // Delay slightly for modal mount
+      setTimeout(() => {
+        handleToggleListening();
+      }, 250);
+    };
+
     window.addEventListener('bradci_open_support', handleOpenSupport);
-    return () => window.removeEventListener('bradci_open_support', handleOpenSupport);
+    window.addEventListener('bradci_open_support_mic', handleOpenSupportMic);
+    return () => {
+      window.removeEventListener('bradci_open_support', handleOpenSupport);
+      window.removeEventListener('bradci_open_support_mic', handleOpenSupportMic);
+    };
   }, []);
 
   // Setup Web Speech Recognition
@@ -118,6 +132,7 @@ export const AIChatSupport: React.FC = () => {
           const transcript = event.results[0][0].transcript;
           setInputText(transcript);
           setIsListening(false);
+          playSuccessChime();
         };
 
         recognition.onerror = (err: any) => {
@@ -130,6 +145,7 @@ export const AIChatSupport: React.FC = () => {
         };
 
         recognitionRef.current = recognition;
+        setSpeechSupported(true);
       } catch {
         setSpeechSupported(false);
       }
@@ -180,26 +196,67 @@ export const AIChatSupport: React.FC = () => {
     const nextState = !autoVoice;
     setAutoVoice(nextState);
     localStorage.setItem('bradci_auto_voice', nextState.toString());
+    if (nextState) {
+      voiceNavigator.announceVoiceActivated(language);
+    } else {
+      voiceNavigator.stop();
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+    }
   };
 
-  const handleToggleListening = () => {
-    if (!recognitionRef.current) return;
+  const handleToggleListening = async () => {
+    voiceNavigator.unlockAudio();
 
     if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      try {
-        voiceNavigator.stop();
-        setIsSpeaking(false);
-        setSpeakingMessageId(null);
-        recognitionRef.current.lang = language === 'en' ? 'en-US' : 'fr-FR';
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.warn('Speech recognition start failed:', err);
-        setIsListening(false);
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
       }
+      setIsListening(false);
+      return;
+    }
+
+    if (!speechSupported || !recognitionRef.current) {
+      // Fallback message if device browser lacks Web Speech API
+      const fallbackNotice: Message = {
+        id: `notice-${Date.now()}`,
+        sender: 'bot',
+        text: language === 'en'
+          ? "Microphone dictation is not natively supported by this browser WebView. You can type your message in the chat and our Audio Voice Off will read the answer aloud!"
+          : "La dictée vocale n'est pas supportée nativement par ce navigateur WebView. Vous pouvez écrire votre question et la Voix Off BRAD'CI lira toutes les réponses à haute voix !",
+        timestamp: new Date().toLocaleTimeString(language === 'en' ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, fallbackNotice]);
+      if (autoVoice) {
+        handleSpeakText(fallbackNotice.id, fallbackNotice.text);
+      }
+      return;
+    }
+
+    try {
+      voiceNavigator.stop();
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+
+      // Prompt microphone permissions explicitly on Android / mobile browsers
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop());
+        } catch (micErr) {
+          console.warn('Microphone permission request rejected:', micErr);
+          setIsListening(false);
+          return;
+        }
+      }
+
+      playGpsChime();
+      recognitionRef.current.lang = language === 'en' ? 'en-US' : 'fr-FR';
+      recognitionRef.current.start();
+      setIsListening(true);
+    } catch (err) {
+      console.warn('Speech recognition start failed:', err);
+      setIsListening(false);
     }
   };
 
@@ -510,25 +567,37 @@ export const AIChatSupport: React.FC = () => {
               {/* Quick suggestions pills */}
               <div className="px-3 py-2 bg-slate-900/90 border-t border-slate-800 flex gap-1.5 overflow-x-auto text-[10px] no-scrollbar">
                 <button
-                  onClick={() => setInputText(language === 'en' ? 'How do I register on BRAD\'CI?' : 'Comment s\'inscrire sur BRAD\'CI ?')}
+                  onClick={() => setInputText(language === 'en' ? 'How do live timed auctions work on BRAD\'CI?' : 'Comment fonctionnent les enchères chronométrées en direct ?')}
                   className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 whitespace-nowrap"
                 >
-                  📝 {translate("Inscription & KYC", "Registration & KYC")}
+                  ⏱️ {translate("Enchères en direct", "Live Auctions")}
                 </button>
                 <button
-                  onClick={() => setInputText(language === 'en' ? 'How does the 5-bid arbitration rule work?' : 'Comment fonctionne la règle des 5 offres ?')}
+                  onClick={() => setInputText(language === 'en' ? 'How does the Wave escrow and delivery secret code work?' : 'Comment fonctionne le paiement séquestré et le code secret de livraison ?')}
                   className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 whitespace-nowrap"
                 >
-                  ⚖️ {translate("Règle 5 Offres", "5-Bid Rule")}
+                  🛡️ {translate("Paiement Séquestré", "Escrow & Secret Code")}
                 </button>
                 <button
-                  onClick={() => setInputText(language === 'en' ? 'How does Wave Escrow & Secret Code delivery security work?' : 'Comment fonctionne le séquestre Wave et le Code Secret de livraison ?')}
+                  onClick={() => setInputText(language === 'en' ? 'How do I track courier delivery in real time with GPS?' : 'Comment suivre la livraison de mon coursier en temps réel avec le GPS ?')}
                   className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 whitespace-nowrap"
                 >
-                  🛡️ {translate("Séquestre Wave & Code Secret", "Wave Escrow & Secret Code")}
+                  🛵 {translate("Livraison GPS", "GPS Tracking")}
                 </button>
                 <button
-                  onClick={() => setInputText(language === 'en' ? 'What are the Seller Pass prices?' : 'Quels sont les tarifs des Pass Vendeur ?')}
+                  onClick={() => setInputText(language === 'en' ? 'How do I download my payment and delivery receipt?' : 'Comment télécharger mon reçu d\'achat et de livraison ?')}
+                  className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 whitespace-nowrap"
+                >
+                  🧾 {translate("Reçus & Factures", "Receipts")}
+                </button>
+                <button
+                  onClick={() => setInputText(language === 'en' ? 'I did not receive my OTP login code' : 'Je n\'ai pas reçu mon code OTP de connexion')}
+                  className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 whitespace-nowrap"
+                >
+                  🔑 {translate("Code OTP", "OTP Code")}
+                </button>
+                <button
+                  onClick={() => setInputText(language === 'en' ? 'What are the Seller and Courier Pass rates?' : 'Quels sont les tarifs des Pass Vendeur et Livreur ?')}
                   className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 whitespace-nowrap"
                 >
                   💎 {translate("Pass & Tarifs", "Passes & Pricing")}
@@ -537,21 +606,19 @@ export const AIChatSupport: React.FC = () => {
 
               {/* Input Form with Voice Dictation */}
               <form onSubmit={handleSend} className="p-3 bg-slate-900 border-t border-slate-800 flex items-center gap-2">
-                {/* Voice input button */}
-                {speechSupported && (
-                  <button
-                    type="button"
-                    onClick={handleToggleListening}
-                    className={`p-2.5 rounded-xl border transition-all shrink-0 ${
-                      isListening
-                        ? 'bg-red-500 text-white border-red-400 animate-pulse ring-2 ring-red-400/50'
-                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
-                    }`}
-                    title={isListening ? translate("Arrêter l'écoute", "Stop Listening") : translate("Parler au micro", "Speak to Microphone")}
-                  >
-                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  </button>
-                )}
+                {/* Voice input button (Always accessible) */}
+                <button
+                  type="button"
+                  onClick={handleToggleListening}
+                  className={`p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer ${
+                    isListening
+                      ? 'bg-red-500 text-white border-red-400 animate-pulse ring-2 ring-red-400/50 shadow-lg shadow-red-500/30'
+                      : 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25 hover:text-white'
+                  }`}
+                  title={isListening ? translate("Arrêter l'écoute", "Stop Listening") : translate("Parler au micro", "Speak to Microphone")}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
 
                 <div className="relative flex-1">
                   <input
