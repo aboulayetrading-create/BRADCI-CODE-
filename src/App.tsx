@@ -43,9 +43,11 @@ import { B2BLiquidationHub } from './components/B2BLiquidationHub';
 import { CartModal } from './components/CartModal';
 import { CartInvoiceModal } from './components/CartInvoiceModal';
 import { NativePermissionModal } from './components/NativePermissionModal';
+import { PermissionsGuard } from './components/PermissionsGuard';
 import { SplashScreen } from './components/SplashScreen';
 import { OutbidAlertBanner } from './components/OutbidAlertBanner';
 import { NotificationManager } from './components/NotificationManager';
+import { useNotificationPermission } from './hooks/useNotificationPermission';
 import { 
   ShieldCheck, 
   Lock, 
@@ -70,6 +72,9 @@ import {
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
+  // Demande dynamique et gestion de l'autorisation des notifications Push dès l'ouverture
+  useNotificationPermission();
+
   const { 
     currentUser,
     activeTab, 
@@ -800,7 +805,9 @@ export default function App() {
   return (
     <ErrorBoundary fallbackTitle="Application BRAD'CI">
       <AppProvider>
-        <AppContent />
+        <PermissionsGuard>
+          <AppContent />
+        </PermissionsGuard>
       </AppProvider>
     </ErrorBoundary>
   );

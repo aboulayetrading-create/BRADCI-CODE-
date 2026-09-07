@@ -248,17 +248,18 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
   return (
     <div 
       id="driver-vtc-gps-screen"
-      className="relative w-full h-[84vh] sm:h-[88vh] min-h-[580px] rounded-3xl overflow-hidden bg-[#060D19] border border-slate-800 shadow-2xl flex flex-col justify-between select-none"
+      className="relative w-full h-[85vh] sm:h-[90vh] min-h-[580px] rounded-3xl overflow-hidden bg-[#060D19] border border-slate-800 shadow-2xl flex flex-col justify-between select-none"
     >
       {/* ========================================================================= */}
-      {/* 1. CARTE GOOGLE MAPS PLEIN ÉCRAN (RENDU 85% DU COCKPIT VTC)               */}
+      {/* 1. CARTE GOOGLE MAPS PLEIN ÉCRAN (85%-90% DU COCKPIT VTC - CROPPÉE)        */}
       {/* ========================================================================= */}
       <div className="absolute inset-0 w-full h-full z-0 overflow-hidden bg-slate-950">
+        {/* Iframe cropped to eliminate Google Maps white headers and copyright bars */}
         <iframe
           id="gmaps-active-mission-iframe"
           title="Google Maps Navigation Active"
           src={`https://maps.google.com/maps?q=${encodeURIComponent((isPickupPhase ? (currentUser?.gpsLocation?.commune || 'Cocody') : job.pickupCommune) + ', Abidjan')}+to+${encodeURIComponent(targetAddress + ', ' + targetCommune + ', Abidjan')}&t=m&z=13&ie=UTF8&iwloc=&output=embed`}
-          className="w-full h-full border-0"
+          className="absolute -top-16 sm:-top-20 -bottom-14 -left-2 -right-2 w-[calc(100%+16px)] h-[calc(100%+120px)] border-0"
           loading="lazy"
           allowFullScreen
         />
@@ -280,7 +281,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
       {/* ========================================================================= */}
       <div 
         id="driver-vtc-top-guidance-bar"
-        className="relative z-20 m-3 sm:m-4 p-3 sm:p-3.5 rounded-2xl bg-[#0B111E]/95 backdrop-blur-md border border-slate-800/90 shadow-2xl flex items-center justify-between gap-3"
+        className="relative z-20 m-2.5 sm:m-3.5 p-3 sm:p-3.5 rounded-2xl bg-[#0B111E]/95 backdrop-blur-md border border-slate-800/90 shadow-2xl flex items-center justify-between gap-3"
       >
         <div className="flex items-center gap-3 min-w-0">
           {/* Large Direction Indicator Icon */}
@@ -291,12 +292,15 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
           {/* Next Instruction Readable in 1 Second */}
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-black text-white tracking-tight truncate">
-                Sortie {targetCommune} • 200m
+              <span className="text-[10px] font-mono-num font-black text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                Dans 200 m
+              </span>
+              <h2 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                {isPickupPhase ? `Vers point de retrait • ${targetCommune}` : `DESTINATION : ${targetCommune.toUpperCase()}`}
               </h2>
             </div>
-            <p className="text-xs text-slate-400 truncate">
-              {isPickupPhase ? `Vers point de retrait (${targetAddress})` : `Vers adresse client (${targetAddress})`}
+            <p className="text-xs text-slate-400 truncate mt-0.5">
+              {targetAddress} ({targetCommune})
             </p>
           </div>
         </div>

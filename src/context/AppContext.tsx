@@ -73,6 +73,7 @@ import {
   getStoredAuditLogs
 } from '../utils/paymentAuditReceiptService';
 import { nativeBridge, NativePhotoSource, NativeCameraFacing } from '../utils/nativeBridge';
+import { sendUniversalPush, BRADCI_NOTIFICATION_CHANNEL_ID } from '../utils/universalNotifications';
 import { sendOtpEmail } from '../services/resendEmailService';
 
 interface ToastNotification {
@@ -987,7 +988,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const pushBrowserNotification = useCallback(async (
     title: string, 
     body: string, 
-    icon = './icon.png',
+    icon = '/icon.png',
     customOptions?: {
       tag?: string;
       data?: any;
@@ -995,38 +996,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       vibrate?: number[];
     }
   ) => {
-    if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
-      return;
-    }
-
-    const options: NotificationOptions & { vibrate?: number[] } = {
-      body,
-      icon,
-      badge: icon,
-      tag: customOptions?.tag || 'bradci-' + Date.now(),
-      vibrate: customOptions?.vibrate || [200, 100, 200],
-      data: customOptions?.data || './',
-      ...((customOptions?.actions && 'actions' in Notification.prototype) ? { actions: customOptions.actions } : {})
-    };
-
-    // 1. Android Chrome & Mobile: showNotification via Service Worker is mandatory
-    if ('serviceWorker' in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        if (registration && 'showNotification' in registration) {
-          await registration.showNotification(title, options);
-          return;
-        }
-      } catch (err) {
-        console.warn('ServiceWorker showNotification failed, trying fallback:', err);
-      }
-    }
-
-    // 2. Desktop Fallback
     try {
-      new Notification(title, options);
+      await sendUniversalPush(title, body, {
+        icon,
+        vibrate: customOptions?.vibrate || [200, 100, 200],
+        url: typeof customOptions?.data === 'string' ? customOptions.data : customOptions?.data?.url || '/',
+        productId: customOptions?.data?.productId
+      });
     } catch (e) {
-      console.warn('Browser notification error:', e);
+      console.warn('sendUniversalPush error fallback:', e);
     }
   }, []);
 
@@ -1074,7 +1052,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const testBody = "Notifications BRAD'CI activées ! Vous recevrez désormais les alertes de vos enchères et livreurs.";
 
         // Déclenche la notification système push
-        await pushBrowserNotification(testTitle, testBody, './icon.png');
+        await pushBrowserNotification(testTitle, testBody, '/icon.png');
 
         // Ajoute également dans l'historique visuel in-app
         addNotification({
@@ -1166,7 +1144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     const prod = products.find(p => p.id === productId);
     const prodTitle = prod ? prod.title : 'votre enchère';
-    const prodImage = prod?.images?.[0] || './icon.png';
+    const prodImage = prod?.images?.[0] || '/icon.png';
 
     // Formatage strict selon le cahier des charges :
     // "Un utilisateur a surenchéri à 6 000 000 FCFA. Reprenez la main !"

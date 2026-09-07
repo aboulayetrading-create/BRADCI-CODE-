@@ -23,7 +23,6 @@ export const KycRequiredModal: React.FC = () => {
     kycRestrictionAction,
     setKycModalOpen,
     setActiveTab,
-    adminInstantApproveMyKYC,
     translate,
     addToast
   } = useApp();
@@ -90,16 +89,6 @@ export const KycRequiredModal: React.FC = () => {
   const handleViewProfile = () => {
     setKycRequiredModalOpen(false);
     setActiveTab('dashboard_client');
-  };
-
-  const handleQuickDemoVerify = () => {
-    adminInstantApproveMyKYC();
-    setKycRequiredModalOpen(false);
-    addToast(
-      translate("Identité Validée (Mode Démo)", "Identity Verified (Demo Mode)"),
-      translate("Votre profil est désormais certifié KYC. Vous pouvez acheter et vendre librement !", "Your profile is now KYC certified. You can freely buy and sell!"),
-      'success'
-    );
   };
 
   return (
@@ -267,20 +256,6 @@ export const KycRequiredModal: React.FC = () => {
               </button>
             </div>
           )}
-
-          {/* Quick Demo Instant Approval Button for Testing */}
-          <div className="pt-2 flex items-center justify-center">
-            <button
-              id="btn-kyc-instant-demo-approve"
-              type="button"
-              onClick={handleQuickDemoVerify}
-              className="text-[11px] text-slate-500 hover:text-amber-400 transition-colors flex items-center gap-1 underline underline-offset-2"
-              title="Permet de certifier immédiatement le profil pour tester les flux d'achat et de vente"
-            >
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>{translate("⚡ Valider instantanément mon KYC (Mode Démo / Test)", "⚡ Instant Approve KYC (Demo / Testing)")}</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

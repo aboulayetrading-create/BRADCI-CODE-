@@ -324,19 +324,20 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
         </div>
       </div>
 
-      {/* 3. Main Map Canvas Area: 100% Native Google Maps */}
-      <div className="relative w-full h-80 sm:h-96 bg-[#040812] overflow-hidden">
-        <div className="w-full h-full relative">
+      {/* 3. Main Map Canvas Area: 85%-90% Screen Height, Google Widgets Cropped */}
+      <div className="relative w-full h-[75vh] sm:h-[85vh] min-h-[520px] bg-[#040812] overflow-hidden">
+        <div className="w-full h-full relative overflow-hidden">
+          {/* Iframe cropped to eliminate Google Maps white headers and copyright bars */}
           <iframe
             title="Google Maps Route Navigation"
             src={gmapsEmbedUrl}
-            className={`w-full h-full border-0 ${navTheme === 'night' ? 'brightness-90 contrast-125' : ''}`}
+            className={`absolute -top-16 sm:-top-20 -bottom-12 -left-1 -right-1 w-[calc(100%+8px)] h-[calc(100%+120px)] border-0 ${navTheme === 'night' ? 'brightness-90 contrast-125' : ''}`}
             loading="lazy"
             allowFullScreen
           />
 
           {/* Live Telemetry Overlay Pill in Top Left (Dynamic Vehicle Icon) */}
-          <div className="absolute top-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs">
+          <div className="absolute top-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs z-10">
             <div className="flex items-center gap-1.5 text-blue-400 font-bold">
               {vehicleType === 'voiture' || vehicleType === 'car' ? (
                 <Car className="w-4 h-4 animate-pulse text-amber-400" />
@@ -356,17 +357,15 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
           </div>
 
           {/* In-Map Top-Right Telemetry Card */}
-          <div className="absolute top-3 right-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-3 rounded-2xl shadow-2xl flex flex-col gap-1.5 text-right">
-            <div>
-              <span className="text-[10px] text-slate-400 block uppercase font-bold">Distance Restante</span>
-              <span className="text-sm font-mono-num font-black text-white">
-                {remainingDistKm} km ({remainingMin} min)
-              </span>
-            </div>
+          <div className="absolute top-3 right-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 sm:p-3 rounded-2xl shadow-2xl flex flex-col gap-1 text-right z-10">
+            <span className="text-[10px] text-slate-400 block uppercase font-bold">Distance Restante</span>
+            <span className="text-sm font-mono-num font-black text-emerald-400">
+              {remainingDistKm} km ({remainingMin} min)
+            </span>
           </div>
 
           {/* In-Map Bottom-Left Origin & Destination Badges */}
-          <div className="absolute bottom-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs">
+          <div className="absolute bottom-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs z-10">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-[10px]">
                 A
@@ -388,7 +387,7 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
             </div>
           </div>
 
-          {/* Floating Recenter GPS Button in Bottom Right (Exact match from user screenshot) */}
+          {/* Floating Recenter GPS Button in Bottom Right */}
           <div className="absolute bottom-3 right-3 z-20">
             <button
               onClick={() => {
@@ -402,96 +401,6 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
               <Navigation className="w-5 h-5 text-white transition-transform group-hover:rotate-45" />
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* 4. Interactive Route Steps List with Spoken Audio Previews */}
-      <div className="p-4 bg-slate-950 border-t border-slate-800">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-extrabold uppercase tracking-wide text-slate-400 flex items-center gap-1.5">
-            <Compass className="w-3.5 h-3.5 text-amber-400" />
-            <span>Feuille de Route Détaillée (Itinéraire Guidé)</span>
-          </span>
-          <div className="flex items-center gap-2 text-xs">
-            <button
-              onClick={() => {
-                const nextProg = Math.max(5, localProgress - 15);
-                setLocalProgress(nextProg);
-                if (onProgressChange) onProgressChange(nextProg);
-              }}
-              className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-[11px]"
-            >
-              ← Étape Préc.
-            </button>
-            <button
-              onClick={() => {
-                const nextProg = Math.min(95, localProgress + 15);
-                setLocalProgress(nextProg);
-                if (onProgressChange) onProgressChange(nextProg);
-              }}
-              className="px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px]"
-            >
-              Étape Suiv. →
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-2 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
-          {routePlan.steps.map((step, idx) => {
-            const isCurrent = idx === currentStepIndex;
-            const isPassed = idx < currentStepIndex;
-
-            return (
-              <div
-                key={step.id}
-                onClick={() => {
-                  setCurrentStepIndex(idx);
-                  const stepProg = Math.round((idx / (routePlan.steps.length - 1)) * 100);
-                  setLocalProgress(stepProg);
-                  if (onProgressChange) onProgressChange(stepProg);
-                  voiceNavigator.speak(step.instruction);
-                }}
-                className={`p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
-                  isCurrent
-                    ? 'bg-amber-500/15 border-amber-500/40 text-white shadow-md'
-                    : isPassed
-                    ? 'bg-slate-900/40 border-slate-800/60 text-slate-500'
-                    : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                    isCurrent
-                      ? 'bg-amber-500 text-slate-950 font-bold'
-                      : isPassed
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}>
-                    {isPassed ? <CheckCircle2 className="w-4 h-4" /> : getStepIcon(step.icon)}
-                  </div>
-                  <div>
-                    <p className={`text-xs font-bold leading-tight ${isCurrent ? 'text-amber-300' : 'text-slate-200'}`}>
-                      {step.instruction}
-                    </p>
-                    <span className="text-[10px] text-slate-400 block mt-0.5">
-                      {step.streetName} • {step.distanceText}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    voiceNavigator.speak(step.instruction);
-                  }}
-                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-400 shrink-0 transition-colors"
-                  title="Écouter cette instruction"
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>

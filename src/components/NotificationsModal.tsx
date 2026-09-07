@@ -40,12 +40,10 @@ export const NotificationsModal: React.FC = () => {
     browserNotificationsEnabled,
     pushToken,
     requestBrowserNotificationPermission,
-    pushBrowserNotification,
     setGpsTrackingJob,
     freightJobs,
     setActiveTab,
     translate,
-    triggerOutbidSimulation,
     setProductDetailModal,
     products
   } = useApp();
@@ -94,12 +92,6 @@ export const NotificationsModal: React.FC = () => {
       setActiveTab('dashboard_driver');
     }
     setNotificationsModalOpen(false);
-  };
-
-  const handleTriggerTestPush = async () => {
-    const testTitle = "Notifications BRAD'CI activées !";
-    const testBody = "Notifications BRAD'CI activées ! Vous recevrez désormais les alertes de vos enchères et livreurs.";
-    await pushBrowserNotification(testTitle, testBody, './icon.png');
   };
 
   const handleCopyToken = () => {
@@ -175,28 +167,9 @@ export const NotificationsModal: React.FC = () => {
               </button>
             ) : (
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={handleTriggerTestPush}
-                  className="px-2 py-1 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 text-[10px] font-bold flex items-center gap-1 transition-all"
-                  title="Envoyer une notification test standard"
-                >
-                  <Send className="w-2.5 h-2.5" />
-                  <span>Test Standard</span>
-                </button>
-                <button
-                  id="btn-test-push-outbid-notif-modal"
-                  onClick={() => {
-                    const firstAuction = products.find(p => p.status === 'active' && p.listingType === 'auction') || products[0];
-                    triggerOutbidSimulation(firstAuction ? firstAuction.id : undefined, 6000000);
-                  }}
-                  className="px-2 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer animate-pulse"
-                  title="Simuler l'alerte push mobile instantanée: Un utilisateur a surenchéri à 6 000 000 FCFA. Reprenez la main !"
-                >
-                  <Flame className="w-2.5 h-2.5 text-red-400" />
-                  <span>Test Surenchère (6M)</span>
-                </button>
-                <span className="px-2 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold font-mono">
-                  ✓ {translate('ACTIF', 'ACTIVE')}
+                <span className="px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold font-mono flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>✓ {translate('NOTIFICATIONS ACTIVES', 'NOTIFICATIONS ACTIVE')}</span>
                 </span>
               </div>
             )}

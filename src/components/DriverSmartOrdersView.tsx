@@ -20,7 +20,8 @@ import {
   Phone,
   Flame,
   TrendingUp,
-  Compass
+  Compass,
+  CornerUpRight
 } from 'lucide-react';
 import { DeliveryJob, VehicleType } from '../types';
 import { calculateCommuneDistanceKm, getCommuneBadgeInfo } from '../data/communes';
@@ -242,31 +243,62 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
     return (
       <div 
         id="driver-cascading-offer-card" 
-        className="relative w-full h-[85vh] min-h-[600px] max-h-[880px] rounded-3xl overflow-hidden bg-[#070E1A] border border-slate-800 shadow-2xl flex flex-col justify-between select-none animate-in fade-in zoom-in-95 duration-200"
+        className="relative w-full h-[85vh] sm:h-[88vh] min-h-[580px] rounded-3xl overflow-hidden bg-[#070E1A] border border-slate-800 shadow-2xl flex flex-col justify-between select-none animate-in fade-in zoom-in-95 duration-200"
       >
         {/* ========================================================================= */}
-        {/* CARTE GOOGLE MAPS PLEIN ÉCRAN (RENDU 85% DU COCKPIT)                     */}
+        {/* 1. CARTE GOOGLE MAPS PLEIN ÉCRAN (85%-90% DE L'ÉCRAN - WIDGETS CROPPÉS)    */}
         {/* ========================================================================= */}
         <div className="absolute inset-0 w-full h-full z-0 overflow-hidden bg-slate-950">
+          {/* Iframe cropped to eliminate Google Maps white headers and copyright bars */}
           <iframe
             id="gmaps-incoming-course-iframe"
             title="Google Maps Course Proposée"
             src={gmapsEmbedUrl}
-            className="w-full h-full border-0"
+            className="absolute -top-16 sm:-top-20 -bottom-14 -left-2 -right-2 w-[calc(100%+16px)] h-[calc(100%+120px)] border-0"
             loading="lazy"
             allowFullScreen
           />
         </div>
 
         {/* ========================================================================= */}
-        {/* 1. TOP FLOATING HUD : COMPTEUR 30S & ATTRIBUTION PRIORITAIRE               */}
+        {/* 2. BANDEAU DE GUIDAGE HAUT (TOP NAVIGATION BAR - COMPACT VTC)             */}
         {/* ========================================================================= */}
-        <div className="relative z-10 p-3 sm:p-4 pointer-events-none">
-          <div className="pointer-events-auto max-w-2xl mx-auto bg-[#0A1324]/90 backdrop-blur-md rounded-2xl border border-slate-700/80 p-3 sm:p-3.5 shadow-2xl flex items-center justify-between gap-3">
+        <div className="relative z-10 p-2.5 sm:p-3.5 pointer-events-none">
+          <div className="pointer-events-auto max-w-2xl mx-auto bg-[#0B111E]/95 backdrop-blur-md rounded-2xl border border-slate-800/90 p-3 shadow-2xl flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
-              {/* Circular 30s Countdown Clock */}
-              <div className="relative w-11 h-11 shrink-0 flex items-center justify-center">
-                <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
+              {/* Direction Indicator Icon */}
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shrink-0">
+                <CornerUpRight className="w-5 h-5 stroke-[2.5]" />
+              </div>
+
+              {/* Next Turn & Destination Headline */}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono-num font-black text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                    Dans 250 m
+                  </span>
+                  <h3 className="text-xs sm:text-sm font-black text-white truncate">
+                    DESTINATION : {currentOfferedJob.dropoffCommune.toUpperCase()}
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-300 truncate mt-0.5">
+                  Approche : <strong className="text-white">{(currentOfferedJob as any).pickupDistKm || 1.8} km</strong> • {currentOfferedJob.dropoffAddress || currentOfferedJob.dropoffCommune}
+                </p>
+              </div>
+            </div>
+
+            {/* Countdown 30s & Gain Net */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="text-right px-2.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
+                <span className="text-[9px] text-emerald-400 uppercase font-extrabold block">Gain Net</span>
+                <span className="text-xs sm:text-sm font-black text-emerald-400 font-mono-num">
+                  +{currentOfferedJob.deliveryFee.toLocaleString('fr-FR')} <span className="text-[9px] font-sans">F</span>
+                </span>
+              </div>
+
+              {/* 30s Circular Countdown Timer */}
+              <div className="relative w-10 h-10 shrink-0 flex items-center justify-center">
+                <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
                   <path
                     className="text-slate-800"
                     strokeWidth="3.5"
@@ -284,149 +316,69 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                   />
                 </svg>
-                <span className={`absolute text-xs font-black font-mono-num ${offerCountdown <= 10 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
+                <span className={`absolute text-[11px] font-black font-mono-num ${offerCountdown <= 10 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
                   {offerCountdown}s
                 </span>
               </div>
-
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="px-2 py-0.5 rounded-full bg-[#F97316]/20 text-[#F97316] text-[10px] font-black uppercase tracking-wider border border-[#F97316]/40 flex items-center gap-1">
-                    <Zap className="w-3 h-3 fill-current" />
-                    <span>Attribution Prioritaire</span>
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-bold hidden sm:inline">
-                    ● Vous êtes le livreur le plus proche
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 font-medium truncate mt-0.5">
-                  Approche : <strong className="text-white">{(currentOfferedJob as any).pickupDistKm || 1.8} km</strong> (~{(currentOfferedJob as any).approachTimeMin || 4} min)
-                </p>
-              </div>
-            </div>
-
-            {/* Payout & Layer Toggle */}
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="text-right px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
-                <span className="text-[9px] text-emerald-400 uppercase font-extrabold block">Gain Net</span>
-                <span className="text-sm sm:text-base font-black text-emerald-400 font-mono-num">
-                  +{currentOfferedJob.deliveryFee.toLocaleString('fr-FR')} <span className="text-[10px] font-sans">F</span>
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setMapLayer(prev => prev === 'roadmap' ? 'satellite' : 'roadmap')}
-                className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
-                title="Changer de vue cartographique"
-              >
-                <Compass className="w-3.5 h-3.5 text-[#F97316]" />
-                <span className="hidden sm:inline">{mapLayer === 'roadmap' ? 'Satellite' : 'Plan'}</span>
-              </button>
             </div>
           </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* 2. BANDEAU DE DESTINATION FLOTTANT SUR LA CARTE (HAUTE LISIBILITÉ)         */}
-        {/* ========================================================================= */}
-        <div className="relative z-10 px-3 sm:px-4 pointer-events-none my-auto">
-          <div className="pointer-events-auto max-w-lg mx-auto bg-[#070E1A]/95 backdrop-blur-md rounded-2xl border-2 border-[#F97316] p-4 shadow-2xl space-y-2.5">
-            {/* DESTINATION HIGHLIGHT */}
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-500 border border-red-500/40 flex items-center justify-center shrink-0 shadow-lg mt-0.5">
-                <MapPin className="w-5 h-5 fill-red-500/30 animate-bounce" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-red-400">
-                    Point de Livraison (Acheteur)
-                  </span>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${dropoffBadge.badgeClass}`}>
-                    {currentOfferedJob.dropoffCommune}
-                  </span>
-                </div>
-                <h4 className="text-base sm:text-lg font-black text-white leading-tight mt-0.5">
-                  DESTINATION : {currentOfferedJob.dropoffCommune.toUpperCase()}
-                </h4>
-                <p className="text-xs font-semibold text-slate-300 mt-0.5 line-clamp-1">
-                  {currentOfferedJob.dropoffAddress}
-                </p>
-              </div>
-            </div>
-
-            {/* Trajectory Divider */}
-            <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-slate-300">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                <span className="text-[11px] text-slate-400 truncate">
-                  Départ : <strong className="text-slate-200">{currentOfferedJob.pickupCommune}</strong> ({currentOfferedJob.pickupAddress})
-                </span>
-              </div>
-              <div className="shrink-0 flex items-center gap-1 font-mono font-bold text-amber-300 text-xs">
-                <Navigation className="w-3.5 h-3.5 text-[#F97316]" />
-                <span>{currentOfferedJob.distanceKm || 7.5} km • ~{currentOfferedJob.etaMinutes || 20} min</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Map is 100% visible and un-obstructed in the center */}
+        <div className="flex-1" />
 
         {/* ========================================================================= */}
-        {/* 3. BOTTOM FLOATING ACTION SHEET (BOUTONS D'ACTION VTC)                     */}
+        {/* 3. BOTTOM FLOATING ACTION SHEET (BOUTONS D'ACTION VTC COMPACTS)           */}
         {/* ========================================================================= */}
-        <div className="relative z-10 p-3 sm:p-4 pointer-events-none">
-          <div className="pointer-events-auto max-w-2xl mx-auto bg-[#0A1324]/95 backdrop-blur-md rounded-2xl border border-slate-700/90 p-3.5 sm:p-4 shadow-2xl space-y-3">
-            {/* Product summary snippet */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
+        <div className="relative z-10 p-2.5 sm:p-3.5 pointer-events-none">
+          <div className="pointer-events-auto max-w-2xl mx-auto bg-[#0B111E]/95 backdrop-blur-md rounded-2xl border border-slate-800 p-3 sm:p-3.5 shadow-2xl space-y-2.5">
+            {/* Delivery Details Line */}
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
                 <img
                   src={currentOfferedJob.productImage}
                   alt={currentOfferedJob.productTitle}
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-700 bg-slate-900 shrink-0"
+                  className="w-10 h-10 rounded-xl object-cover border border-slate-700 bg-slate-900 shrink-0"
                 />
                 <div className="min-w-0">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                    Colis à livrer
-                  </span>
-                  <h5 className="text-xs sm:text-sm font-black text-white truncate">
+                  <h4 className="text-xs sm:text-sm font-black text-white truncate">
                     {currentOfferedJob.productTitle}
-                  </h5>
-                  <span className="text-[11px] text-slate-400 font-mono">
-                    Valeur : <strong className="text-slate-200">{currentOfferedJob.itemValue.toLocaleString('fr-FR')} FCFA</strong>
-                  </span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 truncate">
+                    De <strong className="text-slate-200">{currentOfferedJob.pickupCommune}</strong> à <strong className="text-emerald-400">{currentOfferedJob.dropoffCommune}</strong> ({currentOfferedJob.distanceKm || 7.5} km)
+                  </p>
                 </div>
               </div>
 
-              {/* Open in External Google Maps app button */}
+              {/* External Google Maps launch button */}
               <a
                 href={externalGmapsAppUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-bold transition-all flex items-center gap-1.5 shrink-0"
+                className="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-700 flex items-center justify-center shrink-0 shadow transition-all cursor-pointer"
                 title="Ouvrir dans Google Maps externe"
               >
-                <Navigation className="w-3.5 h-3.5 text-blue-400" />
-                <span className="hidden sm:inline">Google Maps App</span>
+                <Navigation className="w-4 h-4" />
               </a>
             </div>
 
             {/* Main Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
+            <div className="grid grid-cols-12 gap-2 pt-0.5">
               <button
                 id={`btn-decline-cascading-${currentOfferedJob.id}`}
                 onClick={() => handleDeclineOrTimeout(currentOfferedJob.id, 'declined')}
-                className="sm:col-span-4 py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700 font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="col-span-4 py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700 font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span>Refuser (Passer)</span>
+                <span>Refuser</span>
               </button>
 
               <button
                 id={`btn-accept-cascading-${currentOfferedJob.id}`}
                 onClick={() => handleAcceptJob(currentOfferedJob.id)}
-                className="sm:col-span-8 py-3.5 px-6 rounded-xl bg-gradient-to-r from-[#F97316] to-[#EA580C] hover:from-[#FB923C] hover:to-[#F97316] text-white font-black text-xs sm:text-sm shadow-xl shadow-[#F97316]/30 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="col-span-8 py-3 px-4 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-black text-xs sm:text-sm shadow-xl shadow-[#F97316]/30 active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <Bike className="w-5 h-5 stroke-[2.5]" />
-                <span>ACCEPTER LA COURSE (+{currentOfferedJob.deliveryFee.toLocaleString('fr-FR')} FCFA)</span>
+                <Bike className="w-4 h-4 stroke-[2.5]" />
+                <span>ACCEPTER LA COURSE (+{currentOfferedJob.deliveryFee.toLocaleString('fr-FR')} F)</span>
               </button>
             </div>
           </div>
@@ -490,11 +442,11 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
           </div>
         </div>
 
-        {/* Action / Simulation buttons */}
+        {/* Dispatch Action buttons */}
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-          {/* Button to simulate receiving a course immediately */}
+          {/* Button to receive incoming freight job in real-time */}
           <button
-            id="driver-simulate-incoming-course-btn"
+            id="driver-receive-incoming-course-btn"
             onClick={() => {
               setDeclinedJobIds([]);
               const targetJob = freightJobs.find(j => j.status === 'available') || freightJobs[0];
@@ -502,13 +454,13 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
                 setCurrentOfferedJob(targetJob);
                 setOfferCountdown(30);
                 playDriverNewOrderRingtone();
-                addToast("Nouvelle Course !", `Course vers ${targetJob.dropoffCommune} attribuée.`, "info");
+                addToast("Course Disponible !", `Course vers ${targetJob.dropoffCommune} prête à être acceptée.`, "info");
               }
             }}
             className="px-5 py-3 bg-[#F97316] hover:bg-[#EA580C] text-white rounded-xl text-xs font-black flex items-center gap-2 shadow-lg shadow-[#F97316]/20 transition-all cursor-pointer hover:scale-[1.02]"
           >
             <Zap className="w-4 h-4" />
-            <span>Simuler la Réception d'une Course</span>
+            <span>Recevoir une Course Immédiate</span>
           </button>
 
           {declinedJobIds.length > 0 && (

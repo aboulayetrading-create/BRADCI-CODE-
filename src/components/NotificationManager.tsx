@@ -13,6 +13,14 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { 
+  requestUniversalNotificationPermission, 
+  setupAndroidNotificationChannels,
+  isRunningInIframe,
+  isPlatformIOS,
+  isPlatformAndroid,
+  sendUniversalPush
+} from '../utils/universalNotifications';
 
 export type NotificationPermissionState = NotificationPermission | 'unsupported';
 
@@ -76,18 +84,13 @@ export function useNotificationManager() {
     }
   }, []);
 
-  // Déclencher la demande d'autorisation
+  // Déclencher la demande d'autorisation universelle (Android 13+, Android 8-12, Android 5-7 & Web)
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setPermission('unsupported');
-      return false;
-    }
-
     try {
-      const result = await Notification.requestPermission();
-      setPermission(result);
+      const result = await requestUniversalNotificationPermission();
+      setPermission(result.permissionState as NotificationPermissionState);
 
-      if (result === 'granted') {
+      if (result.granted) {
         const token = await registerPushToken();
         setIsBannerDismissed(true);
         sessionStorage.removeItem('bradci_notif_banner_dismissed');
@@ -108,7 +111,7 @@ export function useNotificationManager() {
           // Fallback silencieux
         }
         return true;
-      } else if (result === 'denied') {
+      } else if (result.permissionState === 'denied') {
         setIsBannerDismissed(false);
         sessionStorage.removeItem('bradci_notif_banner_dismissed');
         return false;
@@ -142,8 +145,13 @@ export function useNotificationManager() {
     }
   }, [registerPushToken, addToast, translate]);
 
-  // Vérification automatique au chargement
+  // Vérification et initialisation automatique au chargement (Android 13+, Android 8-12, Android 5-7 & Web)
   useEffect(() => {
+    // 1. Configuration des canaux Android 8.0+ (API 26-32)
+    setupAndroidNotificationChannels().catch(e => {
+      console.warn('Canal Android notification init fallback:', e);
+    });
+
     if (typeof window === 'undefined' || !('Notification' in window)) {
       setPermission('unsupported');
       return;
@@ -152,15 +160,14 @@ export function useNotificationManager() {
     const currentPerm = Notification.permission;
     setPermission(currentPerm);
 
-    // 1. Si la permission est 'default', solliciter l'autorisation au premier chargement
+    // 2. Si la permission est 'default', solliciter l'autorisation dynamique au premier chargement (Android 13+ / API 33+)
     if (currentPerm === 'default') {
-      // Petite temporisation pour que l'interface et le DOM soient prêts
       const timer = setTimeout(() => {
         requestPermission().catch(() => {});
       }, 1200);
       return () => clearTimeout(timer);
     } 
-    // 2. Si déjà accordée, s'assurer que le token push est synchronisé
+    // 3. Si déjà accordée, s'assurer que le token push est synchronisé
     else if (currentPerm === 'granted') {
       registerPushToken();
     }
@@ -217,8 +224,9 @@ export const NotificationManager: React.FC = () => {
     setShowHelpModal
   } = useNotificationManager();
 
-  // Ne rien afficher si autorisé ou si l'utilisateur a masqué la bannière pendant sa session
-  const shouldShowBanner = isDenied && !isBannerDismissed;
+  // Ne pas afficher la bannière agressive si dans une iframe (Google Studio preview)
+  const isIframe = isRunningInIframe();
+  const shouldShowBanner = isDenied && !isBannerDismissed && !isIframe;
 
   return (
     <>
@@ -235,9 +243,13 @@ export const NotificationManager: React.FC = () => {
                 <BellOff className="w-4 h-4 animate-pulse" />
               </div>
               <div className="leading-snug">
-                <span className="font-bold text-amber-300">Notifications désactivées sur votre appareil : </span>
+                <span className="font-bold text-amber-300">
+                  {isPlatformIOS() ? 'Notifications iPhone : ' : 'Notifications Android APK : '}
+                </span>
                 <span className="text-slate-200">
-                  Activez les notifications dans les paramètres de votre téléphone pour recevoir les alertes d'enchères et le suivi des livreurs.
+                  {isPlatformIOS() 
+                    ? 'Installez BRAD\'CI sur l\'écran d\'accueil pour recevoir les alertes d\'enchères et livraisons.'
+                    : 'Activez les notifications dans Paramètres > Applications > BRAD\'CI > Notifications.'}
                 </span>
               </div>
             </div>
@@ -347,12 +359,28 @@ export const NotificationManager: React.FC = () => {
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
                 <div className="flex items-center gap-2 font-bold text-blue-400">
                   <span className="w-5 h-5 rounded-full bg-blue-500 text-slate-950 font-black text-xs flex items-center justify-center">2</span>
-                  <span>Option B : Paramètres Android du téléphone</span>
+                  <span>Option B : Paramètres Android du téléphone (APK)</span>
+                </div>
+                <div className="p-2 rounded-lg bg-blue-950/40 border border-blue-500/30 text-xs font-mono text-blue-200">
+                  Paramètres &gt; Applications &gt; BRAD'CI &gt; Notifications
                 </div>
                 <ul className="space-y-1.5 text-slate-300 pl-7 list-disc">
                   <li>Ouvrez l'application <strong>Paramètres</strong> de votre smartphone.</li>
-                  <li>Allez dans <strong>Applications</strong> &gt; sélectionnez <strong>Chrome</strong> (ou l'application <strong>BRAD'CI</strong>).</li>
+                  <li>Allez dans <strong>Applications</strong> &gt; sélectionnez <strong>BRAD'CI</strong> (ou <strong>Chrome</strong> si vous utilisez le navigateur).</li>
                   <li>Appuyez sur <strong>Notifications</strong> et activez l'interrupteur <strong>« Autoriser les notifications »</strong>.</li>
+                </ul>
+              </div>
+
+              {/* Option C : Sur iPhone (iOS 16.4+ / Safari PWA) */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-purple-400">
+                  <span className="w-5 h-5 rounded-full bg-purple-500 text-white font-black text-xs flex items-center justify-center">3</span>
+                  <span>Option C : Sur iPhone (iOS 16.4+)</span>
+                </div>
+                <ul className="space-y-1.5 text-slate-300 pl-7 list-disc">
+                  <li>Sur Safari, appuyez sur le bouton <strong>Partager</strong> (icône avec flèche vers le haut).</li>
+                  <li>Choisissez <strong>« Sur l'écran d'accueil »</strong> pour installer BRAD'CI en tant qu'application native.</li>
+                  <li>Lancez l'application depuis votre écran d'accueil et acceptez l'invitation de notifications.</li>
                 </ul>
               </div>
 

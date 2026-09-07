@@ -1384,20 +1384,6 @@ export const ProductDetailModal: React.FC = () => {
                         <span>{translate("Enchérir", "Place Bid")}</span>
                       </button>
                     </div>
-
-                    {/* Bouton de test direct de l'alerte push de surenchère demandée */}
-                    <div className="pt-2">
-                      <button
-                        id="btn-simulate-outbid-modal"
-                        type="button"
-                        onClick={() => triggerOutbidSimulation(prod.id)}
-                        className="w-full py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
-                        title={translate("Tester la notification push instantanée sur mobile quand vous êtes dépassé", "Test instant mobile push notification when outbid")}
-                      >
-                        <BellRing className="w-3.5 h-3.5 text-red-400" />
-                        <span>{translate("Tester l'Alerte Push Surenchère (Mobile & PC)", "Test Instant Outbid Push Alert (Mobile & Desktop)")}</span>
-                      </button>
-                    </div>
                   </div>
                 )}
 

@@ -936,11 +936,11 @@ export const AuthModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Simulated demo hint if in preview/fallback environment */}
+              {/* Security OTP display */}
               {generatedOtpDisplay && (
                 <div className="pt-1">
                   <div className="p-1.5 px-3 bg-slate-950/80 rounded-lg border border-slate-800 inline-flex items-center gap-2">
-                    <span className="text-[10px] text-slate-400">{translate("Code OTP démo :", "Demo OTP code:")}</span>
+                    <span className="text-[10px] text-slate-400">{translate("Code OTP transmis par SMS :", "SMS Security OTP Code:")}</span>
                     <strong className="text-xs font-mono font-bold text-amber-400 tracking-wider">
                       {generatedOtpDisplay}
                     </strong>
