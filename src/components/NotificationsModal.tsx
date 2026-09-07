@@ -25,6 +25,7 @@ import {
   BellRing
 } from 'lucide-react';
 import { AppNotification } from '../types';
+import { sendTestNotification } from '../utils/universalNotifications';
 
 export const NotificationsModal: React.FC = () => {
   const { 
@@ -171,6 +172,18 @@ export const NotificationsModal: React.FC = () => {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   <span>✓ {translate('NOTIFICATIONS ACTIVES', 'NOTIFICATIONS ACTIVE')}</span>
                 </span>
+                <button
+                  id="btn-test-push-notification"
+                  type="button"
+                  onClick={async () => {
+                    await sendTestNotification("BRAD'CI Alerte Test", "Validation réussie du canal push local et de l'affichage notification.");
+                  }}
+                  className="px-2.5 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  title="Valider le canal push local"
+                >
+                  <BellRing className="w-3 h-3" />
+                  <span>Tester Push</span>
+                </button>
               </div>
             )}
           </div>

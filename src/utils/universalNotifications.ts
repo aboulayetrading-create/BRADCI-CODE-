@@ -326,3 +326,53 @@ export async function sendUniversalPush(
 
   return false;
 }
+
+/**
+ * Fonction déclenchable dans l'application pour valider le canal local de notification
+ */
+export async function sendTestNotification(
+  title: string = "BRAD'CI", 
+  body: string = "Nouvelle alerte course !"
+): Promise<boolean> {
+  console.log('[BRAD\'CI] Déclenchement de la notification push de test locale...');
+
+  // 1. Essai direct via Service Worker showNotification ou postMessage
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && 'showNotification' in reg) {
+        await reg.showNotification(title, {
+          body,
+          icon: '/icon.png',
+          badge: '/icon.png',
+          vibrate: [200, 100, 200],
+          tag: 'bradci-notification',
+          renotify: true,
+          data: '/'
+        } as any);
+        return true;
+      } else if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'SEND_TEST_NOTIFICATION',
+          title,
+          body,
+          icon: '/icon.png'
+        });
+        return true;
+      }
+    } catch (swErr) {
+      console.warn('[BRAD\'CI] Erreur SW test notification:', swErr);
+    }
+  }
+
+  // 2. Essai via sendUniversalPush (Android Capacitor natif / Web Notification API)
+  return await sendUniversalPush(title, body, {
+    icon: '/icon.png',
+    badge: '/icon.png',
+    url: '/'
+  });
+}
+
+if (typeof window !== 'undefined') {
+  (window as any).sendTestNotification = sendTestNotification;
+}

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { ALL_COMMUNES, ZoneCommune } from '../data/communes';
 import { generateAbidjanRoute, RouteStep, RoutePlan, voiceNavigator } from '../utils/voiceNavigator';
+import { speakInstruction } from '../utils/audioServices';
 
 interface GoogleMapsEmbedProps {
   pickupCommune: string;
@@ -86,11 +87,11 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
     setCurrentStepIndex(safeIndex);
 
     // Speak when step changes
-    if (autoPlayVoice && isVoiceEnabled && safeIndex !== prevStepRef.current) {
+    if (safeIndex !== prevStepRef.current) {
       prevStepRef.current = safeIndex;
       const step = routePlan.steps[safeIndex];
-      if (step) {
-        voiceNavigator.speak(step.instruction);
+      if (step && (isVoiceEnabled || autoPlayVoice)) {
+        speakInstruction(step.instruction);
       }
     }
   }, [localProgress, routePlan, autoPlayVoice, isVoiceEnabled]);
@@ -99,17 +100,22 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
   const toggleVoiceMute = () => {
     const nextState = !isVoiceEnabled;
     setIsVoiceEnabled(nextState);
+    setAutoPlayVoice(nextState);
     voiceNavigator.setMuted(!nextState);
     if (nextState) {
-      voiceNavigator.announceVoiceActivated();
+      const step = routePlan.steps[currentStepIndex];
+      const intro = step 
+        ? `Guidage Voix Off BRAD'CI activé. ${step.instruction}`
+        : "Guidage Voix Off BRAD'CI activé.";
+      speakInstruction(intro);
     }
   };
 
-  // Manual Speak current step
+  // Manual Speak current step (Répéter la manœuvre)
   const handleSpeakCurrentStep = () => {
     const step = routePlan.steps[currentStepIndex];
     if (step) {
-      voiceNavigator.speak(step.instruction);
+      speakInstruction(step.instruction);
     }
   };
 
@@ -269,15 +275,35 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
             </p>
           </div>
         </div>
-        <a
-          href={routePlan.googleMapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-black rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 shrink-0 transition-all cursor-pointer hover:scale-105"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-          <span>Lancer la Voix Off Google Maps</span>
-        </a>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            id="btn-launch-voice-guidance"
+            type="button"
+            onClick={() => {
+              setIsVoiceEnabled(true);
+              setAutoPlayVoice(true);
+              const step = routePlan.steps[currentStepIndex];
+              const textToSpeak = step 
+                ? `Guidage Voix Off BRAD'CI actif. ${step.instruction}`
+                : "Guidage Voix Off BRAD'CI actif.";
+              speakInstruction(textToSpeak);
+            }}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black rounded-xl shadow-lg shadow-amber-500/20 flex items-center gap-2 shrink-0 transition-all cursor-pointer hover:scale-105 active:scale-95"
+          >
+            <Volume2 className="w-3.5 h-3.5" />
+            <span>Lancer la Voix Off</span>
+          </button>
+          <a
+            href={routePlan.googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-1.5 shrink-0 transition-all cursor-pointer hover:scale-105"
+            title="Ouvrir itinéraire dans l'application Google Maps"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Google Maps</span>
+          </a>
+        </div>
       </div>
 
       {/* 2. Turn-by-Turn Dynamic Voice Guidance Banner */}
@@ -311,11 +337,13 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
           {/* Quick Vocal Replay & Step Selector */}
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             <button
+              id="btn-repeat-manoeuvre"
+              type="button"
               onClick={handleSpeakCurrentStep}
-              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95"
+              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
             >
               <Volume2 className="w-3.5 h-3.5" />
-              <span>Répéter la voix</span>
+              <span>Répéter la manœuvre</span>
             </button>
             <span className="text-[10px] text-slate-400 font-mono-num">
               Étape {currentStepIndex + 1} / {routePlan.steps.length}

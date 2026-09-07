@@ -1,5 +1,6 @@
 // Voice Navigation, Turn-by-Turn Route Engine, and Full-Site Audio Speech System for Grand Abidjan
 import { AppLanguage } from '../types';
+export { speakGuidance } from './voiceGuidance';
 
 export interface RouteStep {
   id: string;

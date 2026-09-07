@@ -22,9 +22,11 @@ import {
   AlertOctagon, 
   CreditCard, 
   Zap,
-  FileText 
+  FileText,
+  Mic
 } from 'lucide-react';
 import { GoogleMapsEmbed } from './GoogleMapsEmbed';
+import { DeliveryChatModal } from './DeliveryChatModal';
 import { DeliveryJob, PaymentMethod } from '../types';
 
 export const GpsTrackingModal: React.FC = () => {
@@ -47,6 +49,7 @@ export const GpsTrackingModal: React.FC = () => {
   const [courierProgress, setCourierProgress] = useState(25);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [chatModalOpen, setChatModalOpen] = useState(false);
   const [pickupCodeInput, setPickupCodeInput] = useState('');
   const [driverEnteredOtp, setDriverEnteredOtp] = useState('');
   
@@ -446,6 +449,15 @@ export const GpsTrackingModal: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setChatModalOpen(true)}
+                    className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition-all shadow cursor-pointer flex items-center gap-1"
+                    title="Messagerie & Notes Vocales directes avec le coursier"
+                  >
+                    <Mic className="w-4 h-4" />
+                    <span className="text-[10px] font-black hidden sm:inline">Note Vocale</span>
+                  </button>
                   <a
                     href={`tel:${job.assignedDriverPhone || '+2250144778922'}`}
                     className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow cursor-pointer"
@@ -870,6 +882,19 @@ export const GpsTrackingModal: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal Messagerie Sécurisée & Notes Vocales Livreur-Client */}
+      {job && chatModalOpen && (
+        <DeliveryChatModal
+          isOpen={chatModalOpen}
+          onClose={() => setChatModalOpen(false)}
+          jobId={job.id}
+          partnerName={job.assignedDriverName || "Coursier Brad'CI"}
+          partnerPhone={job.assignedDriverPhone || "+225 01 44 77 89 22"}
+          partnerRole="driver"
+          vehicleInfo={job.assignedDriverVehicle || job.requiredVehicle ? `Véhicule: ${(job.assignedDriverVehicle || job.requiredVehicle).toUpperCase()}` : undefined}
+        />
       )}
     </div>
   );

@@ -20,11 +20,15 @@ import {
   VolumeX,
   X,
   CornerUpRight,
-  Radio
+  Radio,
+  Mic,
+  MessageSquare
 } from 'lucide-react';
 import { DeliveryJob, VehicleType } from '../types';
 import { ALL_COMMUNES } from '../data/communes';
 import { voiceNavigator } from '../utils/voiceNavigator';
+import { speakInstruction } from '../utils/audioServices';
+import { DeliveryChatModal } from './DeliveryChatModal';
 
 interface DriverActiveMissionCockpitProps {
   job?: DeliveryJob;
@@ -54,6 +58,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
   // Modal sheets for actions without leaving the map
   const [showPickupModal, setShowPickupModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
   const [pickupCodeInput, setPickupCodeInput] = useState('');
   const [deliveryOtpInput, setDeliveryOtpInput] = useState('');
 
@@ -109,23 +114,23 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
     if (!nextMuted && job) {
       const targetCommune = job.status === 'accepted' ? job.pickupCommune : job.dropoffCommune;
       const instruction = job.status === 'accepted'
-        ? `Guidage GPS actif. Dans 200 mètres, prenez la sortie vers le point de retrait à ${targetCommune}.`
-        : `Guidage GPS actif. Dans 200 mètres, prenez la sortie vers le client à ${targetCommune}.`;
-      voiceNavigator.speak(instruction);
-      addToast("Guidage vocal activé", "Les instructions de navigation seront annoncées à haute voix.", "info");
+        ? `Guidage Voix Off BRAD'CI actif. Dans 200 mètres, prenez la sortie vers le point de retrait à ${targetCommune}.`
+        : `Guidage Voix Off BRAD'CI actif. Dans 200 mètres, prenez la sortie vers le client à ${targetCommune}.`;
+      speakInstruction(instruction);
+      addToast("Guidage Voix Off activé", "Les instructions de navigation sont annoncées à haute voix.", "info");
     } else {
       addToast("Guidage vocal coupé", "Mode silencieux actif.", "info");
     }
   };
 
-  // Speak current instruction
+  // Speak current instruction (Répéter la manœuvre)
   const handleRepeatVoice = () => {
     if (!job) return;
     const targetCommune = job.status === 'accepted' ? job.pickupCommune : job.dropoffCommune;
     const instruction = job.status === 'accepted'
       ? `Dans 200 mètres, prenez la sortie vers le point de retrait à ${targetCommune}.`
       : `Dans 200 mètres, prenez la sortie vers ${targetCommune}.`;
-    voiceNavigator.speak(instruction);
+    speakInstruction(instruction);
   };
 
   // Open external Google Maps App with route
@@ -150,9 +155,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
     setPickupCodeInput('');
     setShowPickupModal(false);
     addToast("Colis récupéré !", "Trajet vers le client acheteur activé.", "success");
-    if (!isVoiceMuted) {
-      voiceNavigator.speak(`Colis récupéré avec succès. Démarrage de l'itinéraire vers l'acheteur à ${job.dropoffCommune}.`);
-    }
+    speakInstruction(`Colis récupéré avec succès. Démarrage de l'itinéraire vers l'acheteur à ${job.dropoffCommune}.`);
   };
 
   // Validate delivery OTP
@@ -167,9 +170,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
     setDeliveryOtpInput('');
     setShowDeliveryModal(false);
     addToast("Livraison validée !", "Paiement débloqué instantanément sur votre solde.", "success");
-    if (!isVoiceMuted) {
-      voiceNavigator.speak("Course terminée avec succès ! Vos gains sont immédiatement disponibles sur votre solde.");
-    }
+    speakInstruction("Course terminée avec succès ! Vos gains sont immédiatement disponibles sur votre solde.");
   };
 
   // If no active job: display sleek standby view
@@ -305,18 +306,31 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
           </div>
         </div>
 
-        {/* Small Discreet Voice Guidance Toggle Button */}
+        {/* Voice Controls: Lancer la Voix Off and Répéter la manœuvre */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
-            onClick={handleToggleVoice}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
-              isVoiceMuted
-                ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
-                : 'bg-sky-500/20 border-sky-500/40 text-sky-400 hover:bg-sky-500/30 shadow-md'
-            }`}
-            title={isVoiceMuted ? "Activer le guidage vocal" : "Désactiver le guidage vocal"}
+            id="driver-btn-repeat-manoeuvre"
+            type="button"
+            onClick={handleRepeatVoice}
+            className="px-2.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow"
+            title="Répéter la manœuvre"
           >
-            {isVoiceMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            <Volume2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Répéter la manœuvre</span>
+          </button>
+          <button
+            id="driver-btn-toggle-voice"
+            type="button"
+            onClick={handleToggleVoice}
+            className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 font-bold text-xs transition-all cursor-pointer ${
+              isVoiceMuted
+                ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 shadow-md'
+            }`}
+            title={isVoiceMuted ? "Lancer la Voix Off" : "Couper la Voix Off"}
+          >
+            {isVoiceMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+            <span>{isVoiceMuted ? "Lancer la Voix Off" : "Voix Off Active"}</span>
           </button>
         </div>
       </div>
@@ -398,7 +412,18 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
             </button>
           )}
 
-          {/* Circular Button 1: Call Client */}
+          {/* Circular Button 1: Chat / Note Vocale with Client */}
+          <button
+            id="driver-btn-chat-client"
+            type="button"
+            onClick={() => setShowChatModal(true)}
+            className="w-12 h-12 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer shrink-0"
+            title={`Envoyer une Note Vocale ou un message à ${targetClientName}`}
+          >
+            <Mic className="w-5 h-5" />
+          </button>
+
+          {/* Circular Button 2: Call Client */}
           <a
             id="driver-btn-call-client"
             href={`tel:${targetClientPhone}`}
@@ -408,7 +433,7 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
             <Phone className="w-5 h-5 fill-current" />
           </a>
 
-          {/* Circular Button 2: Open in External Google Maps */}
+          {/* Circular Button 3: Open in External Google Maps */}
           <button
             id="driver-btn-external-maps"
             onClick={handleOpenExternalGoogleMaps}
@@ -606,6 +631,18 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Messagerie Sécurisée & Notes Vocales Livreur-Client */}
+      {job && showChatModal && (
+        <DeliveryChatModal
+          isOpen={showChatModal}
+          onClose={() => setShowChatModal(false)}
+          jobId={job.id}
+          partnerName={targetClientName}
+          partnerPhone={targetClientPhone}
+          partnerRole={isPickupPhase ? "seller" : "buyer"}
+        />
       )}
     </div>
   );
