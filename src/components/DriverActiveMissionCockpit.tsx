@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Navigation, 
@@ -11,13 +11,20 @@ import {
   Timer, 
   Clock, 
   RotateCcw, 
-  Zap, 
-  ShieldCheck,
-  Package,
-  Bike
+  ShieldCheck, 
+  Package, 
+  Bike,
+  Car,
+  Truck,
+  Volume2,
+  VolumeX,
+  X,
+  CornerUpRight,
+  Radio
 } from 'lucide-react';
-import { DeliveryJob } from '../types';
-import { GoogleMapsEmbed } from './GoogleMapsEmbed';
+import { DeliveryJob, VehicleType } from '../types';
+import { ALL_COMMUNES } from '../data/communes';
+import { voiceNavigator } from '../utils/voiceNavigator';
 
 interface DriverActiveMissionCockpitProps {
   job?: DeliveryJob;
@@ -30,25 +37,46 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
 }) => {
   const {
     currentUser,
-    freightJobs,
     driverConfirmPickup,
     driverDeclareArrival,
     driverSetInspectionVerdict,
     driverConfirmDeliveryOTP,
-    driverConfirmReturnOTP,
     driverStartAbsentTimer,
     driverCancelDueToAbsentBuyer,
-    setGpsTrackingJob
+    addToast
   } = useApp();
 
+  // Voice navigation toggle
+  const [isVoiceMuted, setIsVoiceMuted] = useState<boolean>(() => {
+    return localStorage.getItem('bradci_driver_voice_muted') === 'true';
+  });
+
+  // Modal sheets for actions without leaving the map
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [pickupCodeInput, setPickupCodeInput] = useState('');
   const [deliveryOtpInput, setDeliveryOtpInput] = useState('');
-  const [returnOtpInput, setReturnOtpInput] = useState('');
 
   // 20-min countdown timer for absent buyer
   const [absentTimerSeconds, setAbsentTimerSeconds] = useState(1200);
   const [isAbsentTimerRunning, setIsAbsentTimerRunning] = useState(false);
 
+  // Map projection coordinates for Grand Abidjan
+  const latMin = 5.24;
+  const latMax = 5.44;
+  const lngMin = -4.14;
+  const lngMax = -3.86;
+
+  const projectToMap = (lat: number, lng: number) => {
+    const x = ((lng - lngMin) / (lngMax - lngMin)) * 100;
+    const y = ((latMax - lat) / (latMax - latMin)) * 100;
+    return {
+      x: Math.max(8, Math.min(92, x)),
+      y: Math.max(12, Math.min(88, y))
+    };
+  };
+
+  // Timer interval
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isAbsentTimerRunning && absentTimerSeconds > 0) {
@@ -73,25 +101,86 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handlePickup = (jobId: string) => {
-    driverConfirmPickup(jobId, pickupCodeInput);
+  // Toggle voice and announce current navigation prompt
+  const handleToggleVoice = () => {
+    const nextMuted = !isVoiceMuted;
+    setIsVoiceMuted(nextMuted);
+    localStorage.setItem('bradci_driver_voice_muted', String(nextMuted));
+    if (!nextMuted && job) {
+      const targetCommune = job.status === 'accepted' ? job.pickupCommune : job.dropoffCommune;
+      const instruction = job.status === 'accepted'
+        ? `Guidage GPS actif. Dans 200 mètres, prenez la sortie vers le point de retrait à ${targetCommune}.`
+        : `Guidage GPS actif. Dans 200 mètres, prenez la sortie vers le client à ${targetCommune}.`;
+      voiceNavigator.speak(instruction);
+      addToast("Guidage vocal activé", "Les instructions de navigation seront annoncées à haute voix.", "info");
+    } else {
+      addToast("Guidage vocal coupé", "Mode silencieux actif.", "info");
+    }
+  };
+
+  // Speak current instruction
+  const handleRepeatVoice = () => {
+    if (!job) return;
+    const targetCommune = job.status === 'accepted' ? job.pickupCommune : job.dropoffCommune;
+    const instruction = job.status === 'accepted'
+      ? `Dans 200 mètres, prenez la sortie vers le point de retrait à ${targetCommune}.`
+      : `Dans 200 mètres, prenez la sortie vers ${targetCommune}.`;
+    voiceNavigator.speak(instruction);
+  };
+
+  // Open external Google Maps App with route
+  const handleOpenExternalGoogleMaps = () => {
+    if (!job) return;
+    const isPickupPhase = job.status === 'accepted';
+    const origin = encodeURIComponent(isPickupPhase ? (currentUser?.gpsLocation?.commune || 'Abidjan') : job.pickupCommune);
+    const dest = encodeURIComponent(isPickupPhase ? `${job.pickupAddress}, ${job.pickupCommune}, Abidjan` : `${job.dropoffAddress}, ${job.dropoffCommune}, Abidjan`);
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+    window.open(mapsUrl, '_blank');
+  };
+
+  // Validate pickup code
+  const handleValidatePickup = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!job) return;
+    if (!pickupCodeInput || pickupCodeInput.trim().length < 4) {
+      addToast("Code requis", "Veuillez saisir le code vendeur à 4 chiffres.", "error");
+      return;
+    }
+    driverConfirmPickup(job.id, pickupCodeInput.trim());
     setPickupCodeInput('');
+    setShowPickupModal(false);
+    addToast("Colis récupéré !", "Trajet vers le client acheteur activé.", "success");
+    if (!isVoiceMuted) {
+      voiceNavigator.speak(`Colis récupéré avec succès. Démarrage de l'itinéraire vers l'acheteur à ${job.dropoffCommune}.`);
+    }
   };
 
-  const handleDeliveryOTP = (jobId: string) => {
-    driverConfirmDeliveryOTP(jobId, deliveryOtpInput);
+  // Validate delivery OTP
+  const handleValidateDeliveryOTP = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!job) return;
+    if (!deliveryOtpInput || deliveryOtpInput.trim().length < 4) {
+      addToast("Code OTP requis", "Veuillez entrer le code secret acheteur (4 chiffres).", "error");
+      return;
+    }
+    driverConfirmDeliveryOTP(job.id, deliveryOtpInput.trim());
     setDeliveryOtpInput('');
+    setShowDeliveryModal(false);
+    addToast("Livraison validée !", "Paiement débloqué instantanément sur votre solde.", "success");
+    if (!isVoiceMuted) {
+      voiceNavigator.speak("Course terminée avec succès ! Vos gains sont immédiatement disponibles sur votre solde.");
+    }
   };
 
-  // If no active job: display sleek radar standby view
+  // If no active job: display sleek standby view
   if (!job) {
     return (
-      <div id="driver-radar-standby" className="p-8 sm:p-12 rounded-3xl bg-[#0C121E] border border-slate-800 text-center space-y-6 shadow-xl">
+      <div id="driver-radar-standby" className="p-8 sm:p-12 rounded-3xl bg-[#06102E] border border-slate-800 text-center space-y-6 shadow-2xl">
         <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
           <div className="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping" />
           <div className="absolute inset-2 rounded-full bg-emerald-500/20 animate-pulse" />
           <div className="w-16 h-16 rounded-full bg-slate-900 border border-emerald-500/50 flex items-center justify-center text-emerald-400 shadow-inner z-10">
-            <Compass className="w-8 h-8 animate-spin" />
+            <Compass className="w-8 h-8 animate-spin" style={{ animationDuration: '8s' }} />
           </div>
         </div>
 
@@ -110,439 +199,410 @@ export const DriverActiveMissionCockpit: React.FC<DriverActiveMissionCockpitProp
           <button
             id="driver-standby-browse-orders-btn"
             onClick={onBrowseOrders}
-            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all flex items-center gap-2 hover:scale-[1.02] cursor-pointer"
+            className="px-6 py-3 bg-[#F97316] hover:bg-[#EA580C] text-white font-black text-xs rounded-2xl shadow-lg transition-all flex items-center gap-2 hover:scale-[1.02] cursor-pointer"
           >
             <Package className="w-4 h-4" />
-            <span>Consulter la Bourse aux Courses Disponibles</span>
+            <span>Consulter les Courses Disponibles</span>
           </button>
         </div>
       </div>
     );
   }
 
-  return (
-    <div id="driver-active-mission-card" className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-950/60 via-slate-900 to-slate-950 border-2 border-emerald-500/50 space-y-6 shadow-2xl">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center">
-            <Navigation className="w-5 h-5 animate-pulse" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-              <h3 className="text-lg font-extrabold text-white font-display">Mission GPS en Cours</h3>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full uppercase border border-emerald-500/30">
-                {job.status === 'accepted' ? 'Étape 1 : Enlèvement Vendeur (Point A)' : 'Étape 2 : Livraison Acheteur (Point B)'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Colis / Commande : <strong className="text-white">{job.productTitle}</strong>
-            </p>
-          </div>
-        </div>
+  // Current phase: Phase 1 (Pickup) or Phase 2 (Delivery)
+  const isPickupPhase = job.status === 'accepted';
+  const isArrivedPhase = job.status === 'arrived';
+  
+  // Destination and Client Info
+  const targetCommune = isPickupPhase ? job.pickupCommune : job.dropoffCommune;
+  const targetAddress = isPickupPhase ? job.pickupAddress : job.dropoffAddress;
+  const targetClientName = isPickupPhase ? (job.sellerName || 'Vendeur') : (job.buyerName || 'Client');
+  const targetClientPhone = isPickupPhase ? (job.sellerPhone || '+2250700000000') : (job.buyerPhone || '+2250700000000');
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <span className="text-xs font-mono-num font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/30 shadow">
-            Rémunération : + {job.deliveryFee.toLocaleString('fr-FR')} FCFA
-          </span>
+  // Compute GPS coordinates for Map
+  const originCommuneObj = ALL_COMMUNES.find(c => c.name.toLowerCase() === (isPickupPhase ? 'plateau' : job.pickupCommune.toLowerCase())) || ALL_COMMUNES[0];
+  const targetCommuneObj = ALL_COMMUNES.find(c => c.name.toLowerCase() === targetCommune.toLowerCase()) || ALL_COMMUNES[1];
+
+  // Coordinates
+  const courierCoords = {
+    lat: isPickupPhase ? 5.328 : (originCommuneObj.coords.lat + (targetCommuneObj.coords.lat - originCommuneObj.coords.lat) * 0.45),
+    lng: isPickupPhase ? -4.020 : (originCommuneObj.coords.lng + (targetCommuneObj.coords.lng - originCommuneObj.coords.lng) * 0.45)
+  };
+
+  const courierPos = projectToMap(courierCoords.lat, courierCoords.lng);
+  const targetPos = projectToMap(targetCommuneObj.coords.lat, targetCommuneObj.coords.lng);
+
+  // Remaining Distance & Time for the VTC Floating Bubble
+  const remainingDistKm = isArrivedPhase ? 0.1 : (job.distanceKm ? Number((job.distanceKm * (isPickupPhase ? 0.4 : 0.6)).toFixed(1)) : 3.0);
+  const remainingTimeMin = isArrivedPhase ? 1 : Math.max(2, Math.round(remainingDistKm * 2.1));
+
+  // Trajectory control points for smooth SVG bezier curve
+  const midX = (courierPos.x + targetPos.x) / 2 + (targetPos.y > courierPos.y ? -6 : 6);
+  const midY = (courierPos.y + targetPos.y) / 2 + (targetPos.x > courierPos.x ? 5 : -5);
+  const trajectoryPathD = `M ${courierPos.x},${courierPos.y} Q ${midX},${midY} ${targetPos.x},${targetPos.y}`;
+
+  // Vehicle Icon
+  const vehicleType = currentUser?.kycVehicleType || currentUser?.vehicleDetails?.type || 'moto';
+  const VehicleIcon = vehicleType === 'car' ? Car : vehicleType === 'cargo' ? Truck : Bike;
+
+  return (
+    <div 
+      id="driver-vtc-gps-screen"
+      className="relative w-full h-[84vh] sm:h-[88vh] min-h-[580px] rounded-3xl overflow-hidden bg-[#060D19] border border-slate-800 shadow-2xl flex flex-col justify-between select-none"
+    >
+      {/* ========================================================================= */}
+      {/* 1. CARTE GOOGLE MAPS PLEIN ÉCRAN (RENDU 85% DU COCKPIT VTC)               */}
+      {/* ========================================================================= */}
+      <div className="absolute inset-0 w-full h-full z-0 overflow-hidden bg-slate-950">
+        <iframe
+          id="gmaps-active-mission-iframe"
+          title="Google Maps Navigation Active"
+          src={`https://maps.google.com/maps?q=${encodeURIComponent((isPickupPhase ? (currentUser?.gpsLocation?.commune || 'Cocody') : job.pickupCommune) + ', Abidjan')}+to+${encodeURIComponent(targetAddress + ', ' + targetCommune + ', Abidjan')}&t=m&z=13&ie=UTF8&iwloc=&output=embed`}
+          className="w-full h-full border-0"
+          loading="lazy"
+          allowFullScreen
+        />
+
+        {/* Recenter GPS & Voice guidance button */}
+        <div className="absolute bottom-28 right-4 z-20">
           <button
-            id="driver-satellite-view-btn"
-            onClick={() => setGpsTrackingJob(job)}
-            className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-xs font-bold rounded-xl border border-blue-500/30 flex items-center gap-1.5 transition-all"
+            onClick={handleRepeatVoice}
+            className="w-12 h-12 rounded-full bg-[#0B111E]/95 hover:bg-slate-800 text-white border border-slate-700 shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer group"
+            title="Recentrer le GPS et écouter l'instruction"
           >
-            <Compass className="w-4 h-4" />
-            <span>Vue Satellite GPS</span>
+            <Navigation className="w-5 h-5 text-sky-400 group-hover:rotate-45 transition-transform" />
           </button>
         </div>
       </div>
 
-      {/* Real-time Google Maps & Turn-by-Turn Voice Navigation Cockpit */}
-      <div className="mb-4">
-        <GoogleMapsEmbed
-          pickupCommune={job.pickupCommune}
-          dropoffCommune={job.dropoffCommune}
-          vehicleType={job.requiredVehicle || 'moto'}
-          isReturning={job.status === 'returning'}
-          courierName={currentUser?.name}
-          courierPhone={currentUser?.phone || '+225 07 00 00 00 00'}
-          currentProgress={job.status === 'in_transit' ? 60 : job.status === 'arrived' ? 95 : 20}
-        />
-      </div>
+      {/* ========================================================================= */}
+      {/* 2. BANDEAU DE GUIDAGE HAUT (TOP NAVIGATION BAR - COMPACT VTC)             */}
+      {/* ========================================================================= */}
+      <div 
+        id="driver-vtc-top-guidance-bar"
+        className="relative z-20 m-3 sm:m-4 p-3 sm:p-3.5 rounded-2xl bg-[#0B111E]/95 backdrop-blur-md border border-slate-800/90 shadow-2xl flex items-center justify-between gap-3"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Large Direction Indicator Icon */}
+          <div className="w-11 h-11 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center shadow-lg shrink-0">
+            <CornerUpRight className="w-6 h-6 stroke-[2.5]" />
+          </div>
 
-      {/* Interactive Trajectory Route (Point A -> Point B) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          {/* Route Timeline */}
-          <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="flex flex-col items-center">
-                <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/40 flex items-center justify-center font-bold text-xs">
-                  A
-                </div>
-                <div className="w-0.5 h-12 bg-slate-700 my-1 border-dashed" />
-                <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center font-bold text-xs">
-                  B
-                </div>
-              </div>
-
-              <div className="flex-1 space-y-4 text-xs">
-                {/* Point A : Seller Pickup */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-blue-400 uppercase text-[10px] tracking-wider">
-                      Point A : Enlèvement (Vendeur)
-                    </span>
-                    <a
-                      href={`tel:${job.sellerPhone || '+2250748921134'}`}
-                      className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 bg-blue-500/10 px-2 py-0.5 rounded-lg border border-blue-500/20"
-                    >
-                      <Phone className="w-3 h-3" />
-                      <span>Appeler Vendeur ({job.sellerName})</span>
-                    </a>
-                  </div>
-                  <p className="font-extrabold text-sm text-white mt-0.5">
-                    {job.pickupCommune}
-                  </p>
-                  <p className="text-slate-400">{job.pickupAddress}</p>
-                </div>
-
-                {/* Point B : Buyer Dropoff */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider">
-                      Point B : Destination (Acheteur)
-                    </span>
-                    <a
-                      href={`tel:${job.buyerPhone || '+2250766112233'}`}
-                      className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20"
-                    >
-                      <Phone className="w-3 h-3" />
-                      <span>Appeler Acheteur ({job.buyerName})</span>
-                    </a>
-                  </div>
-                  <p className="font-extrabold text-sm text-white mt-0.5">
-                    {job.dropoffCommune}
-                  </p>
-                  <p className="text-slate-400">{job.dropoffAddress}</p>
-                </div>
-              </div>
+          {/* Next Instruction Readable in 1 Second */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-black text-white tracking-tight truncate">
+                Sortie {targetCommune} • 200m
+              </h2>
             </div>
-
-            {/* Distance & GPS Launch button */}
-            <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-4 text-xs">
-                <div>
-                  <span className="text-slate-400 text-[10px] block uppercase">Distance estimée</span>
-                  <strong className="text-white font-mono-num">{job.distanceKm || 7.8} km</strong>
-                </div>
-                <div>
-                  <span className="text-slate-400 text-[10px] block uppercase">Temps de trajet</span>
-                  <strong className="text-amber-400 font-mono-num">~{job.etaMinutes || 20} min</strong>
-                </div>
-              </div>
-
-              <button
-                id="driver-launch-gps-nav-btn"
-                type="button"
-                onClick={() => {
-                  const cockpit = document.getElementById('google-maps-navigation-cockpit');
-                  if (cockpit) {
-                    cockpit.scrollIntoView({ behavior: 'smooth' });
-                  }
-                }}
-                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg flex items-center gap-2 transition-all hover:scale-[1.02]"
-              >
-                <Navigation className="w-4 h-4" />
-                <span>Navigation GPS Intégrée (Cartographie Live In-App)</span>
-              </button>
-            </div>
+            <p className="text-xs text-slate-400 truncate">
+              {isPickupPhase ? `Vers point de retrait (${targetAddress})` : `Vers adresse client (${targetAddress})`}
+            </p>
           </div>
         </div>
 
-        {/* Verification Inputs Box */}
-        <div className="p-5 bg-slate-950/90 rounded-2xl border border-slate-800 flex flex-col justify-between space-y-4">
-          {job.status === 'accepted' && (
-            <div className="space-y-3">
+        {/* Small Discreet Voice Guidance Toggle Button */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={handleToggleVoice}
+            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
+              isVoiceMuted
+                ? 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                : 'bg-sky-500/20 border-sky-500/40 text-sky-400 hover:bg-sky-500/30 shadow-md'
+            }`}
+            title={isVoiceMuted ? "Activer le guidage vocal" : "Désactiver le guidage vocal"}
+          >
+            {isVoiceMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 4. FICHE DE COURSE BASSE FLOTTANTE (BOTTOM SHEET VTC)                     */}
+      {/* ========================================================================= */}
+      <div 
+        id="driver-vtc-bottom-sheet"
+        className="relative z-20 m-3 sm:m-4 p-4 rounded-3xl bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 shadow-2xl space-y-3.5"
+      >
+        {/* Step Badge & Destination Summary */}
+        <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+          <div className="flex items-center gap-2">
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+              isPickupPhase 
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' 
+                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+            }`}>
+              {isPickupPhase ? 'Ramassage Colis' : 'Livraison Client'}
+            </span>
+            <span className="text-xs font-bold text-white">
+              {job.pickupCommune} ➔ {job.dropoffCommune}
+            </span>
+          </div>
+
+          <span className="text-xs font-mono font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+            +{job.deliveryFee.toLocaleString('fr-FR')} F
+          </span>
+        </div>
+
+        {/* Client / Recipient Contact info */}
+        <div className="flex items-center justify-between text-xs">
+          <div className="min-w-0 pr-2">
+            <span className="text-[11px] text-slate-400 block font-medium">
+              {isPickupPhase ? 'Vendeur (Expéditeur) :' : 'Destinataire (Acheteur) :'}
+            </span>
+            <p className="font-extrabold text-white truncate text-sm">
+              {targetClientName}
+            </p>
+            <p className="text-xs text-slate-400 truncate mt-0.5">
+              {targetAddress}
+            </p>
+          </div>
+        </div>
+
+        {/* Primary Action Button (BRAD'CI Orange #f97316) + 2 Circular Buttons */}
+        <div className="flex items-center gap-2.5 pt-1">
+          {/* Main Action Button */}
+          {isPickupPhase ? (
+            <button
+              id="driver-btn-arrived-pickup"
+              onClick={() => setShowPickupModal(true)}
+              className="flex-1 py-3.5 px-4 rounded-2xl bg-[#F97316] hover:bg-[#EA580C] text-white font-black text-xs sm:text-sm shadow-xl shadow-[#F97316]/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            >
+              <MapPin className="w-4 h-4 text-white shrink-0" />
+              <span>Arrivé au point de retrait</span>
+            </button>
+          ) : job.status === 'in_transit' ? (
+            <button
+              id="driver-btn-arrived-dropoff"
+              onClick={() => {
+                driverDeclareArrival(job.id);
+                addToast("Arrivée signalée", "L'acheteur a été notifié de votre présence.", "info");
+              }}
+              className="flex-1 py-3.5 px-4 rounded-2xl bg-[#F97316] hover:bg-[#EA580C] text-white font-black text-xs sm:text-sm shadow-xl shadow-[#F97316]/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            >
+              <MapPin className="w-4 h-4 text-white shrink-0" />
+              <span>Je suis arrivé chez le client</span>
+            </button>
+          ) : (
+            <button
+              id="driver-btn-validate-otp"
+              onClick={() => setShowDeliveryModal(true)}
+              className="flex-1 py-3.5 px-4 rounded-2xl bg-[#F97316] hover:bg-[#EA580C] text-white font-black text-xs sm:text-sm shadow-xl shadow-[#F97316]/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            >
+              <ShieldCheck className="w-4 h-4 text-white shrink-0" />
+              <span>Valider OTP Livraison</span>
+            </button>
+          )}
+
+          {/* Circular Button 1: Call Client */}
+          <a
+            id="driver-btn-call-client"
+            href={`tel:${targetClientPhone}`}
+            className="w-12 h-12 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-emerald-400 flex items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer shrink-0"
+            title={`Appeler ${targetClientName} (${targetClientPhone})`}
+          >
+            <Phone className="w-5 h-5 fill-current" />
+          </a>
+
+          {/* Circular Button 2: Open in External Google Maps */}
+          <button
+            id="driver-btn-external-maps"
+            onClick={handleOpenExternalGoogleMaps}
+            className="w-12 h-12 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-400 flex items-center justify-center shadow-lg transition-transform active:scale-95 cursor-pointer shrink-0"
+            title="Ouvrir dans l'application Google Maps externe"
+          >
+            <Compass className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL 1 : CODE ENLÈVEMENT VENDEUR (RAMASSAGE COLIS)                       */}
+      {/* ========================================================================= */}
+      {showPickupModal && (
+        <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-4 flex items-center justify-center animate-in fade-in">
+          <div className="w-full max-w-md bg-[#0C121E] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
                 <KeyRound className="w-4 h-4" />
-                <span>Étape 1 : Code Enlèvement</span>
+                <span>Code Enlèvement Vendeur</span>
               </div>
-              <p className="text-xs text-slate-300">
-                Demandez au vendeur son <strong>code à 4 chiffres</strong> lors de la remise du colis à {job.pickupCommune} :
-              </p>
-              <div className="space-y-2">
-                <input
-                  id="driver-pickup-code-input"
-                  type="text"
-                  maxLength={4}
-                  value={pickupCodeInput}
-                  onChange={(e) => setPickupCodeInput(e.target.value)}
-                  placeholder="Code vendeur (4 chiffres)"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-base font-mono-num font-bold text-white focus:outline-none focus:border-amber-500"
-                />
-                <button
-                  id="driver-validate-pickup-btn"
-                  onClick={() => handlePickup(job.id)}
-                  className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow transition-all"
-                >
-                  Valider Enlèvement & Démarrer Trajet
-                </button>
-              </div>
-            </div>
-          )}
-
-          {job.status === 'in_transit' && (
-            <div className="space-y-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
-                <MapPin className="w-4 h-4" />
-                <span>Étape 2 : Trajet vers l'Acheteur</span>
-              </div>
-              <p className="text-xs text-slate-300">
-                Vous êtes en route vers <strong>{job.dropoffCommune} ({job.dropoffAddress})</strong>. À votre arrivée sur les lieux, signalez votre présence pour débloquer la vérification :
-              </p>
-              <button
-                id="driver-declare-arrival-btn"
-                onClick={() => driverDeclareArrival(job.id)}
-                className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02]"
+              <button 
+                onClick={() => setShowPickupModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
               >
-                <MapPin className="w-4 h-4 text-slate-950" />
-                <span>📍 JE SUIS ARRIVÉ SUR PLACE CHEZ LE CLIENT</span>
+                <X className="w-5 h-5" />
               </button>
-              <p className="text-[10px] text-slate-400 text-center">
-                Le client recevra une notification instantanée pour venir vérifier le colis avec vous.
-              </p>
             </div>
-          )}
 
-          {job.status === 'arrived' && (
-            <div className="space-y-4 p-4 bg-slate-900 border border-emerald-500/30 rounded-2xl">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Étape 3 : Contrôle Physique & Verdict Client</span>
-                </div>
-                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
-                  Sur place
-                </span>
-              </div>
+            <p className="text-xs text-slate-300">
+              Demandez au vendeur (<strong>{job.sellerName}</strong>) son <strong>code à 4 chiffres</strong> pour confirmer la remise du colis :
+            </p>
 
-              <p className="text-xs text-slate-300">
-                Présentez l'article à <strong>{job.buyerName}</strong>. Après vérification de l'état du produit, sélectionnez le résultat du constat :
-              </p>
+            <form onSubmit={handleValidatePickup} className="space-y-4">
+              <input
+                id="driver-modal-pickup-code"
+                type="text"
+                maxLength={4}
+                value={pickupCodeInput}
+                onChange={(e) => setPickupCodeInput(e.target.value)}
+                placeholder="0000"
+                autoFocus
+                className="w-full bg-slate-900 border border-slate-700 rounded-2xl py-3 text-center text-2xl font-mono-num font-bold text-white tracking-widest focus:outline-none focus:border-amber-500"
+              />
 
-              {/* Driver Verdict Options */}
-              <div className="grid grid-cols-1 gap-2.5">
+              <div className="flex gap-2">
                 <button
-                  id="driver-verdict-good-btn"
+                  type="button"
+                  onClick={() => setShowPickupModal(false)}
+                  className="w-1/3 py-3 rounded-xl bg-slate-900 text-slate-400 font-bold text-xs cursor-pointer hover:bg-slate-800"
+                >
+                  Fermer
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 py-3 bg-[#F97316] hover:bg-[#EA580C] text-white font-black text-xs rounded-xl shadow-lg transition-all cursor-pointer"
+                >
+                  Confirmer & Démarrer Trajet
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2 : CONTRÔLE PHYSIQUE & OTP LIVRAISON FINALE                        */}
+      {/* ========================================================================= */}
+      {showDeliveryModal && (
+        <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-4 flex items-center justify-center overflow-y-auto animate-in fade-in">
+          <div className="w-full max-w-md bg-[#0C121E] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90%] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+                <ShieldCheck className="w-4 h-4" />
+                <span>Vérification & OTP Livraison</span>
+              </div>
+              <button 
+                onClick={() => setShowDeliveryModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Verdict options */}
+            <div className="space-y-2">
+              <span className="text-[11px] text-slate-400 font-bold uppercase block">1. Constat physique avec l'acheteur :</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
                   onClick={() => driverSetInspectionVerdict(job.id, 'client_confirmed_good')}
-                  className={`p-3 rounded-xl text-left border transition-all flex items-start gap-2.5 ${
+                  className={`p-2.5 rounded-xl text-left border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                     job.inspectionStatus === 'client_confirmed_good'
-                      ? 'bg-emerald-500/20 border-emerald-500 ring-2 ring-emerald-500/30'
-                      : 'bg-slate-950/80 border-slate-800 hover:border-emerald-500/40'
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
                   }`}
                 >
-                  <CheckCircle2 className={`w-5 h-5 mt-0.5 shrink-0 ${job.inspectionStatus === 'client_confirmed_good' ? 'text-emerald-400' : 'text-slate-500'}`} />
-                  <div>
-                    <div className="font-bold text-xs text-emerald-400">1. Client Présent & Produit Conforme</div>
-                    <div className="text-[11px] text-slate-400">Le client accepte le produit et va vous communiquer son Code Secret de Remise.</div>
-                  </div>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Conforme</span>
                 </button>
 
                 <button
-                  id="driver-verdict-bad-btn"
+                  type="button"
                   onClick={() => driverSetInspectionVerdict(job.id, 'client_confirmed_bad')}
-                  className={`p-3 rounded-xl text-left border transition-all flex items-start gap-2.5 ${
+                  className={`p-2.5 rounded-xl text-left border text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                     job.inspectionStatus === 'client_confirmed_bad'
-                      ? 'bg-red-500/20 border-red-500 ring-2 ring-red-500/30'
-                      : 'bg-slate-950/80 border-slate-800 hover:border-red-500/40'
+                      ? 'bg-rose-500/20 border-rose-500 text-rose-300'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
                   }`}
                 >
-                  <AlertTriangle className={`w-5 h-5 mt-0.5 shrink-0 ${job.inspectionStatus === 'client_confirmed_bad' ? 'text-red-400' : 'text-slate-500'}`} />
-                  <div>
-                    <div className="font-bold text-xs text-red-400">2. Client Présent mais Produit Refusé</div>
-                    <div className="text-[11px] text-slate-400">Le client refuse l'article pour non-conformité. Le retour vers le vendeur s'active.</div>
-                  </div>
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>Refus / Non Conforme</span>
                 </button>
               </div>
+            </div>
 
-              {/* 3. Section CLIENT ABSENT / ATTENTE 20 MINUTES AVEC BONUS 15% */}
-              <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-amber-300 font-extrabold text-xs">
-                    <Timer className="w-4 h-4 text-amber-400 animate-pulse" />
-                    <span>Alternative : Client Injoignable ou Absent ?</span>
-                  </div>
-                  <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                    Chrono 20 min
-                  </span>
+            {/* Secret Code Input */}
+            <form onSubmit={handleValidateDeliveryOTP} className="space-y-3 pt-2 border-t border-slate-800">
+              <label className="text-xs text-slate-300 font-bold block">
+                Code Secret à 4 chiffres (fourni par {job.buyerName}) :
+              </label>
+              <input
+                id="driver-modal-delivery-otp"
+                type="text"
+                maxLength={4}
+                value={deliveryOtpInput}
+                onChange={(e) => setDeliveryOtpInput(e.target.value)}
+                placeholder="0000"
+                className="w-full bg-slate-900 border border-slate-700 rounded-2xl py-3 text-center text-2xl font-mono-num font-bold text-emerald-400 tracking-widest focus:outline-none focus:border-emerald-500"
+              />
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowDeliveryModal(false)}
+                  className="w-1/3 py-3 rounded-xl bg-slate-900 text-slate-400 font-bold text-xs cursor-pointer hover:bg-slate-800"
+                >
+                  Retour
+                </button>
+                <button
+                  type="submit"
+                  className="w-2/3 py-3 bg-[#F97316] hover:bg-[#EA580C] text-white font-black text-xs rounded-xl shadow-lg transition-all cursor-pointer"
+                >
+                  Valider & Débloquer Fonds
+                </button>
+              </div>
+            </form>
+
+            {/* Absent Buyer 20-min alternative */}
+            <div className="pt-2 border-t border-slate-800/80">
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2">
+                <div className="flex items-center justify-between text-amber-300 font-bold">
+                  <span>Client injoignable sur place ?</span>
+                  <Timer className="w-4 h-4 text-amber-400" />
                 </div>
-
-                <p className="text-[11px] text-slate-300">
-                  Si l'acheteur ne se présente pas à l'adresse de livraison, lancez le <strong>Chrono d'attente officiel (20 minutes)</strong>. Si le délai expire sans réponse, vous pouvez annuler la course : <strong>vous encaissez la course + 15% de bonus sur la valeur de l'article</strong>.
+                <p className="text-[10px] text-slate-400">
+                  Lancez le chrono officiel de 20 minutes. Si le délai expire sans réponse : annulation autorisée avec bonus de 15%.
                 </p>
 
                 {!isAbsentTimerRunning && absentTimerSeconds === 1200 ? (
                   <button
-                    id="driver-start-absent-timer-btn"
                     type="button"
                     onClick={() => {
                       setIsAbsentTimerRunning(true);
                       driverStartAbsentTimer(job.id);
                     }}
-                    className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow flex items-center justify-center gap-2 transition-all"
+                    className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] rounded-xl cursor-pointer"
                   >
-                    <Clock className="w-4 h-4" />
-                    <span>Démarrer le Chronomètre d'Attente (20:00)</span>
+                    Démarrer Chrono 20 min
                   </button>
                 ) : (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-amber-500/40">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-amber-400 animate-spin" />
-                        <span className="text-xs text-slate-300">Temps d'attente restant :</span>
-                      </div>
-                      <span className="font-mono text-base font-black text-amber-400">
-                        {formatTimerMinutesSeconds(absentTimerSeconds)}
-                      </span>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-amber-500/40 font-mono text-xs font-bold text-amber-400">
+                      <span>Temps d'attente restant :</span>
+                      <span>{formatTimerMinutesSeconds(absentTimerSeconds)}</span>
                     </div>
 
-                    {absentTimerSeconds === 0 ? (
-                      <div className="space-y-2 animate-in fade-in">
-                        <div className="p-2.5 bg-red-500/20 border border-red-500/40 rounded-xl text-xs text-red-200">
-                          ⏱️ <strong>Délai de 20 minutes expiré !</strong> L'acheteur n'a pas répondu. Vous pouvez maintenant annuler, récupérer le bonus de 15% ({Math.round((job.itemValue || 0) * 0.15).toLocaleString('fr-FR')} FCFA) et retourner le colis.
-                        </div>
-                        <button
-                          id="driver-cancel-absent-buyer-btn"
-                          type="button"
-                          onClick={() => {
-                            driverCancelDueToAbsentBuyer(job.id);
-                            setIsAbsentTimerRunning(false);
-                          }}
-                          className="w-full py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                          <span>Annuler (Client Absent) & Encaisser Bonus 15% (+{Math.round((job.itemValue || 0) * 0.15).toLocaleString('fr-FR')} F)</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-end">
-                        <span className="text-[10px] text-amber-400 font-medium">Alerte envoyée au client</span>
-                      </div>
+                    {absentTimerSeconds === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          driverCancelDueToAbsentBuyer(job.id);
+                          setIsAbsentTimerRunning(false);
+                          setShowDeliveryModal(false);
+                        }}
+                        className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow cursor-pointer"
+                      >
+                        Annuler (Client Absent) & Encaisser Bonus 15%
+                      </button>
                     )}
                   </div>
                 )}
               </div>
-
-              {/* If Good: Secret Code entry */}
-              {job.inspectionStatus === 'client_confirmed_good' && (
-                <div className="pt-2 border-t border-slate-800 space-y-2 animate-in fade-in">
-                  <label className="text-xs font-bold text-white block">
-                    Entrez le Code Secret à 4 chiffres fourni par l'acheteur :
-                  </label>
-                  <input
-                    id="driver-delivery-otp-input"
-                    type="text"
-                    maxLength={4}
-                    value={deliveryOtpInput}
-                    onChange={(e) => setDeliveryOtpInput(e.target.value)}
-                    placeholder="Code Secret (4 chiffres)"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-lg font-mono-num font-bold text-emerald-400 focus:outline-none focus:border-emerald-500 tracking-widest"
-                  />
-                  <button
-                    id="driver-validate-otp-btn"
-                    onClick={() => handleDeliveryOTP(job.id)}
-                    className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Valider la Livraison & Encaisser {job.deliveryFee.toLocaleString('fr-FR')} FCFA</span>
-                  </button>
-                </div>
-              )}
-
-              {/* If Bad: Warning message */}
-              {job.inspectionStatus === 'client_confirmed_bad' && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-slate-300 space-y-1">
-                  <p className="font-bold text-red-400">Colis refusé pour non-conformité :</p>
-                  <p className="text-[11px] text-slate-400">L'acheteur doit cliquer sur "Confirmer le Refus" dans son interface pour vous délivrer le <strong>Code Secret de Retour</strong>. Vos frais de course ({job.deliveryFee.toLocaleString('fr-FR')} FCFA) vous sont intégralement payés.</p>
-                </div>
-              )}
             </div>
-          )}
-
-          {job.status === 'returning' && (
-            <div className="space-y-3 p-3.5 bg-red-500/10 border border-red-500/30 rounded-2xl">
-              <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase tracking-wider">
-                <RotateCcw className="w-4 h-4" />
-                <span>Étape 2 (Retour) : Prise en charge du Colis Refusé</span>
-              </div>
-              <p className="text-xs text-slate-300">
-                L'acheteur a refusé le colis (non-conforme). Vos <strong>frais de course ({job.deliveryFee.toLocaleString('fr-FR')} FCFA)</strong> sont garantis. Entrez le <strong>Code Secret de Retour</strong> transmis par l'acheteur pour valider la prise en charge :
-              </p>
-              <div className="space-y-2">
-                <input
-                  id="driver-return-otp-input"
-                  type="text"
-                  maxLength={4}
-                  value={returnOtpInput}
-                  onChange={(e) => setReturnOtpInput(e.target.value)}
-                  placeholder="Code Secret de Retour (4 chiffres)"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-center text-lg font-mono-num font-bold text-red-400 focus:outline-none focus:border-red-500 tracking-widest"
-                />
-                <button
-                  id="driver-validate-return-otp-btn"
-                  onClick={() => {
-                    const ok = driverConfirmReturnOTP(job.id, returnOtpInput);
-                    if (ok) setReturnOtpInput('');
-                  }}
-                  className="w-full py-3 bg-gradient-to-r from-red-500 to-amber-500 hover:from-red-400 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  <span>Valider le Code Secret & Démarrer Retour vers Vendeur</span>
-                </button>
-              </div>
-              <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 text-[11px] text-slate-300">
-                <p className="font-bold text-white">Adresse de restitution boutique :</p>
-                <p className="text-slate-400">{job.sellerName} • {job.pickupCommune} ({job.pickupAddress})</p>
-              </div>
-
-              {/* Return Trip Radar: Match available orders towards seller commune */}
-              <div className="p-3 bg-gradient-to-r from-emerald-950/70 via-slate-900 to-amber-950/40 rounded-xl border border-emerald-500/30 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
-                    <Compass className="w-4 h-4 animate-spin" />
-                    <span>Radar Retour : Colis en direction de {job.pickupCommune}</span>
-                  </div>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded">
-                    Optimisation Trajet
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300">
-                  Pendant votre trajet retour vers <strong>{job.pickupCommune}</strong>, maximisez vos gains en transportant un colis sur le même axe :
-                </p>
-                {freightJobs.filter(j => (j.status === 'available' || j.status === 'pending_driver') && (j.dropoffCommune === job.pickupCommune || j.pickupCommune === job.dropoffCommune)).length > 0 ? (
-                  <div className="space-y-1.5 pt-1">
-                    {freightJobs.filter(j => (j.status === 'available' || j.status === 'pending_driver') && (j.dropoffCommune === job.pickupCommune || j.pickupCommune === job.dropoffCommune)).map(rj => (
-                      <div key={rj.id} className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between">
-                        <div className="text-xs">
-                          <span className="font-bold text-white block">{rj.productTitle}</span>
-                          <span className="text-[10px] text-slate-400">{rj.pickupCommune} ➔ {rj.dropoffCommune}</span>
-                        </div>
-                        <span className="font-mono text-xs font-bold text-emerald-400">+{rj.deliveryFee.toLocaleString('fr-FR')} F</span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-[10px] text-slate-400 flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span>Recherche de colis disponibles en cours sur l'axe {job.dropoffCommune} ➔ {job.pickupCommune}...</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -13,7 +13,10 @@ import {
   Package,
   Receipt,
   Power,
-  FileCheck
+  FileCheck,
+  TrendingUp,
+  Settings,
+  Radio
 } from 'lucide-react';
 
 export const MobileBottomNav: React.FC = () => {
@@ -39,8 +42,8 @@ export const MobileBottomNav: React.FC = () => {
   } = useApp();
 
   const isDriver = currentUser?.role === 'driver';
-  const isOnline = currentUser?.isOnline ?? true;
-  const driverActiveJob = isDriver && freightJobs ? freightJobs.find(j => j.assignedDriverId === currentUser.id && j.status !== 'delivered' && j.status !== 'cancelled') : null;
+  const isOnline = currentUser?.driverAvailability !== 'offline';
+  const driverActiveJob = isDriver && freightJobs ? freightJobs.find(j => (j.assignedDriverId === currentUser.id || j.assignedDriverName === currentUser.name) && j.status !== 'delivered' && j.status !== 'cancelled') : null;
   const availableOrdersCount = isDriver && freightJobs ? freightJobs.filter(j => j.status === 'available').length : 0;
 
   const handleSellClick = () => {
@@ -67,67 +70,60 @@ export const MobileBottomNav: React.FC = () => {
     activeTab === 'dashboard_driver' || 
     activeTab === 'dashboard_admin';
 
-  // Couriers / Drivers get a dedicated delivery mobile bottom bar
+  // Couriers / Drivers get the 5 dedicated delivery bottom navigation tabs
   if (isDriver) {
+    const isRadarActive = activeDriverTab === 'radar' || activeDriverTab === 'radar_map';
+    const isOrdersActive = activeDriverTab === 'orders' || activeDriverTab === 'available_orders' || activeDriverTab === 'active_mission';
+    const isEarningsActive = activeDriverTab === 'earnings';
+    const isHistoryActive = activeDriverTab === 'history';
+    const isSettingsActive = activeDriverTab === 'settings' || activeDriverTab === 'profile';
+
     return (
       <nav 
         id="mobile-bottom-nav-driver" 
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B1021]/95 backdrop-blur-xl border-t border-[#222D4A] px-2 pt-1.5 pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#06102E]/95 backdrop-blur-xl border-t border-slate-800 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
       >
         <div className="flex items-center justify-around max-w-lg mx-auto">
-          {/* 1. Cockpit Radar & Carte */}
+          {/* 1. ONGLET RADAR */}
           <button
             id="btn-driver-mobile-radar"
             onClick={() => {
               setActiveTab('dashboard_driver');
-              setActiveDriverTab('radar_map');
-              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'radar_map' }));
+              setActiveDriverTab('radar');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'radar' }));
             }}
-            className={`relative flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
-              activeDriverTab === 'radar_map' ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-emerald-400'
+            className={`relative flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
+              isRadarActive ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-emerald-400'
             }`}
           >
-            <Navigation className={`w-5 h-5 ${activeDriverTab === 'radar_map' ? 'text-emerald-400' : 'text-slate-400'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">Radar</span>
+            <Navigation className={`w-5 h-5 ${isRadarActive ? 'text-emerald-400 stroke-[2.5]' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-1 font-bold tracking-tight">Radar</span>
           </button>
 
-          {/* 2. Bourse aux Courses */}
+          {/* 2. ONGLET COURSES */}
           <button
             id="btn-driver-mobile-orders"
             onClick={() => {
               setActiveTab('dashboard_driver');
-              setActiveDriverTab('available_orders');
-              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'available_orders' }));
+              setActiveDriverTab('orders');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'orders' }));
             }}
-            className={`relative flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
-              activeDriverTab === 'available_orders' ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-emerald-400'
+            className={`relative flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
+              isOrdersActive ? 'text-[#F97316] font-black' : 'text-slate-400 hover:text-[#F97316]'
             }`}
           >
-            <Package className={`w-5 h-5 ${activeDriverTab === 'available_orders' ? 'text-emerald-400' : 'text-slate-400'}`} />
-            {availableOrdersCount > 0 && (
-              <span className="absolute top-0 right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-emerald-500 text-slate-950 font-mono-num font-black text-[9px] flex items-center justify-center border border-[#0B1021]">
+            <Package className={`w-5 h-5 ${isOrdersActive ? 'text-[#F97316] stroke-[2.5]' : 'text-slate-400'}`} />
+            {driverActiveJob ? (
+              <span className="absolute top-0 right-3 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            ) : availableOrdersCount > 0 ? (
+              <span className="absolute top-0 right-3 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[#F97316] text-white font-mono font-black text-[9px] flex items-center justify-center border border-[#06102E]">
                 {availableOrdersCount}
               </span>
-            )}
-            <span className="text-[10px] mt-0.5 tracking-tight">Courses</span>
+            ) : null}
+            <span className="text-[10px] mt-1 font-bold tracking-tight">Courses</span>
           </button>
 
-          {/* 3. Central Availability Switch */}
-          <button
-            id="btn-driver-mobile-availability"
-            onClick={toggleDriverAvailability}
-            className={`flex flex-col items-center justify-center -mt-4 w-12 h-12 rounded-2xl shadow-xl border-2 border-[#0B1021] active:scale-95 transition-all cursor-pointer ${
-              isOnline
-                ? 'bg-emerald-500 text-slate-950 shadow-emerald-500/30'
-                : 'bg-slate-800 text-slate-400 border-slate-700'
-            }`}
-            title={isOnline ? 'En service - Cliquer pour passer en pause' : 'En pause - Cliquer pour passer en service'}
-          >
-            <Power className={`w-6 h-6 stroke-[2.5] ${isOnline ? 'text-slate-950' : 'text-red-400'}`} />
-            <span className="sr-only">Statut service</span>
-          </button>
-
-          {/* 4. Tableau de Bord Revenus */}
+          {/* 3. ONGLET REVENUS */}
           <button
             id="btn-driver-mobile-earnings"
             onClick={() => {
@@ -135,15 +131,15 @@ export const MobileBottomNav: React.FC = () => {
               setActiveDriverTab('earnings');
               window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'earnings' }));
             }}
-            className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
-              activeDriverTab === 'earnings' ? 'text-amber-400 font-black' : 'text-slate-400 hover:text-amber-400'
+            className={`flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
+              isEarningsActive ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-emerald-400'
             }`}
           >
-            <Receipt className={`w-5 h-5 ${activeDriverTab === 'earnings' ? 'text-amber-400' : 'text-slate-400'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">Revenus</span>
+            <TrendingUp className={`w-5 h-5 ${isEarningsActive ? 'text-emerald-400 stroke-[2.5]' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-1 font-bold tracking-tight">Revenus</span>
           </button>
 
-          {/* 5. Historique & Reçus */}
+          {/* 4. ONGLET HISTORIQUE */}
           <button
             id="btn-driver-mobile-history"
             onClick={() => {
@@ -151,12 +147,28 @@ export const MobileBottomNav: React.FC = () => {
               setActiveDriverTab('history');
               window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'history' }));
             }}
-            className={`flex flex-col items-center justify-center w-12 py-1 rounded-xl transition-all cursor-pointer ${
-              activeDriverTab === 'history' ? 'text-white font-black' : 'text-slate-400 hover:text-white'
+            className={`flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
+              isHistoryActive ? 'text-white font-black' : 'text-slate-400 hover:text-white'
             }`}
           >
-            <FileCheck className={`w-5 h-5 ${activeDriverTab === 'history' ? 'text-emerald-400' : 'text-slate-400'}`} />
-            <span className="text-[10px] mt-0.5 tracking-tight">Historique</span>
+            <Receipt className={`w-5 h-5 ${isHistoryActive ? 'text-white stroke-[2.5]' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-1 font-bold tracking-tight">Historique</span>
+          </button>
+
+          {/* 5. NOUVEL ONGLET PARAMÈTRES */}
+          <button
+            id="btn-driver-mobile-settings"
+            onClick={() => {
+              setActiveTab('dashboard_driver');
+              setActiveDriverTab('settings');
+              window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'settings' }));
+            }}
+            className={`flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
+              isSettingsActive ? 'text-blue-400 font-black' : 'text-slate-400 hover:text-blue-400'
+            }`}
+          >
+            <Settings className={`w-5 h-5 ${isSettingsActive ? 'text-blue-400 stroke-[2.5]' : 'text-slate-400'}`} />
+            <span className="text-[10px] mt-1 font-bold tracking-tight">Paramètres</span>
           </button>
         </div>
       </nav>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BRAD\'CI</string>
+    <string name="title_activity_main">BRAD\'CI</string>
+    <string name="package_name">com.bradci.app</string>
+    <string name="custom_url_scheme">com.bradci.app</string>
+</resources>

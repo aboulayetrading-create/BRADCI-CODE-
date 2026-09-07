@@ -27,6 +27,7 @@ import {
   Package,
   Receipt,
   FileCheck,
+  TrendingUp,
   Volume2,
   VolumeX,
   Mic,
@@ -128,48 +129,68 @@ export const Navbar: React.FC = () => {
           {/* Desktop Navigation Links (Strict RBAC Routing) */}
           {isDriver ? (
             <nav id="nav-desktop-driver" className="hidden md:flex items-center gap-1 lg:gap-1.5 shrink-0">
+              {/* 1. Radar */}
               <button
-                id="nav-tab-driver-jobs"
+                id="nav-tab-driver-radar"
                 onClick={() => {
                   setActiveTab('dashboard_driver');
-                  setActiveDriverTab('available_orders');
-                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'available_orders' }));
+                  setActiveDriverTab('radar');
+                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'radar' }));
                 }}
                 className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'dashboard_driver' && activeDriverTab === 'available_orders'
+                  activeTab === 'dashboard_driver' && (activeDriverTab === 'radar' || activeDriverTab === 'radar_map')
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <Package className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>{translate("Bourse aux Courses", "Available Orders")}</span>
-                {availableJobsCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 font-mono-num font-black text-[10px]">
-                    {availableJobsCount}
-                  </span>
-                )}
+                <Navigation className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{translate("Radar", "Radar")}</span>
               </button>
 
+              {/* 2. Courses */}
               <button
-                id="nav-tab-driver-active"
+                id="nav-tab-driver-jobs"
                 onClick={() => {
                   setActiveTab('dashboard_driver');
-                  setActiveDriverTab('active_mission');
-                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'active_mission' }));
+                  setActiveDriverTab('orders');
+                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'orders' }));
                 }}
                 className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'dashboard_driver' && activeDriverTab === 'active_mission'
-                    ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/50 shadow-md'
+                  activeTab === 'dashboard_driver' && (activeDriverTab === 'orders' || activeDriverTab === 'available_orders' || activeDriverTab === 'active_mission')
+                    ? 'bg-[#F97316]/20 text-[#F97316] border border-[#F97316]/40 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <Navigation className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span>{translate("Mission en cours", "Active Mission")}</span>
-                {driverActiveMission && (
+                <Package className="w-3.5 h-3.5 text-[#F97316] shrink-0" />
+                <span>{translate("Courses", "Deliveries")}</span>
+                {driverActiveMission ? (
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                )}
+                ) : availableJobsCount > 0 ? (
+                  <span className="px-1.5 py-0.2 rounded-full bg-[#F97316] text-white font-mono-num font-black text-[10px]">
+                    {availableJobsCount}
+                  </span>
+                ) : null}
               </button>
 
+              {/* 3. Revenus */}
+              <button
+                id="nav-tab-driver-earnings"
+                onClick={() => {
+                  setActiveTab('dashboard_driver');
+                  setActiveDriverTab('earnings');
+                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'earnings' }));
+                }}
+                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'dashboard_driver' && activeDriverTab === 'earnings'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{translate("Revenus", "Earnings")}</span>
+              </button>
+
+              {/* 4. Historique */}
               <button
                 id="nav-tab-driver-history"
                 onClick={() => {
@@ -179,29 +200,30 @@ export const Navbar: React.FC = () => {
                 }}
                 className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'dashboard_driver' && activeDriverTab === 'history'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Receipt className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>{translate("Gain", "Earnings")}</span>
-              </button>
-
-              <button
-                id="nav-tab-driver-profile"
-                onClick={() => {
-                  setActiveTab('dashboard_driver');
-                  setActiveDriverTab('profile');
-                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'profile' }));
-                }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'dashboard_driver' && activeDriverTab === 'profile'
                     ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                <FileCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>{translate("Véhicule & Documents", "Vehicle & Documents")}</span>
+                <Receipt className="w-3.5 h-3.5 text-slate-300 shrink-0" />
+                <span>{translate("Historique", "History")}</span>
+              </button>
+
+              {/* 5. Paramètres */}
+              <button
+                id="nav-tab-driver-settings"
+                onClick={() => {
+                  setActiveTab('dashboard_driver');
+                  setActiveDriverTab('settings');
+                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'settings' }));
+                }}
+                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'dashboard_driver' && (activeDriverTab === 'settings' || activeDriverTab === 'profile')
+                    ? 'bg-blue-600/20 text-blue-300 border border-blue-500/40 shadow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Settings className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <span>{translate("Paramètres", "Settings")}</span>
               </button>
             </nav>
           ) : (

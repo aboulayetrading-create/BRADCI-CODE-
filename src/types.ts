@@ -92,6 +92,7 @@ export interface User {
   kycVehicleColor?: string;
   kycVehicleModel?: string;
   kycVehicleType?: VehicleType;
+  driverMatricule?: string;
   gpsLocation?: GPSLocation;
   shop?: ShopProfile;
   rating?: number; // e.g. 4.9
@@ -320,6 +321,9 @@ export interface DeliveryJob {
   paymentOperator?: PaymentMethod;
   paidAt?: string;
   completedAt?: string;
+  createdAt?: string;
+  driverId?: string;
+  orderId?: string;
   otpGeneratedAt?: string;
   driverArrivedAtDestination?: boolean;
   inspectionStatus?: 'pending_arrival' | 'arrived_inspecting' | 'client_confirmed_good' | 'client_confirmed_bad';
@@ -622,7 +626,16 @@ export interface SupportChatMessage {
 
 export type TimeFilter = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all_time';
 
-export type DriverTab = 'radar_map' | 'available_orders' | 'active_mission' | 'earnings' | 'history' | 'profile';
+export type DriverTab = 
+  | 'radar' 
+  | 'orders' 
+  | 'earnings' 
+  | 'history' 
+  | 'settings'
+  | 'radar_map' 
+  | 'available_orders' 
+  | 'active_mission' 
+  | 'profile';
 
 export type PaymentMethod = 'Wave' | 'Orange Money' | 'MTN MoMo' | 'Moov Money' | 'Carte Bancaire';
 

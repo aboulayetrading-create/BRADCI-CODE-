@@ -1,0 +1,375 @@
+import React, { useState, useMemo } from 'react';
+import { useApp } from '../context/AppContext';
+import { 
+  DollarSign, 
+  TrendingUp, 
+  CreditCard, 
+  Calendar, 
+  Clock, 
+  ArrowUpRight, 
+  CheckCircle2, 
+  ShieldCheck, 
+  Sparkles, 
+  X,
+  Phone,
+  BarChart3
+} from 'lucide-react';
+import { PaymentMethod } from '../types';
+
+export const DriverEarningsView: React.FC = () => {
+  const { 
+    currentUser, 
+    freightJobs, 
+    requestUserWithdrawal,
+    addToast 
+  } = useApp();
+
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState<boolean>(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('20000');
+  const [withdrawMethod, setWithdrawMethod] = useState<PaymentMethod>('Wave');
+  const [withdrawPhone, setWithdrawPhone] = useState<string>(currentUser?.phone || '+225 07 48 92 11 05');
+
+  // Completed jobs by driver
+  const myCompletedJobs = useMemo(() => {
+    return freightJobs.filter(
+      j => (j.assignedDriverId === currentUser?.id || j.assignedDriverName === currentUser?.name || currentUser?.role === 'driver') &&
+           j.status === 'delivered'
+    );
+  }, [freightJobs, currentUser]);
+
+  // Actual or realistic revenue calculations
+  const totalLifetimeEarnings = useMemo(() => {
+    const sum = myCompletedJobs.reduce((acc, j) => acc + (j.deliveryFee || 0), 0);
+    return Math.max(sum, 4250000);
+  }, [myCompletedJobs]);
+
+  const availableBalance = Math.max(currentUser?.walletBalance || 0, 32500);
+
+  // Hourly, Daily, Weekly, Yearly metrics
+  const hourlyRate = 2800; // Average net earning per active delivery hour in Abidjan
+  const todayEarnings = 18500;
+  const weekEarnings = 94000;
+  const yearEarnings = totalLifetimeEarnings;
+
+  // Visual chart data for the current week (Lun to Dim)
+  const weeklyData = [
+    { day: 'Lun', amount: 12500, deliveries: 4 },
+    { day: 'Mar', amount: 16000, deliveries: 5 },
+    { day: 'Mer', amount: 9500, deliveries: 3 },
+    { day: 'Jeu', amount: 18000, deliveries: 6 },
+    { day: 'Ven', amount: 22500, deliveries: 7 },
+    { day: 'Sam', amount: 24500, deliveries: 8 },
+    { day: 'Dim', amount: 15500, deliveries: 5 },
+  ];
+
+  const maxDailyAmount = Math.max(...weeklyData.map(d => d.amount));
+
+  const handleWithdrawSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amountNum = parseInt(withdrawAmount, 10);
+    if (!amountNum || amountNum < 1000) {
+      addToast('Montant invalide', 'Le montant minimum de retrait est de 1 000 FCFA.', 'warning');
+      return;
+    }
+    if (amountNum > availableBalance) {
+      addToast('Solde insuffisant', `Votre solde disponible est de ${availableBalance.toLocaleString('fr-FR')} FCFA.`, 'warning');
+      return;
+    }
+
+    if (requestUserWithdrawal) {
+      requestUserWithdrawal(amountNum, withdrawMethod, withdrawPhone);
+    }
+    setIsWithdrawModalOpen(false);
+    addToast(
+      'Virement initié !',
+      `Demande de virement ${withdrawMethod} de ${amountNum.toLocaleString('fr-FR')} FCFA transmise.`,
+      'success'
+    );
+  };
+
+  return (
+    <div id="driver-earnings-view-root" className="space-y-6 animate-in fade-in duration-200">
+      {/* 1. Main Wallet Balance & Retrait Action Banner */}
+      <div className="p-6 sm:p-7 rounded-3xl bg-[#06102E] border border-slate-800 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
+        {/* Ambient Glow */}
+        <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="space-y-1 z-10">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Solde Livreur Retirable Immédiatement
+            </span>
+          </div>
+          <div className="text-3xl sm:text-4xl font-black text-white font-mono-num flex items-baseline gap-2">
+            <span>{availableBalance.toLocaleString('fr-FR')}</span>
+            <span className="text-emerald-400 text-lg font-sans font-black">FCFA</span>
+          </div>
+          <p className="text-xs text-slate-400">
+            Virement direct Wave & Mobile Money (0% frais de commission)
+          </p>
+        </div>
+
+        {/* Primary Action Button: Demander un retrait */}
+        <div className="z-10 w-full md:w-auto">
+          <button
+            id="btn-driver-main-withdraw"
+            onClick={() => {
+              setWithdrawAmount(availableBalance.toString());
+              setIsWithdrawModalOpen(true);
+            }}
+            className="w-full md:w-auto px-6 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/30 active:scale-95 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+          >
+            <CreditCard className="w-5 h-5 stroke-[2.5]" />
+            <span>DEMANDER UN RETRAIT (WAVE / MO-MO)</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Primary 4 Metrics Grid: Gains par Heure, Jour, Semaine, Année */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1: Heure */}
+        <div className="p-5 rounded-3xl bg-[#0C121E] border border-slate-800 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gains par Heure</span>
+            <div className="w-9 h-9 rounded-2xl bg-blue-500/15 text-blue-400 flex items-center justify-center border border-blue-500/30">
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-white font-mono-num">
+              ~{hourlyRate.toLocaleString('fr-FR')} <span className="text-xs font-bold text-blue-400">FCFA/h</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">Moyenne en tournée active</p>
+          </div>
+        </div>
+
+        {/* Metric 2: Jour */}
+        <div className="p-5 rounded-3xl bg-[#0C121E] border border-slate-800 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gains du Jour</span>
+            <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-white font-mono-num">
+              {todayEarnings.toLocaleString('fr-FR')} <span className="text-xs font-bold text-emerald-400">FCFA</span>
+            </div>
+            <p className="text-[11px] text-emerald-400 font-bold mt-0.5">+5 courses clôturées</p>
+          </div>
+        </div>
+
+        {/* Metric 3: Semaine */}
+        <div className="p-5 rounded-3xl bg-[#0C121E] border border-slate-800 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gains de la Semaine</span>
+            <div className="w-9 h-9 rounded-2xl bg-[#F97316]/15 text-[#F97316] flex items-center justify-center border border-[#F97316]/30">
+              <Calendar className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-white font-mono-num">
+              {weekEarnings.toLocaleString('fr-FR')} <span className="text-xs font-bold text-[#F97316]">FCFA</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">38 livraisons validées</p>
+          </div>
+        </div>
+
+        {/* Metric 4: Année */}
+        <div className="p-5 rounded-3xl bg-[#0C121E] border border-slate-800 shadow-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gains de l'Année</span>
+            <div className="w-9 h-9 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/30">
+              <Sparkles className="w-4 h-4" />
+            </div>
+          </div>
+          <div>
+            <div className="text-2xl font-black text-white font-mono-num">
+              {yearEarnings.toLocaleString('fr-FR')} <span className="text-xs font-bold text-amber-400">FCFA</span>
+            </div>
+            <p className="text-[11px] text-amber-400 font-bold mt-0.5">Livreur Certifié Élite</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Graphique épuré de suivi des revenus */}
+      <div className="p-6 sm:p-7 rounded-3xl bg-[#0C121E] border border-slate-800 shadow-xl space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h4 className="text-base font-black text-white flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-[#F97316]" />
+              <span>Suivi Hebdomadaire des Revenus de Courses</span>
+            </h4>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Évolution journalière de vos gains nets perçus sur les 7 derniers jours
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-bold bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+            <span className="text-white">Total semaine : <strong>{weeklyData.reduce((s, d) => s + d.amount, 0).toLocaleString('fr-FR')} FCFA</strong></span>
+          </div>
+        </div>
+
+        {/* Clean Bar Visual Chart */}
+        <div className="pt-6 pb-2">
+          <div className="grid grid-cols-7 gap-2 sm:gap-4 items-end h-48 sm:h-56 px-2">
+            {weeklyData.map((item) => {
+              const heightPercent = Math.round((item.amount / maxDailyAmount) * 100);
+              return (
+                <div key={item.day} className="flex flex-col items-center h-full justify-end group">
+                  {/* Tooltip on hover */}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity mb-2 bg-slate-900 border border-slate-700 px-2 py-1 rounded-lg text-[10px] text-white whitespace-nowrap shadow-xl">
+                    <span className="font-bold text-emerald-400">{item.amount.toLocaleString('fr-FR')} F</span>
+                    <span className="text-slate-400 block">{item.deliveries} courses</span>
+                  </div>
+
+                  {/* Visual Bar */}
+                  <div className="w-full max-w-[42px] bg-slate-900 rounded-2xl overflow-hidden p-1 flex flex-col justify-end h-full">
+                    <div
+                      className="w-full rounded-xl bg-gradient-to-t from-emerald-600 to-emerald-400 group-hover:from-[#F97316] group-hover:to-amber-400 transition-all duration-300 shadow-lg"
+                      style={{ height: `${heightPercent}%` }}
+                    />
+                  </div>
+
+                  {/* Day Label */}
+                  <span className="text-xs font-bold text-slate-400 mt-2 group-hover:text-white transition-colors">
+                    {item.day}
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-mono-num">
+                    {(item.amount / 1000).toFixed(1)}k
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Retrait Modal (Wave / Mobile Money) */}
+      {isWithdrawModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
+          <div className="w-full max-w-md bg-[#0C121E] border border-slate-800 rounded-3xl p-6 shadow-2xl relative text-slate-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-white">Demande de Retrait Livreur</h3>
+                  <p className="text-xs text-slate-400">
+                    Solde disponible : <strong className="text-emerald-400 font-mono">{availableBalance.toLocaleString('fr-FR')} FCFA</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-900 border border-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleWithdrawSubmit} className="space-y-4 pt-1">
+              {/* Method choice */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1.5">Moyen de Réception :</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['Wave', 'Orange Money', 'MTN MoMo'] as PaymentMethod[]).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setWithdrawMethod(m)}
+                      className={`p-2 rounded-xl text-xs font-bold border transition-all ${
+                        withdrawMethod === m
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-md'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {withdrawMethod === 'Wave' ? '✓ Virement Wave direct instantané (0% commission)' : 'Virement sécurisé vers votre compte Mobile Money'}
+                </p>
+              </div>
+
+              {/* Amount input */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Montant à Retirer (FCFA) :</label>
+                <input
+                  type="number"
+                  min={1000}
+                  max={availableBalance}
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div className="flex gap-2">
+                {[5000, 10000, 20000, availableBalance].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setWithdrawAmount(amt.toString())}
+                    className="flex-1 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono font-bold text-slate-300 rounded-lg"
+                  >
+                    {amt === availableBalance ? 'Tout' : `${amt / 1000}k`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Phone input */}
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">Numéro Mobile de Réception :</label>
+                <input
+                  type="tel"
+                  value={withdrawPhone}
+                  onChange={(e) => setWithdrawPhone(e.target.value)}
+                  placeholder="+225 07 XX XX XX XX"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              {/* Net Payout Summary */}
+              <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
+                <div className="flex justify-between">
+                  <span>Montant brut demandé :</span>
+                  <span className="font-mono text-white">{Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Net crédité sur votre mobile :</span>
+                  <span className="font-mono text-emerald-400 font-bold">
+                    {Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsWithdrawModalOpen(false)}
+                  className="px-4 py-2 bg-slate-900 text-slate-400 text-xs font-bold rounded-xl border border-slate-800"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all"
+                >
+                  Valider le Virement
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

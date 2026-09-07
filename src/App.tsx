@@ -45,6 +45,7 @@ import { CartInvoiceModal } from './components/CartInvoiceModal';
 import { NativePermissionModal } from './components/NativePermissionModal';
 import { SplashScreen } from './components/SplashScreen';
 import { OutbidAlertBanner } from './components/OutbidAlertBanner';
+import { NotificationManager } from './components/NotificationManager';
 import { 
   ShieldCheck, 
   Lock, 
@@ -182,6 +183,11 @@ const AppContent: React.FC = () => {
       {/* 2.5 Instant Outbid Mobile Alert Banner */}
       <ErrorBoundary fallbackTitle="Alerte Surenchère">
         <OutbidAlertBanner />
+      </ErrorBoundary>
+
+      {/* 2.6 Automatic Android & Browser Notification Permission Manager */}
+      <ErrorBoundary fallbackTitle="Gestionnaire de notifications">
+        <NotificationManager />
       </ErrorBoundary>
 
       {/* 3. Main Views Container with Isolated Error Boundary */}

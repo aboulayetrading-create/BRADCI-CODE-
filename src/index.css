@@ -386,3 +386,13 @@ html.light .fintech-grid {
   font-variant-numeric: tabular-nums;
 }
 
+@keyframes vtc-dash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+.animate-vtc-dash {
+  animation: vtc-dash 1.4s linear infinite;
+}
+
