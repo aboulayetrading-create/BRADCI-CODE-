@@ -107,17 +107,25 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
   // Démarrer l'enregistrement de la note vocale
   const handleStartRecord = async () => {
     try {
-      await startRecording();
+      const res = await startRecording();
       setIsRecording(true);
       setRecordDuration(0);
       recordingIntervalRef.current = setInterval(() => {
         setRecordDuration((prev) => prev + 1);
       }, 1000);
+
+      if (res?.isFallback) {
+        addToast(
+          "Mode démo vocale", 
+          "Microphone physique non accessible dans ce conteneur. Enregistrement vocal de démonstration actif.", 
+          "info"
+        );
+      }
     } catch (err: any) {
-      console.error('Erreur démarrage enregistrement vocal:', err);
+      console.warn("Information démarrage enregistrement vocal:", err?.message || err);
       addToast(
-        "Microphone requis", 
-        "Veuillez autoriser l'accès au microphone pour envoyer une note vocale.", 
+        "Microphone restreint", 
+        "Veuillez autoriser l'accès au microphone ou ouvrir en plein écran pour envoyer une note vocale.", 
         "warning"
       );
     }
@@ -137,7 +145,7 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
       setIsRecording(false);
       setRecordDuration(0);
 
-      if (duration < 1 && audioBlob.size < 1000) {
+      if (duration < 1 && audioBlob.size < 44) {
         addToast("Note vocale trop courte", "Maintenez le micro au moins 1 seconde pour enregistrer.", "info");
         return;
       }
@@ -157,8 +165,8 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
 
       setMessages((prev) => [...prev, newVoiceMsg]);
       addToast("Note vocale transmise", `Durée: ${Math.max(1, duration)} sec.`, "success");
-    } catch (err) {
-      console.error('Erreur arrêt enregistrement vocal:', err);
+    } catch (err: any) {
+      console.warn("Information arrêt enregistrement vocal:", err?.message || err);
       setIsRecording(false);
       setRecordDuration(0);
       addToast("Erreur enregistrement", "Impossible de sauvegarder la note vocale.", "error");

@@ -23,11 +23,14 @@ import {
   AlertCircle,
   Radio,
   Sun,
-  Moon
+  Moon,
+  AlertOctagon,
+  Zap
 } from 'lucide-react';
 import { ALL_COMMUNES, ZoneCommune } from '../data/communes';
-import { generateAbidjanRoute, RouteStep, RoutePlan, voiceNavigator } from '../utils/voiceNavigator';
+import { generateAbidjanRoute, RouteStep, RoutePlan, voiceNavigator, announceOverspeedAlert, getSpeedLimitForRoad } from '../utils/voiceNavigator';
 import { speakInstruction } from '../utils/audioServices';
+import { useApp } from '../context/AppContext';
 
 interface GoogleMapsEmbedProps {
   pickupCommune: string;
@@ -52,6 +55,8 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
   onProgressChange,
   className = ''
 }) => {
+  const { language } = useApp();
+  const isEn = language === 'en';
   const [mapLayer, setMapLayer] = useState<'roadmap' | 'satellite'>('roadmap');
   const [navTheme, setNavTheme] = useState<'night' | 'day'>('night'); // Default to high-contrast night navigation
   // Voice off by default: let official Google Maps handle voice navigation
@@ -59,7 +64,7 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
   const [autoPlayVoice, setAutoPlayVoice] = useState<boolean>(false);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [routePlan, setRoutePlan] = useState<RoutePlan>(() => 
-    generateAbidjanRoute(pickupCommune, dropoffCommune, isReturning)
+    generateAbidjanRoute(pickupCommune, dropoffCommune, isReturning, language)
   );
   const [isNavigating, setIsNavigating] = useState<boolean>(true);
   const [localProgress, setLocalProgress] = useState<number>(currentProgress);
@@ -67,11 +72,11 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
 
   const prevStepRef = useRef<number>(-1);
 
-  // Re-generate route when communes change
+  // Re-generate route when communes or language change
   useEffect(() => {
-    const plan = generateAbidjanRoute(pickupCommune, dropoffCommune, isReturning);
+    const plan = generateAbidjanRoute(pickupCommune, dropoffCommune, isReturning, language);
     setRoutePlan(plan);
-  }, [pickupCommune, dropoffCommune, isReturning]);
+  }, [pickupCommune, dropoffCommune, isReturning, language]);
 
   // Sync external progress
   useEffect(() => {
@@ -91,10 +96,10 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
       prevStepRef.current = safeIndex;
       const step = routePlan.steps[safeIndex];
       if (step && (isVoiceEnabled || autoPlayVoice)) {
-        speakInstruction(step.instruction);
+        speakInstruction(step.instruction, language);
       }
     }
-  }, [localProgress, routePlan, autoPlayVoice, isVoiceEnabled]);
+  }, [localProgress, routePlan, autoPlayVoice, isVoiceEnabled, language]);
 
   // Handle Voice Mute Toggle
   const toggleVoiceMute = () => {
@@ -105,9 +110,9 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
     if (nextState) {
       const step = routePlan.steps[currentStepIndex];
       const intro = step 
-        ? `Guidage Voix Off BRAD'CI activé. ${step.instruction}`
-        : "Guidage Voix Off BRAD'CI activé.";
-      speakInstruction(intro);
+        ? (isEn ? `BRAD'CI Voice Guidance activated. ${step.instruction}` : `Guidage Voix Off BRAD'CI activé. ${step.instruction}`)
+        : (isEn ? "BRAD'CI Voice Guidance activated." : "Guidage Voix Off BRAD'CI activé.");
+      speakInstruction(intro, language);
     }
   };
 
@@ -115,7 +120,7 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
   const handleSpeakCurrentStep = () => {
     const step = routePlan.steps[currentStepIndex];
     if (step) {
-      speakInstruction(step.instruction);
+      speakInstruction(step.instruction, language);
     }
   };
 
@@ -126,6 +131,35 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
 
   // Current active step
   const activeStep = routePlan.steps[currentStepIndex] || routePlan.steps[0];
+
+  // Vitesse autorisée sur la voie actuelle
+  const currentSpeedLimit = activeStep?.speedLimitKmh || getSpeedLimitForRoad(activeStep?.streetName || '', 50);
+  const isOverspeed = speedKmh > currentSpeedLimit;
+  const overspeedDelta = Math.max(0, speedKmh - currentSpeedLimit);
+  const lastOverspeedAlertTimeRef = useRef<number>(0);
+
+  // Alerte vocale de signalisation en cas de dépassement de vitesse
+  // RÈGLE : Se déclenche impérativement MÊME SI LE GUIDAGE VOCAL EST COUPÉ (isVoiceEnabled = false)
+  useEffect(() => {
+    if (isOverspeed) {
+      const now = Date.now();
+      if (now - lastOverspeedAlertTimeRef.current > 7500) {
+        lastOverspeedAlertTimeRef.current = now;
+        announceOverspeedAlert(speedKmh, currentSpeedLimit, activeStep?.streetName || '', language);
+      }
+    }
+  }, [speedKmh, currentSpeedLimit, isOverspeed, activeStep, language]);
+
+  const handleAdjustSpeed = (delta: number) => {
+    setSpeedKmh(prev => Math.max(15, Math.min(130, prev + delta)));
+  };
+
+  const handleTestOverspeed = () => {
+    const forcedSpeed = currentSpeedLimit + 20;
+    setSpeedKmh(forcedSpeed);
+    lastOverspeedAlertTimeRef.current = Date.now();
+    announceOverspeedAlert(forcedSpeed, currentSpeedLimit, activeStep?.streetName || '', language);
+  };
 
   const getStepIcon = (iconType: RouteStep['icon']) => {
     switch (iconType) {
@@ -352,6 +386,40 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
         </div>
       </div>
 
+      {/* 2.1 Alerte Vocale d'Urgence - Excès de Vitesse (Forcée même si guidage vocal coupé) */}
+      {isOverspeed && (
+        <div 
+          id="gmaps-overspeed-alarm-banner"
+          className="p-3 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white border-b-2 border-red-300 ring-2 ring-red-500/60 flex items-center justify-between gap-3 animate-pulse"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-full bg-white border-[3px] border-red-600 flex items-center justify-center shadow-lg shrink-0">
+              <span className="text-slate-950 font-black text-xs tracking-tight">{currentSpeedLimit}</span>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="px-1.5 py-0.2 rounded bg-black/40 text-[9px] font-black uppercase tracking-wider text-amber-300">
+                  ALERTE SÉCURITÉ VITESSE
+                </span>
+                <span className="text-[10px] text-white/90">
+                  (Signal vocal forcé même si guidage coupé)
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm font-black text-white mt-0.5 truncate">
+                Vitesse : {speedKmh} km/h • Limite {currentSpeedLimit} km/h • Ralentissez immédiatement !
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSpeedKmh(Math.max(20, currentSpeedLimit - 5))}
+            className="px-3 py-1 bg-white hover:bg-slate-100 text-red-700 font-black text-xs rounded-xl shadow shrink-0 active:scale-95 cursor-pointer"
+          >
+            Ralentir
+          </button>
+        </div>
+      )}
+
       {/* 3. Main Map Canvas Area: 85%-90% Screen Height, Google Widgets Cropped */}
       <div className="relative w-full h-[75vh] sm:h-[85vh] min-h-[520px] bg-[#040812] overflow-hidden">
         <div className="w-full h-full relative overflow-hidden">
@@ -364,8 +432,10 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
             allowFullScreen
           />
 
-          {/* Live Telemetry Overlay Pill in Top Left (Dynamic Vehicle Icon) */}
-          <div className="absolute top-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs z-10">
+          {/* Live Telemetry Overlay Pill in Top Left (Dynamic Vehicle Icon & Speed Limit Sign) */}
+          <div className={`absolute top-3 left-3 backdrop-blur-md border p-2 sm:p-2.5 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs z-10 transition-all ${
+            isOverspeed ? 'bg-red-950/95 border-red-500 shadow-red-600/40 text-white animate-pulse ring-2 ring-red-500' : 'bg-[#0B111E]/95 border-slate-800 text-white'
+          }`}>
             <div className="flex items-center gap-1.5 text-blue-400 font-bold">
               {vehicleType === 'voiture' || vehicleType === 'car' ? (
                 <Car className="w-4 h-4 animate-pulse text-amber-400" />
@@ -378,10 +448,49 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
                 {vehicleType === 'voiture' || vehicleType === 'car' ? 'Voiture' : vehicleType === 'cargo' ? 'Camionnette' : 'Moto'} • {courierName}
               </span>
             </div>
-            <div className="w-px h-4 bg-slate-800" />
-            <span className="font-mono-num text-amber-400 font-black">
+
+            <div className="w-px h-4 bg-slate-700" />
+
+            {/* Panneau de Limitation */}
+            <div 
+              className="w-7 h-7 rounded-full bg-white border-2 border-red-600 flex items-center justify-center shadow shrink-0"
+              title={`Limite : ${currentSpeedLimit} km/h`}
+            >
+              <span className="text-slate-950 font-black text-[10px] leading-none">{currentSpeedLimit}</span>
+            </div>
+
+            {/* Speed Value */}
+            <span className={`font-mono-num font-black ${isOverspeed ? 'text-red-400 animate-bounce' : 'text-amber-400'}`}>
               {speedKmh} km/h
             </span>
+
+            {/* Micro Speed Adjusters */}
+            <div className="flex items-center gap-1 pl-1 border-l border-slate-700/60">
+              <button
+                type="button"
+                onClick={() => handleAdjustSpeed(5)}
+                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-[10px] font-black cursor-pointer"
+                title="+5 km/h"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAdjustSpeed(-5)}
+                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-[10px] font-black cursor-pointer"
+                title="-5 km/h"
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={handleTestOverspeed}
+                className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[9px] font-bold cursor-pointer"
+                title="Tester alerte vocale d'excès de vitesse"
+              >
+                Test Alerte
+              </button>
+            </div>
           </div>
 
           {/* In-Map Top-Right Telemetry Card */}

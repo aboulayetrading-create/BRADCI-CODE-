@@ -1,7 +1,7 @@
 import React from 'react';
-import { Logo, LogoIcon, LogoProps } from './Logo';
+import { Logo, LogoIcon, LogoProps, BradCiLogoImg } from './Logo';
 
-export { Logo, LogoIcon };
+export { Logo, LogoIcon, BradCiLogoImg };
 export type { LogoProps };
 
 export interface BradCiLogoProps {

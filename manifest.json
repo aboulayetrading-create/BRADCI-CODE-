@@ -4,13 +4,13 @@
   "description": "Plateforme d'enchères express de seconde main et déstockage sécurisé à Abidjan avec Paiement Direct à la Livraison (POD Mobile Money), bourse de fret et forfaits certifiés.",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon.png",
+      "src": "icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

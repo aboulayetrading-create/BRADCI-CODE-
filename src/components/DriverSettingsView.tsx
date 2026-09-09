@@ -16,7 +16,8 @@ import {
   Sparkles, 
   Edit3,
   Bell,
-  Play
+  Play,
+  Crown
 } from 'lucide-react';
 import { playDriverNewOrderRingtone, voiceNavigator } from '../utils/voiceNavigator';
 
@@ -24,6 +25,8 @@ export const DriverSettingsView: React.FC = () => {
   const { 
     currentUser, 
     setKycModalOpen, 
+    setPricingModalOpen,
+    setTargetPlanForPricing,
     theme, 
     setTheme, 
     language, 
@@ -89,6 +92,56 @@ export const DriverSettingsView: React.FC = () => {
           <CheckCircle2 className="w-3.5 h-3.5" />
           <span>Agréé BRAD'CI</span>
         </span>
+      </div>
+
+      {/* SECTION PASS LIVREUR VIP (OPTION BIENTÔT) */}
+      <div className="p-6 rounded-3xl bg-gradient-to-br from-[#0C121E] via-[#06102E] to-[#0C121E] border border-amber-500/40 shadow-2xl space-y-4 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/40 shrink-0">
+              <Crown className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-base font-black text-white font-display">Pass Livreur VIP BRAD'CI</h4>
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-sm border border-amber-300">
+                  ⏳ BIENTÔT
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">Offre exclusive réservée aux livreurs et transporteurs partenaires</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTargetPlanForPricing('vip_pass');
+              setPricingModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            <span>Consulter le Pass Livreur</span>
+            <span className="text-[10px] bg-slate-950/20 px-2 py-0.5 rounded font-mono">6 000 F/m</span>
+          </button>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-white">Statut actuel :</span>
+              <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold font-mono text-[11px] border border-emerald-500/30">
+                ✓ Courses 100% Gratuites & Illimitées Actives (0 FCFA)
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Toutes les courses sont sans frais d'abonnement. Lors du lancement officiel du Pass Livreur VIP, 5 courses gratuites d'essai vous seront offertes avant l'activation.
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-amber-300 text-xs font-bold shrink-0">
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
+            <span>0% Commission Livreur</span>
+          </div>
+        </div>
       </div>
 
       {/* 1. Vérification KYC (CNI / Permis / Véhicule) */}

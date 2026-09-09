@@ -4,6 +4,7 @@ import { defineCustomElements } from '@ionic/pwa-elements/loader';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
+import 'leaflet/dist/leaflet.css';
 
 // Initialize Capacitor PWA elements (for web fallback camera dialogs)
 if (typeof window !== 'undefined') {
@@ -13,7 +14,9 @@ if (typeof window !== 'undefined') {
 // Register Service Worker for PWA and Mobile Push Notifications
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      return navigator.serviceWorker.register('/sw.js');
+    }).catch((err) => {
       console.info('Service Worker registration notice:', err);
     });
   });

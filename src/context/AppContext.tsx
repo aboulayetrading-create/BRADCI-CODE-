@@ -988,7 +988,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const pushBrowserNotification = useCallback(async (
     title: string, 
     body: string, 
-    icon = '/icon.png',
+    icon = './icon.png',
     customOptions?: {
       tag?: string;
       data?: any;
@@ -1052,7 +1052,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const testBody = "Notifications BRAD'CI activées ! Vous recevrez désormais les alertes de vos enchères et livreurs.";
 
         // Déclenche la notification système push
-        await pushBrowserNotification(testTitle, testBody, '/icon.png');
+        await pushBrowserNotification(testTitle, testBody, './icon.png');
 
         // Ajoute également dans l'historique visuel in-app
         addNotification({
@@ -1144,7 +1144,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     const prod = products.find(p => p.id === productId);
     const prodTitle = prod ? prod.title : 'votre enchère';
-    const prodImage = prod?.images?.[0] || '/icon.png';
+    const prodImage = prod?.images?.[0] || './icon.png';
 
     // Formatage strict selon le cahier des charges :
     // "Un utilisateur a surenchéri à 6 000 000 FCFA. Reprenez la main !"

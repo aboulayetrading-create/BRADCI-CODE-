@@ -29,6 +29,8 @@ export const LogoIcon: React.FC<{
   size,
   id
 }) => {
+  const [imgFailed, setImgFailed] = React.useState(false);
+
   // Unique SVG filter & gradient IDs to avoid any DOM collision
   const uid = React.useId().replace(/:/g, '_');
   const shieldGradLeft = `shield_grad_left_${uid}`;
@@ -38,6 +40,26 @@ export const LogoIcon: React.FC<{
   const blueSpeedGrad = `blue_speed_grad_${uid}`;
   const dropShadow = `shield_glow_${uid}`;
   const badgeGlow = `badge_glow_${uid}`;
+
+  if (!imgFailed) {
+    return (
+      <img 
+        id={id}
+        src="./icon.png" 
+        alt="BRAD'CI Logo" 
+        className={`select-none shrink-0 object-contain rounded-xl ${className}`}
+        style={size ? { width: size, height: size } : undefined}
+        onError={(e) => { 
+          const target = e.currentTarget as HTMLImageElement;
+          if (target.getAttribute('src') !== 'icon.png') {
+            target.src = 'icon.png';
+          } else {
+            setImgFailed(true);
+          }
+        }} 
+      />
+    );
+  }
 
   return (
     <svg 
@@ -356,5 +378,22 @@ export const Logo: React.FC<LogoProps> = ({
 // Backwards compatibility aliases
 export const BradCiLogoIcon = LogoIcon;
 export const BradCiLogo = Logo;
+
+/**
+ * Image officielle locale BRAD'CI pour le packaging autonome APK Android
+ */
+export const BradCiLogoImg: React.FC<{ className?: string; alt?: string; onClick?: () => void }> = ({
+  className = "w-10 h-10 object-contain rounded-xl",
+  alt = "BRAD'CI Logo",
+  onClick
+}) => (
+  <img 
+    src="./icon.png" 
+    alt={alt} 
+    className={className} 
+    onClick={onClick}
+    onError={(e) => { (e.target as HTMLImageElement).src = 'icon.png'; }} 
+  />
+);
 
 export default Logo;

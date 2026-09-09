@@ -51,7 +51,8 @@ import {
   Bell,
   LogOut,
   Radio,
-  Smartphone
+  Smartphone,
+  Zap
 } from 'lucide-react';
 import { Product, ShopProfile, PaymentMethod, DeliveryJob } from '../types';
 import { ReferralDashboard } from './ReferralDashboard';
@@ -2286,6 +2287,80 @@ export const ClientDashboard: React.FC = () => {
                 {currentUser.sellerPlan === 'pro' ? 'Compte Vendeur Pro' : currentUser.sellerPlan === 'standard' ? 'Compte Vendeur Standard' : 'Compte Client / Vendeur'}
               </span>
             </div>
+          </div>
+
+          {/* SECTION ABONNEMENT & PASS VENDEUR (RÉSERVÉ VENDEURS / ACHETEURS - SANS PASS LIVREUR) */}
+          <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#0C121E] via-[#081024] to-[#0C121E] border border-amber-500/30 shadow-2xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30 shrink-0">
+                  <Crown className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-base font-black text-white font-display">
+                      {translate("Abonnement & Pass Vendeur Pro", "Seller Pro Pass & Subscription")}
+                    </h4>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                      {currentUser.sellerPlan === 'pro'
+                        ? 'OR VIP (2.5%)'
+                        : currentUser.sellerPlan === 'standard'
+                        ? 'PRO CERTIFIÉ (5%)'
+                        : 'COMPTE GRATUIT (10%)'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {translate(
+                      "Réduisez vos commissions jusqu'à 2.5%, affichez le badge officiel et propulsez vos annonces en tête du radar Abidjan.",
+                      "Lower your commission fees down to 2.5%, show verified badge, and boost listings to the top of Abidjan radar."
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                id="btn-settings-manage-seller-pass"
+                type="button"
+                onClick={() => {
+                  setTargetPlanForPricing('standard');
+                  setPricingModalOpen(true);
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+              >
+                <Zap className="w-4 h-4" />
+                <span>{translate("Voir les Pass Vendeurs & Boost", "View Seller Passes & Boost")}</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1">
+                <span className="text-[10px] text-amber-400 font-bold uppercase block tracking-wider">Boost Flash (1 000 F)</span>
+                <p className="text-xs font-bold text-white">48h en tête de fil</p>
+                <p className="text-[11px] text-slate-400">5x plus d'acheteurs & d'enchérisseurs</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1">
+                <span className="text-[10px] text-blue-400 font-bold uppercase block tracking-wider">Pass Pro Certifié (5 000 F/m)</span>
+                <p className="text-xs font-bold text-white">Commission 5%</p>
+                <p className="text-[11px] text-slate-400">Badge Certifié & Vitrine Boutique</p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1">
+                <span className="text-[10px] text-amber-300 font-bold uppercase block tracking-wider">Pass Vendeur Or VIP (10 000 F/m)</span>
+                <p className="text-xs font-bold text-white">Commission record 2.5%</p>
+                <p className="text-[11px] text-slate-400">Top Algorithme & Support Dédié VIP</p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1 border-t border-slate-800/60">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>
+                {translate(
+                  "Offre réservée aux vendeurs & acheteurs. Le Pass Livreur (Courses VIP) est géré exclusivement dans l'espace Chauffeur Livreur.",
+                  "Offer reserved for sellers & buyers. Courier Pass (VIP Runs) is managed exclusively in Driver Space."
+                )}
+              </span>
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

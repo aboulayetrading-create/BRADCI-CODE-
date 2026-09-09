@@ -1,23 +1,28 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Bike, 
   Car, 
   Truck, 
   MapPin, 
-  Navigation, 
   Radio, 
   Power, 
   Layers, 
   Locate, 
   Plus, 
-  Minus,
+  Minus, 
+  ShieldCheck, 
+  Navigation,
   Sparkles,
-  ShieldCheck,
-  Compass
+  Package,
+  X,
+  ChevronRight,
+  Filter
 } from 'lucide-react';
+import L from 'leaflet';
 import { ALL_COMMUNES } from '../data/communes';
 import { VehicleType } from '../types';
+import { playGpsChime } from '../utils/audioServices';
 
 interface SimulatedCourier {
   id: string;
@@ -29,14 +34,30 @@ interface SimulatedCourier {
   lng: number;
   isAvailable: boolean;
   rating: number;
-  heading: number; // in degrees
+  heading: number;
+}
+
+interface RadarJobPoint {
+  id: string;
+  title: string;
+  pickupCommune: string;
+  dropoffCommune: string;
+  fee: number;
+  distanceKm: number;
+  lat: number;
+  lng: number;
+  type: 'urgent' | 'b2b' | 'standard';
 }
 
 export const DriverRadarView: React.FC = () => {
   const { 
     currentUser, 
     toggleDriverAvailability,
-    userLocation
+    userLocation,
+    language,
+    translate,
+    addToast,
+    freightJobs
   } = useApp();
 
   const isOnline = currentUser?.driverAvailability !== 'offline';
@@ -51,20 +72,29 @@ export const DriverRadarView: React.FC = () => {
     return communeObj ? { lat: communeObj.coords.lat, lng: communeObj.coords.lng } : { lat: 5.3599, lng: -4.0082 };
   }, [userLocation, driverCommune]);
 
-  const [mapZoom, setMapZoom] = useState<number>(1);
-  const [mapStyle, setMapStyle] = useState<'night' | 'satellite'>('night');
-  const [selectedCourier, setSelectedCourier] = useState<SimulatedCourier | null>(null);
+  // Map state
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const circleLayerRef = useRef<L.Circle | null>(null);
 
-  // Simulated active online couriers across Abidjan zones
-  const simulatedCouriers: SimulatedCourier[] = useMemo(() => [
+  const [mapStyle, setMapStyle] = useState<'dark' | 'streets' | 'satellite'>('dark');
+  const [radarRadiusKm, setRadarRadiusKm] = useState<number>(5);
+  const [vehicleFilter, setVehicleFilter] = useState<'all' | 'moto' | 'voiture' | 'cargo'>('all');
+  const [selectedCourier, setSelectedCourier] = useState<SimulatedCourier | null>(null);
+  const [selectedJob, setSelectedJob] = useState<RadarJobPoint | null>(null);
+
+  // Simulated active online couriers across Grand Abidjan
+  const initialCouriers: SimulatedCourier[] = useMemo(() => [
     {
       id: 'drv-01',
       name: 'Kouassi Roland',
       vehicle: 'moto',
       plate: '4589 JJ 01',
       commune: 'Cocody',
-      lat: 5.352,
-      lng: -3.998,
+      lat: 5.354,
+      lng: -3.988,
       isAvailable: true,
       rating: 4.9,
       heading: 45
@@ -76,7 +106,7 @@ export const DriverRadarView: React.FC = () => {
       plate: '1120 KL 01',
       commune: 'Plateau',
       lat: 5.328,
-      lng: -4.020,
+      lng: -4.019,
       isAvailable: true,
       rating: 4.8,
       heading: 120
@@ -99,7 +129,7 @@ export const DriverRadarView: React.FC = () => {
       vehicle: 'moto',
       plate: '3341 MM 01',
       commune: 'Yopougon',
-      lat: 5.340,
+      lat: 5.342,
       lng: -4.075,
       isAvailable: true,
       rating: 4.7,
@@ -135,319 +165,536 @@ export const DriverRadarView: React.FC = () => {
       vehicle: 'moto',
       plate: '5562 TZ 01',
       commune: 'Adjamé',
-      lat: 5.355,
-      lng: -4.030,
+      lat: 5.358,
+      lng: -4.028,
       isAvailable: true,
       rating: 4.9,
       heading: 60
     }
   ], []);
 
-  // Map coordinates projection to percentage
-  const latMin = 5.25;
-  const latMax = 5.43;
-  const lngMin = -4.12;
-  const lngMax = -3.88;
+  const [simulatedCouriers, setSimulatedCouriers] = useState<SimulatedCourier[]>(initialCouriers);
 
-  const projectToMapCoords = (lat: number, lng: number) => {
-    const x = ((lng - lngMin) / (lngMax - lngMin)) * 100;
-    const y = ((latMax - lat) / (latMax - latMin)) * 100;
-    return {
-      x: Math.max(6, Math.min(94, x)),
-      y: Math.max(6, Math.min(94, y))
-    };
+  // Live courier movement around Abidjan (Yango / Uber radar style)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSimulatedCouriers(prev => prev.map(c => {
+        const rad = (c.heading * Math.PI) / 180;
+        const speed = 0.0003 + Math.random() * 0.0003;
+        let newLat = c.lat + Math.cos(rad) * speed;
+        let newLng = c.lng + Math.sin(rad) * speed;
+        let newHeading = c.heading + (Math.random() * 20 - 10);
+
+        if (newLat < 5.26 || newLat > 5.44 || newLng < -4.12 || newLng > -3.92) {
+          newHeading = (newHeading + 180) % 360;
+        }
+
+        return {
+          ...c,
+          lat: newLat,
+          lng: newLng,
+          heading: Math.round((newHeading + 360) % 360)
+        };
+      }));
+    }, 2800);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Radar delivery jobs
+  const radarJobs: RadarJobPoint[] = useMemo(() => [
+    {
+      id: 'job-r1',
+      title: 'iPhone 15 Pro Max sous scellé',
+      pickupCommune: 'Cocody Angré',
+      dropoffCommune: 'Marcory Zone 4',
+      fee: 3500,
+      distanceKm: 8.2,
+      lat: 5.372,
+      lng: -3.992,
+      type: 'urgent'
+    },
+    {
+      id: 'job-r2',
+      title: 'Carton Vêtements Mode Wax',
+      pickupCommune: 'Le Plateau',
+      dropoffCommune: 'Yopougon Siporex',
+      fee: 4000,
+      distanceKm: 9.8,
+      lat: 5.325,
+      lng: -4.022,
+      type: 'standard'
+    },
+    {
+      id: 'job-r3',
+      title: 'Lot 10 Sacs Riz & Huile B2B',
+      pickupCommune: 'Treichville Port',
+      dropoffCommune: 'Koumassi Remblais',
+      fee: 6500,
+      distanceKm: 6.4,
+      lat: 5.308,
+      lng: -4.008,
+      type: 'b2b'
+    }
+  ], []);
+
+  // Helper tile URLs - 100% clean, NO watermarks (replaces cartocdn api watermark)
+  const getTileUrl = (style: 'dark' | 'streets' | 'satellite') => {
+    switch (style) {
+      case 'streets':
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}';
+      case 'satellite':
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      case 'dark':
+      default:
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+    }
   };
 
-  const driverPos = projectToMapCoords(driverCoords.lat, driverCoords.lng);
+  // Initialize Map
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
 
-  const getVehicleIcon = (v: VehicleType | string, sizeClass = 'w-3.5 h-3.5') => {
-    switch (v) {
-      case 'voiture':
-      case 'car':
-        return <Car className={sizeClass} />;
-      case 'cargo':
-        return <Truck className={sizeClass} />;
-      default:
-        return <Bike className={sizeClass} />;
+    if (!mapInstanceRef.current) {
+      const map = L.map(mapContainerRef.current, {
+        center: [driverCoords.lat, driverCoords.lng],
+        zoom: 13,
+        zoomControl: false,
+        attributionControl: false
+      });
+
+      const tileLayer = L.tileLayer(getTileUrl(mapStyle), {
+        maxZoom: 19,
+        maxNativeZoom: mapStyle === 'dark' ? 16 : 19
+      }).addTo(map);
+
+      tileLayerRef.current = tileLayer;
+
+      const markersGroup = L.layerGroup().addTo(map);
+      markersLayerRef.current = markersGroup;
+
+      mapInstanceRef.current = map;
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        tileLayerRef.current = null;
+        markersLayerRef.current = null;
+        circleLayerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update Tile Layer on Style Change
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    if (tileLayerRef.current) {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    }
+    const newLayer = L.tileLayer(getTileUrl(mapStyle), {
+      maxZoom: 19,
+      maxNativeZoom: mapStyle === 'dark' ? 16 : 19
+    }).addTo(mapInstanceRef.current);
+    tileLayerRef.current = newLayer;
+  }, [mapStyle]);
+
+  // Update Markers & Radius Circle
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const markersGroup = markersLayerRef.current;
+    if (!map || !markersGroup) return;
+
+    markersGroup.clearLayers();
+
+    // 1. Radar Scanning Circle
+    if (circleLayerRef.current) {
+      map.removeLayer(circleLayerRef.current);
+      circleLayerRef.current = null;
+    }
+
+    if (isOnline) {
+      const circle = L.circle([driverCoords.lat, driverCoords.lng], {
+        radius: radarRadiusKm * 1000,
+        color: '#10B981',
+        weight: 1.5,
+        fillColor: '#10B981',
+        fillOpacity: 0.08,
+        dashArray: '4, 4'
+      }).addTo(map);
+      circleLayerRef.current = circle;
+    }
+
+    // 2. Driver Marker (You)
+    const driverIconHtml = `
+      <div class="relative flex items-center justify-center">
+        ${isOnline ? '<div class="absolute -inset-3 rounded-full bg-emerald-400/25 animate-ping"></div>' : ''}
+        <div class="w-11 h-11 rounded-2xl flex items-center justify-center shadow-2xl border-2 transition-all ${
+          isOnline ? 'bg-emerald-500 text-slate-950 border-white ring-4 ring-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-600'
+        }">
+          <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+          </svg>
+        </div>
+        <div class="absolute -bottom-5 whitespace-nowrap bg-slate-950/90 text-white border border-slate-700 px-2 py-0.5 rounded-full text-[9px] font-black shadow-lg">
+          ${language === 'en' ? 'YOU' : 'VOUS'} • ${driverCommune}
+        </div>
+      </div>
+    `;
+
+    const driverMarker = L.marker([driverCoords.lat, driverCoords.lng], {
+      icon: L.divIcon({
+        className: 'driver-live-marker',
+        html: driverIconHtml,
+        iconSize: [44, 44],
+        iconAnchor: [22, 22]
+      })
+    });
+
+    driverMarker.on('click', () => {
+      addToast(
+        language === 'en' ? "Your GPS Location" : "Votre Position GPS",
+        `${driverCommune} (${driverCoords.lat.toFixed(4)}, ${driverCoords.lng.toFixed(4)})`,
+        "info"
+      );
+    });
+
+    markersGroup.addLayer(driverMarker);
+
+    // 3. Online Couriers Markers
+    const filteredCouriers = simulatedCouriers.filter(c => {
+      if (vehicleFilter === 'all') return true;
+      return c.vehicle === vehicleFilter;
+    });
+
+    filteredCouriers.forEach(c => {
+      const courierIconHtml = `
+        <div class="relative cursor-pointer hover:scale-110 transition-transform">
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center shadow-lg border text-white ${
+            c.vehicle === 'cargo' 
+              ? 'bg-purple-600 border-purple-400' 
+              : c.vehicle === 'voiture' 
+              ? 'bg-amber-600 border-amber-400' 
+              : 'bg-sky-600 border-sky-400'
+          }">
+            <span class="text-xs font-black">${c.vehicle === 'cargo' ? '🚛' : c.vehicle === 'voiture' ? '🚗' : '🛵'}</span>
+          </div>
+          <div class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-950"></div>
+        </div>
+      `;
+
+      const courierMarker = L.marker([c.lat, c.lng], {
+        icon: L.divIcon({
+          className: 'courier-radar-marker',
+          html: courierIconHtml,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        })
+      });
+
+      courierMarker.on('click', () => {
+        setSelectedJob(null);
+        setSelectedCourier(c);
+      });
+
+      markersGroup.addLayer(courierMarker);
+    });
+
+    // 4. Delivery Opportunities Markers
+    radarJobs.forEach(j => {
+      const jobIconHtml = `
+        <div class="relative cursor-pointer hover:scale-110 transition-transform">
+          <div class="px-2 py-1 rounded-xl flex items-center gap-1 shadow-2xl border ${
+            j.type === 'urgent'
+              ? 'bg-red-500 text-white border-red-300 ring-2 ring-red-400/40 animate-pulse'
+              : j.type === 'b2b'
+              ? 'bg-purple-600 text-white border-purple-300'
+              : 'bg-emerald-500 text-slate-950 border-emerald-300'
+          }">
+            <span class="text-[10px] font-black leading-none">+${j.fee.toLocaleString('fr-FR')} F</span>
+          </div>
+        </div>
+      `;
+
+      const jobMarker = L.marker([j.lat, j.lng], {
+        icon: L.divIcon({
+          className: 'job-radar-marker',
+          html: jobIconHtml,
+          iconSize: [60, 24],
+          iconAnchor: [30, 12]
+        })
+      });
+
+      jobMarker.on('click', () => {
+        setSelectedCourier(null);
+        setSelectedJob(j);
+      });
+
+      markersGroup.addLayer(jobMarker);
+    });
+
+  }, [driverCoords, isOnline, radarRadiusKm, vehicleFilter, simulatedCouriers, radarJobs, language, driverCommune]);
+
+  // Recenter Map
+  const handleRecenter = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([driverCoords.lat, driverCoords.lng], 14, {
+        duration: 1.2
+      });
+      playGpsChime();
+      addToast(
+        language === 'en' ? "Radar Recentered" : "Radar Recentré",
+        `${driverCommune} • GPS 100% Fixé`,
+        "info"
+      );
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.zoomIn();
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.zoomOut();
     }
   };
 
   return (
-    <div id="driver-radar-view" className="relative w-full h-[calc(100vh-140px)] min-h-[580px] rounded-3xl overflow-hidden bg-[#06102E] border border-slate-800 shadow-2xl flex flex-col justify-between select-none">
-      {/* Top Map HUD: Current Position Pill & Style Switcher */}
-      <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between gap-3 pointer-events-none">
-        {/* Left: Driver GPS Location & Accuracy Badge */}
-        <div className="flex items-center gap-2 pointer-events-auto bg-[#06102E]/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/80 shadow-xl">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-          <MapPin className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs font-black text-white">{driverCommune}</span>
-          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">({driverCoords.lat.toFixed(4)}, {driverCoords.lng.toFixed(4)})</span>
-          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-1.5 py-0.5 rounded border border-emerald-500/30">
-            GPS Fixé
+    <div id="driver-radar-view" className="relative w-full h-[calc(100vh-130px)] min-h-[580px] rounded-3xl overflow-hidden bg-[#040814] border border-slate-800 shadow-2xl flex flex-col justify-between select-none">
+      {/* Real Interactive Leaflet Map Container */}
+      <div 
+        ref={mapContainerRef} 
+        id="leaflet-radar-map-canvas"
+        className="absolute inset-0 w-full h-full z-0 bg-[#040814]"
+      />
+
+      {/* Rotating Radar Sweep Overlay */}
+      {isOnline && (
+        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden flex items-center justify-center">
+          <div 
+            className="w-[500px] h-[500px] sm:w-[680px] sm:h-[680px] rounded-full opacity-40 mix-blend-screen"
+            style={{
+              background: 'conic-gradient(from 0deg, rgba(16, 185, 129, 0.45) 0deg, rgba(16, 185, 129, 0.06) 50deg, transparent 80deg, transparent 360deg)',
+              animation: 'spin 4s linear infinite'
+            }}
+          />
+        </div>
+      )}
+
+      {/* TOP HUD : Live Status & Fast Map Controls */}
+      <div className="relative z-20 p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5 pointer-events-none">
+        {/* Left: Driver GPS Commune Pill */}
+        <div className="pointer-events-auto flex items-center gap-2 bg-[#06102E]/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700 shadow-2xl">
+          <div className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
+          <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="leading-tight">
+            <span className="text-xs font-black text-white block">{driverCommune}</span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {driverCoords.lat.toFixed(3)}, {driverCoords.lng.toFixed(3)}
+            </span>
+          </div>
+          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2 py-0.5 rounded-md border border-emerald-500/30">
+            {language === 'en' ? 'LIVE GPS' : 'GPS RÉEL'}
           </span>
         </div>
 
-        {/* Right: Active Radar Counter & Map Controls */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="bg-[#06102E]/90 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-700/80 shadow-xl flex items-center gap-2 text-xs text-slate-300 font-bold">
-            <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
-            <span>{simulatedCouriers.length + (isOnline ? 1 : 0)} livreurs en ligne</span>
+        {/* Right: Online Couriers Count + Map Style Toggle */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <div className="bg-[#06102E]/90 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-700 shadow-xl flex items-center gap-2 text-xs text-slate-300 font-bold">
+            <Radio className={`w-4 h-4 ${isOnline ? 'text-emerald-400 animate-pulse' : 'text-slate-500'}`} />
+            <span>{simulatedCouriers.length + (isOnline ? 1 : 0)} {language === 'en' ? 'active couriers' : 'livreurs en ligne'}</span>
           </div>
 
           <button
-            onClick={() => setMapStyle(prev => prev === 'night' ? 'satellite' : 'night')}
-            className="p-2.5 rounded-2xl bg-[#06102E]/90 backdrop-blur-md border border-slate-700/80 text-slate-300 hover:text-white shadow-xl transition-all"
-            title="Changer le style de carte"
+            id="btn-radar-style-toggle"
+            type="button"
+            onClick={() => {
+              const styles: ('dark' | 'streets' | 'satellite')[] = ['dark', 'streets', 'satellite'];
+              const nextIndex = (styles.indexOf(mapStyle) + 1) % styles.length;
+              setMapStyle(styles[nextIndex]);
+              addToast(
+                language === 'en' ? "Map Style" : "Style de Carte",
+                styles[nextIndex] === 'satellite' ? "Vue Satellite HD" : styles[nextIndex] === 'streets' ? "Plan des Rues" : "Radar Nocturne VTC",
+                "info"
+              );
+            }}
+            className="p-2.5 rounded-2xl bg-[#06102E]/90 backdrop-blur-md border border-slate-700 text-sky-400 hover:text-white shadow-xl transition-all cursor-pointer active:scale-95"
+            title={language === 'en' ? "Toggle Map Style (Night / Streets / Satellite)" : "Changer le style de carte (Nuit / Rues / Satellite)"}
           >
             <Layers className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Main Fullscreen Interactive Radar Canvas */}
-      <div className="relative flex-1 w-full h-full overflow-hidden">
-        {/* Map Background Canvas */}
-        <div 
-          className="absolute inset-0 transition-all duration-300"
-          style={{
-            transform: `scale(${mapZoom})`,
-            transformOrigin: `${driverPos.x}% ${driverPos.y}%`
-          }}
+      {/* Floating Right Map Buttons (Zoom & Recenter) */}
+      <div className="absolute right-3 sm:right-4 top-24 z-20 flex flex-col gap-2 pointer-events-auto">
+        <button
+          id="btn-radar-recenter"
+          type="button"
+          onClick={handleRecenter}
+          className="p-2.5 rounded-2xl bg-[#06102E]/95 hover:bg-slate-800 border border-slate-700 text-emerald-400 shadow-xl transition-all cursor-pointer active:scale-90"
+          title={language === 'en' ? "Recenter to my location" : "Recentrer sur ma position"}
         >
-          {/* Base SVG Map Grid of Abidjan */}
-          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              {/* Ébrié Lagoon Gradient */}
-              <linearGradient id="lagoonWater" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#0B1A3D" />
-                <stop offset="100%" stopColor="#061226" />
-              </linearGradient>
+          <Locate className="w-4 h-4" />
+        </button>
 
-              {/* Radar Glow Radial Gradient centered on driver */}
-              <radialGradient id="radarGlow" cx={`${driverPos.x}%`} cy={`${driverPos.y}%`} r="35%">
-                <stop offset="0%" stopColor="#10B981" stopOpacity="0.25" />
-                <stop offset="50%" stopColor="#10B981" stopOpacity="0.08" />
-                <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
-              </radialGradient>
-            </defs>
+        <button
+          id="btn-radar-zoom-in"
+          type="button"
+          onClick={handleZoomIn}
+          className="p-2.5 rounded-2xl bg-[#06102E]/95 hover:bg-slate-800 border border-slate-700 text-white shadow-xl transition-all cursor-pointer active:scale-90"
+          title="Zoom +"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
 
-            {/* Dark Map Base Texture */}
-            <rect width="100" height="100" fill={mapStyle === 'night' ? '#04091A' : '#07152A'} />
+        <button
+          id="btn-radar-zoom-out"
+          type="button"
+          onClick={handleZoomOut}
+          className="p-2.5 rounded-2xl bg-[#06102E]/95 hover:bg-slate-800 border border-slate-700 text-white shadow-xl transition-all cursor-pointer active:scale-90"
+          title="Zoom -"
+        >
+          <Minus className="w-4 h-4" />
+        </button>
+      </div>
 
-            {/* Road Grid Lines (Boulevards & Expressways of Abidjan) */}
-            <g stroke="#1E293B" strokeWidth="0.35" strokeDasharray="1,1" opacity="0.6">
-              <line x1="0" y1="20" x2="100" y2="20" />
-              <line x1="0" y1="40" x2="100" y2="40" />
-              <line x1="0" y1="60" x2="100" y2="60" />
-              <line x1="0" y1="80" x2="100" y2="80" />
-              <line x1="20" y1="0" x2="20" y2="100" />
-              <line x1="40" y1="0" x2="40" y2="100" />
-              <line x1="60" y1="0" x2="60" y2="100" />
-              <line x1="80" y1="0" x2="80" y2="100" />
-            </g>
-
-            {/* Stylized Ébrié Lagoon Waterbody */}
-            <path
-              d="M 5,68 Q 20,60 38,62 Q 55,64 68,58 Q 82,52 96,65 L 96,82 Q 75,76 52,78 Q 28,80 5,82 Z"
-              fill="url(#lagoonWater)"
-              stroke="#1D3557"
-              strokeWidth="0.5"
-            />
-            <path
-              d="M 28,62 Q 40,55 58,56 Q 72,58 85,50 L 88,58 Q 65,65 42,66 Z"
-              fill="url(#lagoonWater)"
-              stroke="#1D3557"
-              strokeWidth="0.4"
-            />
-
-            {/* Major Bridges of Abidjan (H.K.B, De Gaulle, Houphouët-Boigny, 5e Pont Cocody) */}
-            {/* 5e Pont Alassane Ouattara (Cocody <-> Plateau) */}
-            <line x1="48" y1="48" x2="53" y2="45" stroke="#F97316" strokeWidth="0.8" strokeLinecap="round" opacity="0.9" />
-            {/* Pont H.K.B (Riviera <-> Marcory) */}
-            <line x1="64" y1="52" x2="66" y2="64" stroke="#38BDF8" strokeWidth="0.7" strokeLinecap="round" />
-            {/* Pont Général de Gaulle (Plateau <-> Treichville) */}
-            <line x1="46" y1="58" x2="48" y2="66" stroke="#38BDF8" strokeWidth="0.7" strokeLinecap="round" />
-
-            {/* Major Arteries (Autoroute du Nord, Bd Latrille, VGE) */}
-            <path d="M 10,25 Q 35,32 50,44 Q 65,58 75,85" fill="none" stroke="#334155" strokeWidth="0.9" opacity="0.8" />
-            <path d="M 45,15 L 50,45 L 48,70 L 52,95" fill="none" stroke="#334155" strokeWidth="0.8" opacity="0.8" />
-            <path d="M 52,65 Q 68,72 88,80" fill="none" stroke="#334155" strokeWidth="0.8" opacity="0.8" />
-
-            {/* Radar Circular Scanning Rings centered on current driver */}
-            <circle cx={`${driverPos.x}%`} cy={`${driverPos.y}%`} r="8" fill="none" stroke="#10B981" strokeWidth="0.3" strokeDasharray="1,1" opacity="0.8" />
-            <circle cx={`${driverPos.x}%`} cy={`${driverPos.y}%`} r="16" fill="none" stroke="#10B981" strokeWidth="0.3" strokeDasharray="2,2" opacity="0.6" />
-            <circle cx={`${driverPos.x}%`} cy={`${driverPos.y}%`} r="26" fill="none" stroke="#10B981" strokeWidth="0.25" strokeDasharray="2,2" opacity="0.4" />
-            <circle cx={`${driverPos.x}%`} cy={`${driverPos.y}%`} r="38" fill="none" stroke="#10B981" strokeWidth="0.2" opacity="0.2" />
-
-            {/* Radar Ambient Radial Glow */}
-            <circle cx={`${driverPos.x}%`} cy={`${driverPos.y}%`} r="35" fill="url(#radarGlow)" />
-          </svg>
-
-          {/* Active Radar Sweep Beam Animation */}
-          {isOnline && (
-            <div 
-              className="absolute pointer-events-none rounded-full"
-              style={{
-                left: `${driverPos.x}%`,
-                top: `${driverPos.y}%`,
-                width: '420px',
-                height: '420px',
-                transform: 'translate(-50%, -50%)',
-                background: 'conic-gradient(from 0deg, rgba(16, 185, 129, 0.35) 0deg, rgba(16, 185, 129, 0.08) 60deg, transparent 90deg, transparent 360deg)',
-                animation: 'spin 4s linear infinite'
-              }}
-            />
-          )}
-
-          {/* Major Commune Labels on Map */}
-          {ALL_COMMUNES.slice(0, 10).map((commune) => {
-            const pos = projectToMapCoords(commune.coords.lat, commune.coords.lng);
-            return (
-              <div
-                key={commune.id}
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center"
-                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-slate-600/50 mx-auto mb-0.5" />
-                <span className="text-[10px] font-bold text-slate-400/80 uppercase tracking-widest px-1 py-0.2 rounded bg-slate-950/40 backdrop-blur-[1px]">
-                  {commune.name}
-                </span>
-              </div>
-            );
-          })}
-
-          {/* Other Online Couriers Pins */}
-          {simulatedCouriers.map((courier) => {
-            const pos = projectToMapCoords(courier.lat, courier.lng);
-            return (
-              <div
-                key={courier.id}
-                onClick={() => setSelectedCourier(courier)}
-                className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group z-10 transition-transform hover:scale-125"
-                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-              >
-                <div className="relative">
-                  {/* Courier vehicle marker badge */}
-                  <div className="w-8 h-8 rounded-full bg-slate-900/90 border border-slate-600 text-slate-200 flex items-center justify-center shadow-lg group-hover:border-emerald-400 group-hover:text-emerald-300 transition-colors">
-                    {getVehicleIcon(courier.vehicle)}
-                  </div>
-                  {/* Small online green dot */}
-                  <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-slate-900" />
-                </div>
-
-                {/* Name tooltip on hover */}
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 pointer-events-none whitespace-nowrap bg-slate-950/95 border border-slate-700 px-2 py-1 rounded-lg text-[10px] text-white shadow-2xl z-30">
-                  <span className="font-bold text-emerald-400">{courier.name}</span>
-                  <span className="text-slate-400 block text-[9px]">{courier.commune} • {courier.plate}</span>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Current Driver's GPS Position Marker */}
-          <div
-            className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20"
-            style={{ left: `${driverPos.x}%`, top: `${driverPos.y}%` }}
-          >
-            {/* Multiple pulsing animated rings */}
-            <div className={`absolute -inset-4 rounded-full ${isOnline ? 'bg-emerald-500/25 animate-ping' : 'bg-red-500/20'}`} />
-            <div className={`absolute -inset-8 rounded-full ${isOnline ? 'bg-emerald-500/15 animate-pulse' : 'bg-transparent'}`} />
-
-            {/* Main Driver Pin */}
-            <div className={`relative w-11 h-11 rounded-2xl flex items-center justify-center shadow-2xl border-2 transition-all ${
-              isOnline
-                ? 'bg-emerald-500 text-slate-950 border-white shadow-emerald-500/50 scale-105'
-                : 'bg-red-950/90 text-red-300 border-red-500/60'
-            }`}>
-              <Navigation className="w-5 h-5 fill-current transform rotate-45 stroke-[2.5]" />
-              
-              {/* Star rating micro-badge */}
-              <div className="absolute -bottom-1 -right-1 bg-slate-950 text-amber-400 text-[8px] font-mono-num font-black px-1 rounded-full border border-amber-500/40">
-                ★ 4.9
-              </div>
-            </div>
-
-            {/* Driver Identity Label */}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap bg-slate-950/90 backdrop-blur-md border border-slate-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold text-white shadow-xl">
-              <span className="text-emerald-400">VOUS</span> ({driverCommune})
-            </div>
-          </div>
-        </div>
-
-        {/* Selected Courier Detail Popover */}
+      {/* BOTTOM SHEET / HUD CONTROLS */}
+      <div className="relative z-20 m-2.5 sm:m-3.5 space-y-2.5">
+        {/* Detail Popup Card for Selected Courier */}
         {selectedCourier && (
-          <div className="absolute top-16 left-4 z-30 w-72 bg-[#0C121E]/95 backdrop-blur-xl border border-slate-700 rounded-2xl p-3.5 shadow-2xl animate-in fade-in">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center justify-center">
-                  {getVehicleIcon(selectedCourier.vehicle, 'w-4 h-4')}
+          <div className="p-3.5 rounded-2xl bg-[#080E1A]/95 backdrop-blur-md border border-sky-500/40 shadow-2xl animate-in slide-in-from-bottom-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-lg border border-sky-500/30">
+                  {selectedCourier.vehicle === 'cargo' ? '🚛' : selectedCourier.vehicle === 'voiture' ? '🚗' : '🛵'}
                 </div>
                 <div>
-                  <h4 className="font-bold text-xs text-white">{selectedCourier.name}</h4>
-                  <span className="text-[10px] text-slate-400">{selectedCourier.commune} • {selectedCourier.plate}</span>
+                  <h4 className="text-xs font-black text-white">{selectedCourier.name}</h4>
+                  <p className="text-[11px] text-slate-400">
+                    {selectedCourier.plate} • {selectedCourier.commune} • ⭐ {selectedCourier.rating}
+                  </p>
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedCourier(null)}
-                className="text-slate-400 hover:text-white text-xs p-1"
+                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
-            </div>
-            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">Statut : <strong className="text-emerald-400 font-bold">En ligne</strong></span>
-              <span className="text-amber-400 font-mono font-bold">★ {selectedCourier.rating} / 5.0</span>
             </div>
           </div>
         )}
 
-        {/* Floating Map Zoom & Recenter Controls */}
-        <div className="absolute right-4 bottom-24 z-20 flex flex-col gap-2">
-          <button
-            onClick={() => setMapZoom(prev => Math.min(2.2, prev + 0.3))}
-            className="w-10 h-10 rounded-2xl bg-[#06102E]/90 backdrop-blur-md border border-slate-700/80 text-white flex items-center justify-center shadow-xl hover:bg-slate-800 active:scale-95 transition-all"
-            title="Zoomer"
-          >
-            <Plus className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setMapZoom(prev => Math.max(0.8, prev - 0.3))}
-            className="w-10 h-10 rounded-2xl bg-[#06102E]/90 backdrop-blur-md border border-slate-700/80 text-white flex items-center justify-center shadow-xl hover:bg-slate-800 active:scale-95 transition-all"
-            title="Dézoomer"
-          >
-            <Minus className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setMapZoom(1)}
-            className="w-10 h-10 rounded-2xl bg-[#06102E]/90 backdrop-blur-md border border-slate-700/80 text-emerald-400 flex items-center justify-center shadow-xl hover:bg-slate-800 active:scale-95 transition-all"
-            title="Recentrer sur ma position"
-          >
-            <Locate className="w-5 h-5" />
-          </button>
-        </div>
+        {/* Detail Popup Card for Selected Delivery Opportunity */}
+        {selectedJob && (
+          <div className="p-3.5 rounded-2xl bg-[#080E1A]/95 backdrop-blur-md border border-emerald-500/40 shadow-2xl animate-in slide-in-from-bottom-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  {selectedJob.type === 'urgent' ? '🔥 URGENT' : selectedJob.type === 'b2b' ? '🏢 B2B' : '📦 COLIS'}
+                </span>
+                <span className="text-xs font-extrabold text-white truncate">{selectedJob.title}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedJob(null)}
+                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-        {/* Central Master Status Toggle Button (Prominent Bottom Center) */}
-        <div className="absolute bottom-6 left-0 right-0 z-20 flex flex-col items-center justify-center px-4 pointer-events-none">
-          <button
-            id="driver-radar-central-status-toggle"
-            onClick={toggleDriverAvailability}
-            className={`pointer-events-auto px-6 sm:px-8 py-3.5 rounded-full font-black text-xs sm:text-sm flex items-center gap-3 transition-all shadow-2xl active:scale-95 cursor-pointer border ${
-              isOnline
-                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 border-emerald-300 ring-4 ring-emerald-500/30 shadow-emerald-500/40'
-                : 'bg-slate-900/95 hover:bg-slate-800 text-slate-300 border-red-500/50 ring-4 ring-red-500/20 shadow-black/80'
-            }`}
-          >
-            <span className={`w-3.5 h-3.5 rounded-full ${isOnline ? 'bg-slate-950 animate-pulse' : 'bg-red-500'}`} />
-            <Power className={`w-4 h-4 ${isOnline ? 'text-slate-950' : 'text-red-400'}`} />
-            <span className="tracking-wide">
-              {isOnline ? '🟢 EN SERVICE (RADAR EN LIGNE)' : '🔴 HORS LIGNE (PASSER EN SERVICE)'}
-            </span>
-          </button>
-          <p className="text-[10px] text-slate-400/90 font-medium mt-2 bg-[#06102E]/80 backdrop-blur-sm px-3 py-0.5 rounded-full border border-slate-800 pointer-events-auto">
-            {isOnline 
-              ? '✓ Votre position est diffusée sur le réseau d\'attribution prioritaire' 
-              : 'Cliquez pour activer votre géolocalisation et recevoir les courses'}
-          </p>
+            <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800">
+              <span className="text-slate-300">
+                {selectedJob.pickupCommune} ➔ {selectedJob.dropoffCommune} ({selectedJob.distanceKm} km)
+              </span>
+              <span className="font-mono font-black text-emerald-400">
+                +{selectedJob.fee.toLocaleString('fr-FR')} FCFA
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Master Bottom Control Bar */}
+        <div className="p-3.5 sm:p-4 rounded-3xl bg-[#06102E]/95 backdrop-blur-md border border-slate-800 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* Online/Offline Status Switch */}
+          <div className="flex items-center justify-between w-full sm:w-auto gap-3">
+            <button
+              id="btn-radar-toggle-availability"
+              type="button"
+              onClick={() => {
+                toggleDriverAvailability();
+                playGpsChime();
+              }}
+              className={`flex-1 sm:flex-initial px-4 py-2.5 rounded-2xl font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 ${
+                isOnline
+                  ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                  : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20'
+              }`}
+            >
+              <Power className="w-4 h-4" />
+              <span>{isOnline ? (language === 'en' ? 'ONLINE (SCANNING)' : 'EN LIGNE (RADAR ACTIF)') : (language === 'en' ? 'OFFLINE' : 'HORS LIGNE')}</span>
+            </button>
+
+            {/* Radar Radius Range Selector */}
+            <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-2xl border border-slate-800">
+              {[3, 5, 10].map(radius => (
+                <button
+                  key={radius}
+                  type="button"
+                  onClick={() => {
+                    setRadarRadiusKm(radius);
+                    addToast(
+                      language === 'en' ? `Radar Range: ${radius} km` : `Portée Radar : ${radius} km`,
+                      language === 'en' ? `Scanning radius adjusted to ${radius} km.` : `Rayon de détection ajusté à ${radius} km.`,
+                      "info"
+                    );
+                  }}
+                  className={`px-2.5 py-1 rounded-xl text-[11px] font-mono font-bold transition-all cursor-pointer ${
+                    radarRadiusKm === radius
+                      ? 'bg-emerald-500 text-slate-950 font-black shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {radius} km
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Vehicle Type Filter */}
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto justify-start sm:justify-end">
+            {[
+              { id: 'all', label: language === 'en' ? 'All' : 'Tous', icon: Filter },
+              { id: 'moto', label: 'Motos', icon: Bike },
+              { id: 'voiture', label: 'Autos', icon: Car },
+              { id: 'cargo', label: 'Cargo', icon: Truck }
+            ].map(f => {
+              const Icon = f.icon;
+              const isSelected = vehicleFilter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setVehicleFilter(f.id as any)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
+                    isSelected
+                      ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40'
+                      : 'bg-slate-900/60 text-slate-400 border border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{f.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

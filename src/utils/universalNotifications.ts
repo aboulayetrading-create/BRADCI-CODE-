@@ -255,7 +255,7 @@ export async function sendUniversalPush(
     vibrate?: number[];
   } = {}
 ): Promise<boolean> {
-  const icon = options.icon || '/icon.png';
+  const icon = options.icon || './icon.png';
   const vibrate = options.vibrate || [200, 100, 200];
 
   // 1. Application native Capacitor (Android APK)
@@ -343,8 +343,8 @@ export async function sendTestNotification(
       if (reg && 'showNotification' in reg) {
         await reg.showNotification(title, {
           body,
-          icon: '/icon.png',
-          badge: '/icon.png',
+          icon: './icon.png',
+          badge: './icon.png',
           vibrate: [200, 100, 200],
           tag: 'bradci-notification',
           renotify: true,
@@ -356,7 +356,7 @@ export async function sendTestNotification(
           type: 'SEND_TEST_NOTIFICATION',
           title,
           body,
-          icon: '/icon.png'
+          icon: './icon.png'
         });
         return true;
       }
@@ -367,8 +367,8 @@ export async function sendTestNotification(
 
   // 2. Essai via sendUniversalPush (Android Capacitor natif / Web Notification API)
   return await sendUniversalPush(title, body, {
-    icon: '/icon.png',
-    badge: '/icon.png',
+    icon: './icon.png',
+    badge: './icon.png',
     url: '/'
   });
 }

@@ -24,12 +24,28 @@ export const PricingModal: React.FC = () => {
     translate
   } = useApp();
 
-  const [selectedPlan, setSelectedPlan] = useState<SellerPlan | DriverPlan | 'boost'>(
-    targetPlanForPricing || 'standard'
-  );
+  const isDriverUser = currentUser?.role === 'driver' || targetPlanForPricing === 'vip_pass';
+
+  const [selectedPlan, setSelectedPlan] = useState<SellerPlan | DriverPlan | 'boost'>(() => {
+    if (targetPlanForPricing) {
+      if (targetPlanForPricing === 'vip_pass' && currentUser?.role !== 'driver') {
+        return 'standard';
+      }
+      return targetPlanForPricing;
+    }
+    return currentUser?.role === 'driver' ? 'vip_pass' : 'standard';
+  });
+
   const [paymentMethod, setPaymentMethod] = useState<'wave' | 'orange' | 'mtn' | 'moov'>('wave');
   const [phoneNumber, setPhoneNumber] = useState(currentUser?.phone || '+225 07 48 92 11 34');
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fallback safety if role changes or plan is vip_pass for a non-driver
+  React.useEffect(() => {
+    if (currentUser?.role !== 'driver' && selectedPlan === 'vip_pass') {
+      setSelectedPlan('standard');
+    }
+  }, [currentUser?.role, selectedPlan]);
 
   if (!pricingModalOpen) return null;
 
@@ -76,260 +92,295 @@ export const PricingModal: React.FC = () => {
           <X className="w-5 h-5" />
         </button>
 
-        {/* Title */}
+        {/* Title & Header */}
         <div className="text-center max-w-2xl mx-auto mb-6">
           <div className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-3.5 py-1 rounded-full text-xs font-bold border border-emerald-500/20 mb-2">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>{translate("Publication 100% Illimitée & Gratuite pour Tous", "100% Free & Unlimited Listings for All")}</span>
+            <span>
+              {isDriverUser 
+                ? translate("Espace Chauffeur & Coursier Agréé BRAD'CI", "Approved BRAD'CI Driver & Courier Space")
+                : translate("Publication 100% Illimitée & Gratuite pour Tous", "100% Free & Unlimited Listings for All")
+              }
+            </span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-display">
-            {translate("Passez au Niveau Supérieur avec les Pass BRAD'CI", "Level Up Your Business with BRAD'CI Passes")}
+            {isDriverUser
+              ? translate("Pass Livreur VIP BRAD'CI", "BRAD'CI VIP Courier Pass")
+              : translate("Passez au Niveau Supérieur avec les Pass Vendeurs BRAD'CI", "Level Up with BRAD'CI Seller Passes")
+            }
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-2">
-            {translate(
-              "Les comptes basiques publient librement sans limite. Les Pass Professionnels vous permettent de passer au sérieux : réduisez drastiquement vos commissions, obtenez un badge de confiance certifié et maximisez vos ventes.",
-              "Basic accounts post freely with zero limits. Professional Passes let you get serious: drastically cut commission fees, get certified trust badges, and maximize your sales."
-            )}
+            {isDriverUser
+              ? translate(
+                  "Offre exclusive réservée aux livreurs et transporteurs partenaires. Profitez de 0% de commission et d'un accès prioritaire aux courses d'Abidjan.",
+                  "Exclusive offer reserved for couriers and delivery drivers. Enjoy 0% commission and priority access to Abidjan deliveries."
+                )
+              : translate(
+                  "Les comptes basiques publient librement sans limite. Les Pass Vendeurs vous permettent de passer au sérieux : réduisez drastiquement vos commissions, obtenez un badge de confiance certifié et maximisez vos ventes.",
+                  "Basic accounts post freely with zero limits. Seller Passes let you get serious: drastically cut commission fees, get certified trust badges, and maximize your sales."
+                )
+            }
           </p>
         </div>
 
-        {/* Free Basic Perks Reminder Banner */}
+        {/* Perks Reminder Banner */}
         <div className="mb-6 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-slate-900/80 to-emerald-500/10 border border-emerald-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2.5 text-emerald-300">
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <div>
-              <span className="font-bold text-white block">{translate("Compte Basique Gratuit (0 FCFA)", "Free Basic Account (0 FCFA)")}</span>
-              <span className="text-[11px] text-slate-300">{translate("Liberté de poste totale : Annonces Boutiques & Enchères illimitées sans abonnement obligatoire.", "Total posting freedom: Unlimited Shop listings & Live Auctions without mandatory subscription.")}</span>
+              <span className="font-bold text-white block">
+                {isDriverUser
+                  ? translate("Accès Bourse de Fret 100% Offert (0 FCFA)", "100% Free Delivery Board Access (0 FCFA)")
+                  : translate("Compte Vendeur & Acheteur Gratuit (0 FCFA)", "Free Buyer & Seller Account (0 FCFA)")
+                }
+              </span>
+              <span className="text-[11px] text-slate-300">
+                {isDriverUser
+                  ? translate("Phase de lancement : Toutes les courses sont sans frais d'abonnement pour les chauffeurs certifiés.", "Launch phase: All deliveries have zero subscription fee for verified drivers.")
+                  : translate("Liberté de poste totale : Annonces Boutiques & Enchères illimitées sans abonnement obligatoire.", "Total posting freedom: Unlimited Shop listings & Live Auctions without mandatory subscription.")
+                }
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2.5 py-1 rounded-lg border border-emerald-500/30">
-              {translate("✓ 0 FCFA / Toujours Gratuit", "✓ 0 FCFA / Always Free")}
+              {translate("✓ 0 FCFA / Actuellement Gratuit", "✓ 0 FCFA / Currently Free")}
             </span>
           </div>
         </div>
 
-        {/* 4 Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {/* Card 1: Boost Flash (1 000 FCFA) */}
-          <div 
-            onClick={() => setSelectedPlan('boost')}
-            className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
-              selectedPlan === 'boost'
-                ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-500/10 scale-[1.02]'
-                : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-                  {translate("À l'acte", "One-time")}
-                </span>
-              </div>
-              <h3 className="font-bold text-sm text-white">Boost Flash</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">{translate("Propulsion 48h", "48h Feed Boost")}</p>
-              <div className="mt-3 mb-4">
-                <span className="text-xl font-extrabold text-white font-mono-num">1 000 F</span>
-                <span className="text-[10px] text-slate-400"> {translate("/ annonce", "/ listing")}</span>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-300">
-                <li className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{translate("En tête de liste du feed Abidjan", "Top priority in Abidjan feed")}</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{translate("Badge doré \"En Vedette\"", "Golden \"Featured\" Badge")}</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{translate("5x plus d'enchérisseurs & d'appels", "5x more bidders & calls")}</span>
-                </li>
-              </ul>
-            </div>
-            <button 
-              type="button" 
-              className={`mt-4 w-full py-2 rounded-xl text-xs font-bold transition-all ${
-                selectedPlan === 'boost' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'
-              }`}
+        {/* Cards Grid: DRIVER VIEW vs BUYER/SELLER VIEW */}
+        {isDriverUser ? (
+          /* Driver View: ONLY Pass Livreur VIP (With Bientôt Option) */
+          <div className="max-w-xl mx-auto mb-8">
+            <div 
+              onClick={() => setSelectedPlan('vip_pass')}
+              className="p-6 rounded-3xl border border-emerald-500/40 bg-gradient-to-br from-[#0C121E] via-[#06102E] to-[#0C121E] shadow-2xl relative transition-all"
             >
-              {translate("Sélectionner", "Select")}
-            </button>
-          </div>
+              <div className="absolute -top-3 right-6 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-[10px] uppercase px-3 py-1 rounded-full shadow-lg border border-amber-300 flex items-center gap-1.5">
+                <span>⏳</span>
+                <span>{translate("OPTION BIENTÔT DISPONIBLE", "COMING SOON OPTION")}</span>
+              </div>
 
-          {/* Card 2: Pass Vendeur Certifié (5 000 FCFA) */}
-          <div 
-            onClick={() => setSelectedPlan('standard')}
-            className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
-              selectedPlan === 'standard'
-                ? 'bg-blue-500/15 border-blue-400 shadow-lg shadow-blue-500/10 scale-[1.02]'
-                : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="absolute -top-2.5 right-3 bg-blue-500 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full shadow">
-              {translate("PRO CERTIFIÉ", "CERTIFIED PRO")}
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400">
-                  <ShieldCheck className="w-4 h-4" />
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 border border-emerald-500/30">
+                    <Bike className="w-5 h-5" />
+                  </div>
+                  <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/30">
+                    {translate("Courses Illimitées Actives (0 FCFA)", "Unlimited Runs Active (0 FCFA)")}
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded">
-                  {translate("Boutique Certifiée", "Certified Shop")}
-                </span>
-              </div>
-              <h3 className="font-bold text-sm text-white">{translate("Pass Vendeur Certifié", "Certified Seller Pass")}</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">{translate("Passez au sérieux & gagnez +", "Get serious & earn more")}</p>
-              <div className="mt-3 mb-4">
-                <span className="text-xl font-extrabold text-white font-mono-num">5 000 F</span>
-                <span className="text-[10px] text-slate-400"> {translate("/ mois", "/ mo")}</span>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-300">
-                <li className="flex items-start gap-1.5 text-blue-200 font-semibold">
-                  <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                  <span>{translate("Badge officiel \"Vendeur Certifié & Vérifié\"", "Official \"Verified Seller\" badge")}</span>
-                </li>
-                <li className="flex items-start gap-1.5 text-blue-200 font-semibold">
-                  <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                  <span>{translate("Commission réduite à 5% seulement", "Reduced fee down to only 5%")}</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                  <span>{translate("Vitrine Boutique Personnalisée (Logo & Bannière)", "Custom Storefront (Logo & Banner)")}</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                  <span>{translate("Paiements directs & virements instantanés", "Direct payments & instant payouts")}</span>
-                </li>
-              </ul>
-            </div>
-            <button 
-              type="button" 
-              className={`mt-4 w-full py-2 rounded-xl text-xs font-bold transition-all ${
-                selectedPlan === 'standard' ? 'bg-blue-500 text-slate-950' : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              {translate("Sélectionner", "Select")}
-            </button>
-          </div>
 
-          {/* Card 3: Pass Illimité - Boutique VIP Or (10 000 FCFA) */}
-          <div 
-            onClick={() => setSelectedPlan('pro')}
-            className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
-              selectedPlan === 'pro'
-                ? 'bg-amber-500/15 border-amber-400 shadow-xl shadow-amber-500/20 scale-[1.02]'
-                : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="absolute -top-2.5 right-3 bg-amber-400 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full shadow">
-              {translate("ÉLITE OR", "GOLD ELITE")}
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400">
-                  <Crown className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-                  {translate("Boutique Or VIP", "VIP Gold Store")}
-                </span>
-              </div>
-              <h3 className="font-bold text-sm text-white">{translate("Pass Vendeur Or VIP", "VIP Gold Seller Pass")}</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">{translate("Commission minimale 2.5%", "Minimum 2.5% fee")}</p>
-              <div className="mt-3 mb-4">
-                <span className="text-xl font-extrabold text-white font-mono-num">10 000 F</span>
-                <span className="text-[10px] text-slate-400"> {translate("/ mois", "/ mo")}</span>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-300">
-                <li className="flex items-start gap-1.5 text-amber-300 font-bold">
-                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{translate("Badge Prestige \"Boutique Officielle Or VIP\"", "Prestige \"VIP Gold Store\" Badge")}</span>
-                </li>
-                <li className="flex items-start gap-1.5 text-amber-300 font-bold">
-                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{translate("Commission record minimale : 2.5% seulement", "Record low commission: only 2.5%")}</span>
-                </li>
-                <li className="flex items-start gap-1.5 font-semibold text-white">
-                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{translate("Top Algorithme Abidjan & En Tête d'Accueil", "Top Abidjan Algorithm & Home Placement")}</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{translate("Radar Demande & Support Dédié VIP 7j/7", "Demand Radar & 7/7 VIP Support")}</span>
-                </li>
-              </ul>
-            </div>
-            <button 
-              type="button" 
-              className={`mt-4 w-full py-2 rounded-xl text-xs font-bold transition-all ${
-                selectedPlan === 'pro' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              {translate("Sélectionner", "Select")}
-            </button>
-          </div>
+                <h3 className="font-extrabold text-lg text-white font-display">
+                  {translate("Pass Livreur VIP BRAD'CI", "BRAD'CI VIP Courier Pass")}
+                </h3>
+                <p className="text-xs text-amber-300 font-medium mt-1">
+                  {translate("Courses illimitées gratuites actives • Lancement officiel bientôt disponible", "Free unlimited runs active • Official launch coming soon")}
+                </p>
 
-          {/* Card 4: Pass Livreur VIP (Coming Soon with Free Unlimited Active) */}
-          <div 
-            onClick={() => setSelectedPlan('vip_pass')}
-            className={`p-4 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
-              selectedPlan === 'vip_pass'
-                ? 'bg-emerald-500/15 border-emerald-400 shadow-xl shadow-emerald-500/20 scale-[1.02]'
-                : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
-            }`}
-          >
-            <div className="absolute -top-2.5 right-3 bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full shadow border border-amber-300 flex items-center gap-1">
-              <span>⏳</span>
-              <span>{translate("PASS BIENTÔT", "COMING SOON")}</span>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                  <Bike className="w-4 h-4" />
+                <div className="mt-4 mb-5 flex flex-wrap items-baseline gap-2">
+                  <span className="text-3xl font-black text-white font-mono-num">6 000 F</span>
+                  <span className="text-xs text-slate-400"> {translate("/ mois", "/ mo")}</span>
+                  <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-md border border-amber-500/30">
+                    {translate("5 Courses d'Essai Offertes au Lancement", "5 Free Trial Runs at Launch")}
+                  </span>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  {translate("Gratuit Actuel (Illimité)", "Currently Free (Unlimited)")}
-                </span>
+
+                <ul className="space-y-2.5 text-xs text-slate-300">
+                  <li className="flex items-start gap-2 text-emerald-300 font-semibold">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{translate("0% de commission sur vos frais de livraison : vous conservez 100% de vos gains", "0% commission on delivery fees: keep 100% of your earnings")}</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-emerald-300 font-semibold">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{translate("Accès illimité sans blocage à toutes les courses prioritaires de Grand Abidjan", "Unlimited unblocked access to all priority deliveries across Grand Abidjan")}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("Badge officiel \"Livreur VIP Certifié\" pour rassurer acheteurs et vendeurs", "Official \"Certified VIP Courier\" badge to reassure clients and sellers")}</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-amber-200 font-medium">
+                    <Check className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("Période d'essai automatique : 5 courses offertes dès l'ouverture officielle", "Automatic trial: 5 free deliveries provided upon official rollout")}</span>
+                  </li>
+                </ul>
               </div>
-              <h3 className="font-bold text-sm text-white">{translate("Pass Livreur VIP", "VIP Courier Pass")}</h3>
-              <p className="text-[11px] text-amber-300 font-medium mt-0.5">
-                {translate("Courses illimitées gratuites actives • Lancement bientôt", "Free unlimited runs active • Launching soon")}
-              </p>
-              <div className="mt-3 mb-4 flex items-baseline gap-2">
-                <span className="text-xl font-extrabold text-white font-mono-num">6 000 F</span>
-                <span className="text-[10px] text-slate-400"> {translate("/ mois", "/ mo")}</span>
-                <span className="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-500/30">
-                  {translate("5 Courses Offertes au Lancement", "5 Free Trial Deliveries at Launch")}
-                </span>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-300">
-                <li className="flex items-start gap-1.5 text-emerald-300 font-semibold">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{translate("Accès illimité sans blocage à toutes les courses d'Abidjan", "Unlimited unblocked access to all deliveries across Abidjan")}</span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{translate("0% de commission sur vos frais de livraison", "0% commission on your delivery earnings")}</span>
-                </li>
-                <li className="flex items-start gap-1.5 text-amber-200">
-                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                  <span>{translate("Période d'essai : 5 courses offertes dès l'activation", "Trial period: 5 free deliveries upon official launch")}</span>
-                </li>
-              </ul>
+
+              <button 
+                type="button" 
+                className="mt-6 w-full py-3 rounded-xl text-xs font-black transition-all bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>⏳</span>
+                <span>{translate("Option Bientôt Disponible (Courses Illimitées Actives)", "Option Coming Soon (Unlimited Runs Active)")}</span>
+              </button>
             </div>
-            <button 
-              type="button" 
-              className={`mt-4 w-full py-2 rounded-xl text-xs font-bold transition-all ${
-                selectedPlan === 'vip_pass' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+          </div>
+        ) : (
+          /* Buyer/Seller View: STRICTLY Seller Passes & Boost (NO Pass Livreur) */
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            {/* Card 1: Boost Flash (1 000 FCFA) */}
+            <div 
+              onClick={() => setSelectedPlan('boost')}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
+                selectedPlan === 'boost'
+                  ? 'bg-amber-500/10 border-amber-500 shadow-lg shadow-amber-500/10 scale-[1.02]'
+                  : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
               }`}
             >
-              {translate("Offre Gratuite Active (Pass Bientôt)", "Free Active (Pass Soon)")}
-            </button>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400">
+                    <Zap className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+                    {translate("À l'acte", "One-time")}
+                  </span>
+                </div>
+                <h3 className="font-bold text-sm text-white">Boost Flash</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">{translate("Propulsion 48h", "48h Feed Boost")}</p>
+                <div className="mt-3 mb-4">
+                  <span className="text-xl font-extrabold text-white font-mono-num">1 000 F</span>
+                  <span className="text-[10px] text-slate-400"> {translate("/ annonce", "/ listing")}</span>
+                </div>
+                <ul className="space-y-2 text-xs text-slate-300">
+                  <li className="flex items-start gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("En tête de liste du feed Abidjan", "Top priority in Abidjan feed")}</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("Badge doré \"En Vedette\"", "Golden \"Featured\" Badge")}</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("5x plus d'enchérisseurs & d'appels", "5x more bidders & calls")}</span>
+                  </li>
+                </ul>
+              </div>
+              <button 
+                type="button" 
+                className={`mt-4 w-full py-2 rounded-xl text-xs font-bold transition-all ${
+                  selectedPlan === 'boost' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                {translate("Sélectionner", "Select")}
+              </button>
+            </div>
+
+            {/* Card 2: Pass Vendeur Certifié (5 000 FCFA) */}
+            <div 
+              onClick={() => setSelectedPlan('standard')}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
+                selectedPlan === 'standard'
+                  ? 'bg-blue-500/15 border-blue-400 shadow-lg shadow-blue-500/10 scale-[1.02]'
+                  : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="absolute -top-2.5 right-3 bg-blue-500 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full shadow">
+                {translate("PRO CERTIFIÉ", "CERTIFIED PRO")}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded">
+                    {translate("Boutique Certifiée", "Certified Shop")}
+                  </span>
+                </div>
+                <h3 className="font-bold text-sm text-white">{translate("Pass Vendeur Certifié", "Certified Seller Pass")}</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">{translate("Passez au sérieux & gagnez +", "Get serious & earn more")}</p>
+                <div className="mt-3 mb-4">
+                  <span className="text-xl font-extrabold text-white font-mono-num">5 000 F</span>
+                  <span className="text-[10px] text-slate-400"> {translate("/ mois", "/ mo")}</span>
+                </div>
+                <ul className="space-y-2 text-xs text-slate-300">
+                  <li className="flex items-start gap-1.5 text-blue-200 font-semibold">
+                    <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                    <span>{translate("Badge officiel \"Vendeur Certifié & Vérifié\"", "Official \"Verified Seller\" badge")}</span>
+                  </li>
+                  <li className="flex items-start gap-1.5 text-blue-200 font-semibold">
+                    <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                    <span>{translate("Commission réduite à 5% seulement", "Reduced fee down to only 5%")}</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                    <span>{translate("Vitrine Boutique Personnalisée (Logo & Bannière)", "Custom Storefront (Logo & Banner)")}</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                    <span>{translate("Paiements directs & virements instantanés", "Direct payments & instant payouts")}</span>
+                  </li>
+                </ul>
+              </div>
+              <button 
+                type="button" 
+                className={`mt-4 w-full py-2 rounded-xl text-xs font-bold transition-all ${
+                  selectedPlan === 'standard' ? 'bg-blue-500 text-slate-950' : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                {translate("Sélectionner", "Select")}
+              </button>
+            </div>
+
+            {/* Card 3: Pass Illimité - Boutique VIP Or (10 000 FCFA) */}
+            <div 
+              onClick={() => setSelectedPlan('pro')}
+              className={`p-5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between relative ${
+                selectedPlan === 'pro'
+                  ? 'bg-amber-500/15 border-amber-400 shadow-xl shadow-amber-500/20 scale-[1.02]'
+                  : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <div className="absolute -top-2.5 right-3 bg-amber-400 text-slate-950 font-black text-[9px] uppercase px-2 py-0.5 rounded-full shadow">
+                {translate("ÉLITE OR", "GOLD ELITE")}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400">
+                    <Crown className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
+                    {translate("Boutique Or VIP", "VIP Gold Store")}
+                  </span>
+                </div>
+                <h3 className="font-bold text-sm text-white">{translate("Pass Vendeur Or VIP", "VIP Gold Seller Pass")}</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">{translate("Commission minimale 2.5%", "Minimum 2.5% fee")}</p>
+                <div className="mt-3 mb-4">
+                  <span className="text-xl font-extrabold text-white font-mono-num">10 000 F</span>
+                  <span className="text-[10px] text-slate-400"> {translate("/ mois", "/ mo")}</span>
+                </div>
+                <ul className="space-y-2 text-xs text-slate-300">
+                  <li className="flex items-start gap-1.5 text-amber-300 font-bold">
+                    <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("Badge Prestige \"Boutique Officielle Or VIP\"", "Prestige \"VIP Gold Store\" Badge")}</span>
+                  </li>
+                  <li className="flex items-start gap-1.5 text-amber-300 font-bold">
+                    <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("Commission record minimale : 2.5% seulement", "Record low commission: only 2.5%")}</span>
+                  </li>
+                  <li className="flex items-start gap-1.5 font-semibold text-white">
+                    <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("Top Algorithme Abidjan & En Tête d'Accueil", "Top Abidjan Algorithm & Home Placement")}</span>
+                  </li>
+                  <li className="flex items-start gap-1.5">
+                    <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <span>{translate("Radar Demande & Support Dédié VIP 7j/7", "Demand Radar & 7/7 VIP Support")}</span>
+                  </li>
+                </ul>
+              </div>
+              <button 
+                type="button" 
+                className={`mt-4 w-full py-2 rounded-xl text-xs font-bold transition-all ${
+                  selectedPlan === 'pro' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                {translate("Sélectionner", "Select")}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Payment Form (Mobile Money Abidjan) */}
         <form onSubmit={handlePay} className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl">
@@ -337,7 +388,7 @@ export const PricingModal: React.FC = () => {
             <div>
               <p className="text-xs text-slate-400">{translate("Formule choisie :", "Selected Plan:")}</p>
               <h4 className="text-base font-bold text-white uppercase tracking-wide flex items-center gap-2">
-                <span>{selectedPlan.toUpperCase()}</span>
+                <span>{selectedPlan === 'vip_pass' ? translate("PASS LIVREUR VIP (BIENTÔT)", "VIP COURIER PASS (SOON)") : selectedPlan.toUpperCase()}</span>
                 <span className="font-mono-num text-amber-400">({getPlanPrice(selectedPlan)})</span>
               </h4>
             </div>
@@ -456,28 +507,57 @@ export const PricingModal: React.FC = () => {
 
         {/* Commission Policy Transparency Box */}
         <div className="mt-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div className="space-y-1">
-            <p className="font-bold text-amber-400 flex items-center gap-1.5">
-              <span>🔨 {translate("Règle Enchères Express :", "Live Auctions Rule:")}</span>
-            </p>
-            <p className="text-slate-300 text-[11px]">
-              {translate(
-                "Toutes les ventes aux enchères sont fixées à 10% de commission, quel que soit le pass vendeur souscrit.",
-                "All live auction sales carry a fixed 10% commission rate, regardless of the active seller pass."
-              )}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <p className="font-bold text-emerald-400 flex items-center gap-1.5">
-              <span>🏪 {translate("Règle Boutiques & Achats Directs :", "Official Stores & Direct Buy Rule:")}</span>
-            </p>
-            <p className="text-slate-300 text-[11px]">
-              {translate(
-                "Compte Basique : 10% | Pass Vendeur Certifié : 5% | Pass VIP Or : 2.5% seulement.",
-                "Basic Account: 10% | Certified Pro: 5% | VIP Gold Pass: only 2.5%."
-              )}
-            </p>
-          </div>
+          {isDriverUser ? (
+            <>
+              <div className="space-y-1">
+                <p className="font-bold text-amber-400 flex items-center gap-1.5">
+                  <span>🛵 {translate("Règle Chauffeurs & Coursiers :", "Drivers & Couriers Rule:")}</span>
+                </p>
+                <p className="text-slate-300 text-[11px]">
+                  {translate(
+                    "0% de commission sur vos frais de livraison. Vous conservez 100% de la rémunération versée par le client ou le vendeur.",
+                    "0% commission on delivery fees. You keep 100% of the payout from customer or seller."
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                  <span>⏳ {translate("Statut Lancement :", "Launch Status:")}</span>
+                </p>
+                <p className="text-slate-300 text-[11px]">
+                  {translate(
+                    "Accès bourse de fret actuellement 100% offert. Au lancement officiel, 5 courses d'essai vous seront offertes avant l'abonnement à 6 000 FCFA.",
+                    "Board access is currently 100% free. At official rollout, 5 free deliveries are granted prior to 6,000 FCFA sub."
+                  )}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <p className="font-bold text-amber-400 flex items-center gap-1.5">
+                  <span>🔨 {translate("Règle Enchères Express :", "Live Auctions Rule:")}</span>
+                </p>
+                <p className="text-slate-300 text-[11px]">
+                  {translate(
+                    "Toutes les ventes aux enchères sont fixées à 10% de commission, quel que soit le pass vendeur souscrit.",
+                    "All live auction sales carry a fixed 10% commission rate, regardless of the active seller pass."
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                  <span>🏪 {translate("Règle Boutiques & Achats Directs :", "Official Stores & Direct Buy Rule:")}</span>
+                </p>
+                <p className="text-slate-300 text-[11px]">
+                  {translate(
+                    "Compte Basique : 10% | Pass Vendeur Certifié : 5% | Pass VIP Or : 2.5% seulement.",
+                    "Basic Account: 10% | Certified Pro: 5% | VIP Gold Pass: only 2.5%."
+                  )}
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mt-4 text-center text-slate-500 text-[11px] flex items-center justify-center gap-1.5">

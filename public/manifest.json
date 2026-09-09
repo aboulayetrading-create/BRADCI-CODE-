@@ -1,25 +1,23 @@
 {
   "short_name": "BRAD'CI",
-  "name": "BRAD'CI - Enchères Express & Déstockage",
-  "description": "Plateforme d'enchères express de seconde main et déstockage sécurisé à Abidjan avec Paiement Direct à la Livraison (POD Mobile Money), bourse de fret et forfaits certifiés.",
+  "name": "BRAD'CI Delivery",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon.png",
+      "src": "icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/",
+  "start_url": "./index.html",
   "background_color": "#06102e",
   "theme_color": "#06102e",
   "display": "standalone",
-  "orientation": "portrait-primary",
-  "scope": "/"
+  "orientation": "portrait"
 }

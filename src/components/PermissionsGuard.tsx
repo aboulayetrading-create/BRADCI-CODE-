@@ -25,6 +25,7 @@ import {
   isPlatformAndroid,
   isRunningInIframe
 } from '../utils/universalNotifications';
+import { voiceNavigator } from '../utils/voiceNavigator';
 import { BradCiLogoIcon } from './BradCiLogo';
 
 export type PermissionState = 'pending' | 'checking' | 'granted' | 'denied';
@@ -83,6 +84,7 @@ export const PermissionsGuard: React.FC<PermissionsGuardProps> = ({ children }) 
     try {
       localStorage.setItem('bradci_permissions_accepted', 'true');
       localStorage.setItem('bradci_permissions_ok', 'true');
+      voiceNavigator.unlockAudio();
     } catch (_) {}
     setIsUnlocked(true);
   };
@@ -263,14 +265,19 @@ export const PermissionsGuard: React.FC<PermissionsGuardProps> = ({ children }) 
             <div className="absolute -inset-2 bg-gradient-to-r from-[#f97316] to-blue-600 rounded-3xl blur-md opacity-50 animate-pulse" />
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-[#09153a] border-2 border-white/20 p-2 shadow-2xl flex items-center justify-center overflow-hidden">
               <img 
-                src="/icon.png" 
-                alt="Logo Officiel BRAD'CI" 
+                src="./icon.png" 
+                alt="BRAD'CI Logo" 
                 className="w-full h-full object-contain filter drop-shadow-md rounded-xl"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                  const fb = document.getElementById('bradci-logo-vector-fallback');
-                  if (fb) fb.style.display = 'block';
-                }}
+                onError={(e) => { 
+                  const target = e.currentTarget as HTMLImageElement;
+                  if (target.getAttribute('src') !== 'icon.png') {
+                    target.src = 'icon.png';
+                  } else {
+                    target.style.display = 'none';
+                    const fb = document.getElementById('bradci-logo-vector-fallback');
+                    if (fb) fb.style.display = 'block';
+                  }
+                }} 
               />
               <div id="bradci-logo-vector-fallback" style={{ display: 'none' }} className="w-full h-full flex items-center justify-center">
                 <BradCiLogoIcon className="w-full h-full" />
