@@ -106,7 +106,7 @@ export const Navbar: React.FC = () => {
       <div className="w-full max-w-[1800px] mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex items-center justify-between h-14 sm:h-16 lg:h-[68px] gap-2 sm:gap-3 lg:gap-4">
           {/* Brand Logo & Tag */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button 
               id="nav-logo"
               onClick={() => setActiveTab(isDriver ? 'dashboard_driver' : 'explore')}
@@ -129,7 +129,7 @@ export const Navbar: React.FC = () => {
 
           {/* Desktop Navigation Links (Strict RBAC Routing) */}
           {isDriver ? (
-            <nav id="nav-desktop-driver" className="hidden md:flex items-center gap-1 lg:gap-1.5 shrink-0">
+            <nav id="nav-desktop-driver" className="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0">
               {/* 1. Radar */}
               <button
                 id="nav-tab-driver-radar"
@@ -138,7 +138,7 @@ export const Navbar: React.FC = () => {
                   setActiveDriverTab('radar');
                   window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'radar' }));
                 }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`h-9 px-2.5 lg:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === 'dashboard_driver' && (activeDriverTab === 'radar' || activeDriverTab === 'radar_map')
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -156,7 +156,7 @@ export const Navbar: React.FC = () => {
                   setActiveDriverTab('orders');
                   window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'orders' }));
                 }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`h-9 px-2.5 lg:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === 'dashboard_driver' && (activeDriverTab === 'orders' || activeDriverTab === 'available_orders' || activeDriverTab === 'active_mission')
                     ? 'bg-[#F97316]/20 text-[#F97316] border border-[#F97316]/40 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -181,7 +181,7 @@ export const Navbar: React.FC = () => {
                   setActiveDriverTab('earnings');
                   window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'earnings' }));
                 }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`h-9 px-2.5 lg:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === 'dashboard_driver' && activeDriverTab === 'earnings'
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -199,7 +199,7 @@ export const Navbar: React.FC = () => {
                   setActiveDriverTab('history');
                   window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'history' }));
                 }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`h-9 px-2.5 lg:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === 'dashboard_driver' && activeDriverTab === 'history'
                     ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -217,7 +217,7 @@ export const Navbar: React.FC = () => {
                   setActiveDriverTab('settings');
                   window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'settings' }));
                 }}
-                className={`px-2.5 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`h-9 px-2.5 lg:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeTab === 'dashboard_driver' && (activeDriverTab === 'settings' || activeDriverTab === 'profile')
                     ? 'bg-blue-600/20 text-blue-300 border border-blue-500/40 shadow-sm'
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
@@ -228,12 +228,12 @@ export const Navbar: React.FC = () => {
               </button>
             </nav>
           ) : (
-            <nav className="hidden md:flex items-center gap-0.5 lg:gap-1.5 shrink-0">
+            <nav id="nav-desktop-client" className="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0">
               {/* Feed / Explore */}
               <button
                 id="nav-tab-explore"
                 onClick={() => setActiveTab('explore')}
-                className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`h-9 px-2.5 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center ${
                   activeTab === 'explore' 
                     ? 'bg-slate-800 text-amber-400 font-semibold shadow-sm' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
@@ -246,7 +246,7 @@ export const Navbar: React.FC = () => {
               <button
                 id="nav-tab-express-courier"
                 onClick={() => setActiveTab('express_courier')}
-                className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                className={`h-9 px-2.5 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
                   activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
                     ? 'bg-violet-600/30 text-violet-300 border border-violet-500/40 font-bold shadow-sm' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
@@ -263,13 +263,13 @@ export const Navbar: React.FC = () => {
               <button
                 id="nav-tab-b2b"
                 onClick={() => setActiveTab('b2b_liquidation')}
-                className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
+                className={`h-9 px-2.5 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors flex items-center justify-center gap-1 lg:gap-1.5 whitespace-nowrap cursor-pointer ${
                   activeTab === 'b2b_liquidation' 
                     ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/40 font-bold shadow-sm' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                 }`}
               >
-                <Building2 className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-blue-400 shrink-0" />
+                <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                 <span>{translate("Déstockage B2B", "B2B Liquidation")}</span>
                 <span className="hidden xl:inline-block text-[9px] bg-blue-500/30 text-cyan-300 font-extrabold px-1.5 py-0.2 rounded">LOTS</span>
               </button>
@@ -279,13 +279,13 @@ export const Navbar: React.FC = () => {
                 <button
                   id="nav-tab-client-dashboard"
                   onClick={() => setActiveTab('dashboard_client')}
-                  className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
+                  className={`h-9 px-2.5 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors flex items-center justify-center gap-1 lg:gap-1.5 whitespace-nowrap cursor-pointer ${
                     activeTab === 'dashboard_client' 
                       ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold' 
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
-                  <User className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-blue-400 shrink-0" />
+                  <User className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                   <span>{translate("Mon Espace", "My Space")}</span>
                 </button>
               )}
@@ -295,13 +295,13 @@ export const Navbar: React.FC = () => {
                 <button
                   id="nav-tab-admin-dashboard"
                   onClick={() => setActiveTab('dashboard_admin')}
-                  className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
+                  className={`h-9 px-2.5 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors flex items-center justify-center gap-1 lg:gap-1.5 whitespace-nowrap cursor-pointer ${
                     activeTab === 'dashboard_admin' 
                       ? 'bg-red-600/20 text-red-400 border border-red-500/30 font-semibold' 
                       : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                   }`}
                 >
-                  <ShieldCheck className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-red-400 shrink-0" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-red-400 shrink-0" />
                   <span>{translate("Back-Office", "Back-Office")}</span>
                 </button>
               )}
@@ -310,13 +310,13 @@ export const Navbar: React.FC = () => {
               <button
                 id="nav-tab-pricing"
                 onClick={() => setActiveTab('tarifs')}
-                className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors flex items-center gap-1 lg:gap-1.5 whitespace-nowrap ${
+                className={`h-9 px-2.5 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors flex items-center justify-center gap-1 lg:gap-1.5 whitespace-nowrap cursor-pointer ${
                   activeTab === 'tarifs' 
                     ? 'bg-slate-800 text-amber-400 font-semibold' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
                 }`}
               >
-                <Sparkles className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-amber-400 shrink-0" />
+                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span>{translate("Pass & Tarifs", "Pass & Rates")}</span>
               </button>
 
@@ -324,7 +324,7 @@ export const Navbar: React.FC = () => {
               <button
                 id="nav-tab-about"
                 onClick={() => setActiveTab('about')}
-                className={`hidden lg:block px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`hidden xl:flex h-9 px-2.5 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors items-center justify-center whitespace-nowrap cursor-pointer ${
                   activeTab === 'about' 
                     ? 'bg-slate-800 text-amber-400 font-semibold' 
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
@@ -338,18 +338,40 @@ export const Navbar: React.FC = () => {
           {/* Right Action Bar - Organized, Executive, Clean & Responsive */}
           <div 
             id="navbar-actions-bar" 
-            className="flex items-center gap-1.5 sm:gap-2 min-w-0 justify-end py-1"
+            className="flex items-center gap-1.5 sm:gap-2 shrink-0 justify-end"
           >
+            {/* Quick Voix Off / Voice Guide Toggle Button (Always visible on mobile & desktop) */}
+            <button
+              id="btn-navbar-voice-toggle"
+              type="button"
+              onClick={() => toggleVoice()}
+              className={`h-9 px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-sm ${
+                voiceEnabled
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
+                  : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+              title={voiceEnabled ? translate("Voix Off Activée (Cliquer pour couper)", "Voice Assistance On (Click to mute)") : translate("Voix Off Coupée (Cliquer pour activer)", "Voice Assistance Off (Click to unmute)")}
+            >
+              {voiceEnabled ? (
+                <Volume2 className="w-4 h-4 text-emerald-400 shrink-0 animate-pulse" />
+              ) : (
+                <VolumeX className="w-4 h-4 text-slate-500 shrink-0" />
+              )}
+              <span className="hidden sm:inline text-[11px] font-bold">
+                {voiceEnabled ? translate("Voix ON", "Voice ON") : translate("Voix OFF", "Voice OFF")}
+              </span>
+            </button>
+
             {/* 1. Shopping Cart Button - Visible on Desktop, in drawer/bottom nav on Mobile */}
             {!isDriver && (
               <button
                 id="btn-navbar-cart"
                 onClick={() => setCartModalOpen(true)}
-                className="relative hidden md:flex h-8.5 sm:h-9.5 px-2 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center gap-1.5 shadow-sm cursor-pointer"
+                className="relative hidden sm:flex h-9 px-2.5 sm:px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center justify-center gap-1.5 shadow-sm cursor-pointer"
                 title={translate("Mon Panier Multi-Articles", "My Multi-Item Cart")}
               >
                 <ShoppingCart className="w-4 h-4 text-amber-400 shrink-0" />
-                <span className="text-xs font-bold hidden sm:inline">{translate("Panier", "Cart")}</span>
+                <span className="text-xs font-bold hidden md:inline">{translate("Panier", "Cart")}</span>
                 {cart.length > 0 && (
                   <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[10px] flex items-center justify-center animate-bounce shrink-0 shadow">
                     {cart.reduce((s, i) => s + i.quantity, 0)}
@@ -363,7 +385,7 @@ export const Navbar: React.FC = () => {
               <button
                 id="navbar-driver-status-toggle"
                 onClick={toggleDriverAvailability}
-                className={`hidden md:flex h-8.5 sm:h-9.5 px-2.5 sm:px-3.5 rounded-xl font-black text-xs items-center gap-1.5 transition-all border shadow-sm cursor-pointer ${
+                className={`hidden sm:flex h-9 px-2.5 sm:px-3.5 rounded-xl font-black text-xs items-center justify-center gap-1.5 transition-all border shadow-sm cursor-pointer ${
                   currentUser.driverAvailability !== 'offline'
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
                     : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
@@ -381,7 +403,7 @@ export const Navbar: React.FC = () => {
             <button
               id="btn-navbar-notifications"
               onClick={() => setNotificationsModalOpen(true)}
-              className="relative hidden md:flex h-8.5 sm:h-9.5 w-8.5 sm:w-9.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center justify-center cursor-pointer shadow-sm"
+              className="relative hidden sm:flex h-9 w-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-amber-400 border border-slate-800 hover:border-amber-500/40 transition-all shrink-0 items-center justify-center cursor-pointer shadow-sm"
               title={translate("Notifications & Alertes", "Notifications & Alerts")}
             >
               <Bell className="w-4 h-4 shrink-0" />
@@ -398,7 +420,7 @@ export const Navbar: React.FC = () => {
                 <button
                   id="user-profile-menu-btn"
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="h-8 sm:h-9 flex items-center gap-1.5 px-1.5 sm:px-2 rounded-lg hover:bg-slate-800 border-2 border-amber-400/80 hover:border-amber-400 transition-all bg-slate-900/90 shadow-sm shadow-amber-500/10 shrink-0 group"
+                  className="h-9 flex items-center justify-center gap-1.5 px-2 sm:px-2.5 rounded-xl hover:bg-slate-800 border border-amber-400/70 hover:border-amber-400 transition-all bg-slate-900/90 shadow-sm shadow-amber-500/10 shrink-0 group cursor-pointer"
                   title={`${translate("Connecté :", "Logged in:")} ${currentUser.name}`}
                 >
                   <div className="relative shrink-0 flex items-center justify-center">
@@ -406,7 +428,7 @@ export const Navbar: React.FC = () => {
                       src={currentUser.avatar}
                       alt={currentUser.name}
                       referrerPolicy="no-referrer"
-                      className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full object-cover border border-amber-300 shadow-sm shrink-0 block group-hover:scale-105 transition-transform"
+                      className="w-6 h-6 rounded-full object-cover border border-amber-300 shadow-sm shrink-0 block group-hover:scale-105 transition-transform"
                     />
                     <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border-2 border-[#080C14]" />
                   </div>
@@ -415,7 +437,7 @@ export const Navbar: React.FC = () => {
                       <span>{currentUser.name.split(' ')[0]}</span>
                       {currentUser.isVIP && <Crown className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />}
                     </div>
-                    <span className="text-[9.5px] text-amber-400 font-mono block leading-tight font-bold">
+                    <span className="text-[9.5px] text-amber-400 font-mono block leading-none font-bold">
                       {currentUser.kycStatus === 'verified' ? '✓ KYC' : 'KYC ?'}
                     </span>
                   </div>
@@ -551,7 +573,7 @@ export const Navbar: React.FC = () => {
               <button
                 id="btn-navbar-auth"
                 onClick={() => setAuthModalOpen(true)}
-                className="h-8 sm:h-9 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 px-2.5 sm:px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm shrink-0"
+                className="h-9 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer"
               >
                 <User className="w-3.5 h-3.5 text-slate-400" />
                 <span>{translate("Connexion", "Sign In")}</span>
@@ -562,17 +584,17 @@ export const Navbar: React.FC = () => {
             <button
               id="btn-toggle-mobile-menu"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="h-8 sm:h-9 w-8 sm:w-9 flex items-center justify-center text-slate-300 hover:text-white rounded-lg bg-slate-900/90 hover:bg-slate-800 md:hidden shrink-0 border border-slate-800 transition-colors"
+              className="h-9 w-9 flex items-center justify-center text-slate-300 hover:text-white rounded-xl bg-slate-900/90 hover:bg-slate-800 lg:hidden shrink-0 border border-slate-800 transition-colors cursor-pointer"
               title={translate("Menu Mobile", "Mobile Menu")}
             >
-              {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
+              {mobileMenuOpen ? <X className="w-4.5 h-4.5" /> : <Menu className="w-4.5 h-4.5" />}
             </button>
           </div>
         </div>
 
         {/* Mobile Dropdown Menu Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-800/80 py-3 space-y-3 bg-[#06102E]/98 backdrop-blur-xl animate-in slide-in-from-top duration-200">
+          <div className="lg:hidden border-t border-slate-800/80 py-3 space-y-3 bg-[#06102E]/98 backdrop-blur-xl animate-in slide-in-from-top duration-200">
             {/* Branded Mobile Drawer Header */}
             <div className="px-3 pb-2 border-b border-slate-800/80 flex items-center justify-between">
               <BradCiLogo 

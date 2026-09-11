@@ -406,7 +406,32 @@ export function queryBradCiKnowledge(rawQuery: string, lang: AppLanguage = 'fr')
     };
   }
 
-  // 16. HUMAN AGENT & PHONE / WHATSAPP SUPPORT
+  // 16. DEMANDE D'APPEL TÉLÉPHONIQUE 85 MINUTES (RÉSERVÉ EXCLUSIVEMENT AUX PASS ABONNÉS)
+  if (
+    query.includes('appel') || 
+    query.includes('85 min') || 
+    query.includes('85 minute') || 
+    query.includes('demande d\'appel') || 
+    query.includes('demande rappel') || 
+    query.includes('rappel') || 
+    query.includes('telephonique') ||
+    query.includes('appeler') ||
+    query.includes('au telephone')
+  ) {
+    return {
+      category: 'support',
+      text: isEn
+        ? "📞 **VIP Phone Call Request (85-Minute Session - Reserved for Subscribers) :**\n\n• **Subscriber Exclusive Privilege**: The direct phone consultation (up to **85 minutes of dedicated voice assistance** with a senior BRAD'CI advisor) is strictly reserved for members holding an active subscriber pass:\n  - **Pass Vendeur Standard (5,000 FCFA/month)**\n  - **Pass Vendeur Pro Illimité (10,000 FCFA/month)**\n  - **Pass Livreur VIP (6,000 FCFA/month)**\n• **For Non-Subscribers**: You can activate a Pass directly in the 'Abonnements' menu to unlock this exclusive 85-minute phone consultation privilege immediately.\n• **24/7 Digital Support**: You can also continue chatting with me here by text and audio voice-off at any time free of charge!"
+        : "📞 **Demande d'Appel Téléphonique VIP (Session 85 Minutes - Réservé aux Abonnés Pass) :**\n\n• **Privilège Exclusif aux Membres Abonnés** : La réservation d'un appel téléphonique personnalisé (jusqu'à **85 minutes d'assistance vocale dédiée** avec un conseiller senior BRAD'CI) est un service prioritaire strictement réservé aux titulaires d'un Pass Abonné :\n  - **Pass Vendeur Standard (5 000 FCFA/mois)** : 15 articles + boutique dédiée\n  - **Pass Vendeur Pro Illimité (10 000 FCFA/mois)** : Publications illimitées & visibilité maximale\n  - **Pass Livreur VIP (6 000 FCFA/mois)** : Courses illimitées à 0% de commission\n• **Pour les Utilisateurs Sans Pass** : Vous pouvez souscrire à un pass dans l'onglet 'Abonnements' pour débloquer instantanément votre droit à l'appel de 85 minutes.\n• **Assistance Écrite & Vocale Continue** : Je reste également à votre entière disposition ici même par message et voix off 24h/24 pour répondre à toutes vos questions !",
+      suggestedAction: {
+        labelFr: "Activer un Pass Abonné",
+        labelEn: "Activate Subscriber Pass",
+        actionType: "open_pricing"
+      }
+    };
+  }
+
+  // 17. HUMAN AGENT & PHONE / WHATSAPP SUPPORT
   if (
     query.includes('agent') || 
     query.includes('humain') || 
@@ -421,25 +446,25 @@ export function queryBradCiKnowledge(rawQuery: string, lang: AppLanguage = 'fr')
     return {
       category: 'support',
       text: isEn
-        ? "📞 **Contact BRAD'CI Customer Support :**\n\nOur customer advisors based in Abidjan (Plateau) are available 24/7:\n\n• **Instant WhatsApp Support**: Chat directly with a support agent.\n• **Telephone Hotline**: Call our team for immediate phone guidance.\n• **Free Callback Request**: Switch to the 'Human Advisor' tab above to request a free callback within 5 minutes."
-        : "📞 **Contacter le Service Clientèle BRAD'CI :**\n\nNos conseillers clientèle basés à Abidjan (Plateau) sont à votre écoute 24h/24 et 7j/7 :\n\n• **Assistance WhatsApp Instantanée** : Échangez directement par message avec un conseiller.\n• **Hotline Téléphonique** : Contactez notre standard pour une assistance vocale personnalisée.\n• **Rappel Gratuit en 5 Minutes** : Basculez sur l'onglet 'Conseiller Humain' pour être rappelé sans frais.",
+        ? "📞 **BRAD'CI Customer Service Team (Abidjan Plateau) :**\n\nI am Fatou, your dedicated customer support advisor. Our team in Plateau, Abidjan is at your service:\n\n• **Live Chat Assistance**: I answer all your questions instantly regarding your orders, bids, deliveries, and passes.\n• **VIP Phone Callback (85 min)**: Exclusively available for active Pass Abonnés via the 'Demande d'Appel' tab.\n• **WhatsApp Direct Support**: Official WhatsApp support line for urgent logistical escalation."
+        : "📞 **Service Clientèle BRAD'CI (Plateau, Abidjan) :**\n\nJe suis Fatou, votre conseillère clientèle dédiée. Notre équipe au Plateau à Abidjan est à votre disposition :\n\n• **Assistance Écrite Instantanée** : Je réponds immédiatement à toutes vos questions sur vos achats, ventes, enchères, livraisons et abonnements.\n• **Rappel Téléphonique VIP (85 min)** : Réservé exclusivement aux membres abonnés titulaires d'un Pass dans l'onglet 'Demande d'Appel'.\n• **Assistance WhatsApp Officielle** : Ligne d'assistance WhatsApp pour le suivi urgent des courses.",
       suggestedAction: {
-        labelFr: "Parler à un Conseiller",
-        labelEn: "Speak to an Advisor",
+        labelFr: "Demande d'Appel (Pass Abonnés)",
+        labelEn: "Phone Call Request (Subscribers)",
         actionType: "connect_agent"
       }
     };
   }
 
-  // 17. DEFAULT FALLBACK
+  // 18. DEFAULT FALLBACK
   return {
     category: 'general',
     text: isEn
-      ? "💡 **Welcome to BRAD'CI Assistant !**\n\nI am here to provide instant, precise assistance on all platform operations:\n• **Timed Live Auctions**: Bidding rules, increments, and the 5-bid seller arbitration rule.\n• **Secured Escrow**: Funds held safely until parcel inspection, validated via secret OTP code.\n• **GPS Delivery**: Real-time map tracking with automated courier arrival notifications.\n• **Receipts & Invoices**: Automatic electronic receipts for both buyers and sellers.\n• **Troubleshooting**: OTP code resend, GPS location fixes, and dispute resolution.\n\nAsk your question by typing or tap the microphone 🎙️ to speak directly!"
-      : "💡 **Bienvenue sur BRAD'CI Assistant !**\n\nJe suis votre assistant virtuel officiel pour répondre avec précision à toutes vos questions :\n• **Enchères Chronométrées** : Fonctionnement du compte à rebours, surenchères et arbitrage des 5 offres.\n• **Paiement Séquestré (Escrow)** : Conservation sécurisée des fonds jusqu'à inspection, déblocage par Code Secret OTP.\n• **Livraison GPS en Direct** : Suivi du coursier sur Google Maps et alertes automatiques de prise en charge et d'arrivée.\n• **Reçus Électroniques** : Génération automatique de reçus officiels distincts Acheteur et Vendeur.\n• **Assistance Technique** : Procédure OTP non reçu, résolution GPS et gestion des litiges.\n\nPosez votre question par écrit ou cliquez sur le micro 🎙️ pour vous exprimer à voix haute !",
+      ? "💡 **Hello! I am Fatou, your BRAD'CI Customer Advisor.**\n\nI am at your full service to guide you through any aspect of BRAD'CI:\n• **Timed Live Auctions**: 5-bid rule, increments, and seller choice.\n• **Secured Escrow & POD**: Funds protected until delivery, verified via 4-digit secret OTP.\n• **GPS Delivery Tracking**: Live courier monitoring on Google Maps.\n• **Pass & Subscriptions**: Standard Pass (5,000 F), Pro Pass (10,000 F), Driver VIP (6,000 F).\n• **VIP Phone Calls (85 min)**: Exclusively available for subscriber pass holders.\n\nHow can I help you today?"
+      : "💡 **Bonjour ! Je suis Fatou, votre conseillère au service client BRAD'CI.**\n\nJe suis à votre entière disposition pour vous accompagner dans toutes vos démarches :\n• **Enchères & Règle des 5 Offres** : Arbitrage du vendeur dès 5 offres concurrentes.\n• **Paiement à la Livraison (POD) & Code Secret** : Règlement Mobile Money à l'arrivée et code à 4 chiffres à remettre après inspection.\n• **Courses Express & Carte GPS** : Suivi des coursiers en temps réel sur Google Maps.\n• **Abonnements Pass Vendeur & Livreur** : Pass Standard (5 000 F), Pro (10 000 F), Livreur VIP (6 000 F).\n• **Demandes d'Appel VIP (85 min)** : Réservées exclusivement aux abonnés Pass.\n\nEn quoi puis-je vous être utile aujourd'hui ?",
     suggestedAction: {
-      labelFr: "Parler à un Conseiller Humain",
-      labelEn: "Speak to a Human Advisor",
+      labelFr: "Demande d'Appel (Pass Abonnés)",
+      labelEn: "Phone Call Request (Subscribers)",
       actionType: "connect_agent"
     }
   };

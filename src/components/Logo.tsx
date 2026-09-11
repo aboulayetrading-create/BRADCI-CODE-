@@ -1,4 +1,5 @@
 import React from 'react';
+import { BRADCI_OFFICIAL_LOGO_DATA_URI } from '../utils/logoAssetData';
 
 export interface LogoProps {
   className?: string;
@@ -48,17 +49,15 @@ export const LogoIcon: React.FC<{
     return (
       <img 
         id={id}
-        src="/logo.png" 
+        src={BRADCI_OFFICIAL_LOGO_DATA_URI || "/logo.png?v=14"} 
         alt="BRAD'CI Logo" 
         className={`select-none shrink-0 object-contain rounded-xl ${className}`}
         style={size ? { width: size, height: size } : undefined}
         onError={(e) => { 
           const target = e.currentTarget as HTMLImageElement;
           const currentSrc = target.getAttribute('src');
-          if (currentSrc === '/logo.png') {
-            target.src = '/icon.png';
-          } else if (currentSrc === '/icon.png') {
-            target.src = './icon.png';
+          if (currentSrc !== BRADCI_OFFICIAL_LOGO_DATA_URI) {
+            target.src = BRADCI_OFFICIAL_LOGO_DATA_URI;
           } else {
             setImgFailed(true);
           }
@@ -399,16 +398,14 @@ export const BradCiLogoImg: React.FC<{ className?: string; alt?: string; onClick
   onClick
 }) => (
   <img 
-    src="/logo.png" 
+    src={BRADCI_OFFICIAL_LOGO_DATA_URI || "/logo.png?v=14"} 
     alt={alt} 
     className={className} 
     onClick={onClick}
     onError={(e) => { 
       const target = e.currentTarget as HTMLImageElement;
-      if (target.getAttribute('src') === '/logo.png') {
-        target.src = '/icon.png';
-      } else {
-        target.src = './icon.png';
+      if (target.getAttribute('src') !== BRADCI_OFFICIAL_LOGO_DATA_URI) {
+        target.src = BRADCI_OFFICIAL_LOGO_DATA_URI;
       }
     }} 
   />

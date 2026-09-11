@@ -5,9 +5,11 @@ import {
   AdvancedMarker, 
   InfoWindow, 
   useMap,
-  useAdvancedMarkerRef
+  useAdvancedMarkerRef,
+  useApiIsLoaded
 } from '@vis.gl/react-google-maps';
 import { useApp } from '../context/AppContext';
+import { GMP_ATTRIBUTION_ID } from '../utils/googleMapsConfig';
 import { 
   MapPin, 
   Navigation, 
@@ -527,6 +529,7 @@ export const InteractiveAbidjanMap: React.FC<InteractiveAbidjanMapProps> = ({
   // Google Maps API Key & Map ID
   const googleMapsApiKey = ((import.meta as unknown as { env?: { VITE_GOOGLE_MAPS_API_KEY?: string } }).env?.VITE_GOOGLE_MAPS_API_KEY) || '';
   const googleMapsMapId = ((import.meta as unknown as { env?: { VITE_GOOGLE_MAPS_MAP_ID?: string } }).env?.VITE_GOOGLE_MAPS_MAP_ID) || 'DEMO_MAP_ID';
+  const isParentApiLoaded = useApiIsLoaded();
   const [mapSdkFailed, setMapSdkFailed] = useState<boolean>(!googleMapsApiKey);
 
   return (
@@ -681,9 +684,129 @@ export const InteractiveAbidjanMap: React.FC<InteractiveAbidjanMapProps> = ({
                   allowFullScreen
                 />
               </div>
+            ) : isParentApiLoaded ? (
+              <Map
+                id="bradci_abidjan_map"
+                mapId={googleMapsMapId}
+                defaultCenter={ABIDJAN_CENTER}
+                defaultZoom={12}
+                gestureHandling="greedy"
+                disableDefaultUI={false}
+                mapTypeId={mapLayer === 'satellite' ? 'hybrid' : 'roadmap'}
+                styles={navTheme === 'night' && mapLayer === 'roadmap' ? NIGHT_MAP_STYLES : []}
+                className="w-full h-full min-h-[420px]"
+              >
+                {/* Pan & Zoom controller */}
+                <MapController targetCenter={mapTargetCenter} targetZoom={mapTargetZoom} />
+
+                {/* 1. All Commune Centroid Markers */}
+                {ALL_COMMUNES.map(c => {
+                  const count = filteredProducts.filter(p => 
+                    p.commune.toLowerCase().includes(c.name.toLowerCase()) || 
+                    c.name.toLowerCase().includes(p.commune.toLowerCase())
+                  ).length;
+
+                  return (
+                    <CommuneMarker
+                      key={c.id}
+                      commune={c}
+                      itemCount={count}
+                      isSelected={selectedCommuneId === c.id}
+                      onSelect={handleCommuneSelect}
+                    />
+                  );
+                })}
+
+                {/* 2. All Filtered Products & B2B Lots Markers */}
+                {filteredProducts.map(prod => (
+                  <ProductMarker
+                    key={prod.id}
+                    product={prod}
+                    isSelected={activeProduct?.id === prod.id}
+                    onClick={handleMarkerProductClick}
+                  />
+                ))}
+
+                {/* 3. Live Driver / Courier GPS Marker (Hidden in auction option) */}
+                {filterType !== 'auction' && (
+                  <DriverMarker
+                    position={simulatedDriverPosition}
+                    courierName="Bakary Traoré"
+                    vehicleType={simulatedDriverVehicle}
+                    speedKmh={42}
+                  />
+                )}
+
+                {/* 4. Client Pickup Marker with inDrive style */}
+                <ClientPickupMarker
+                  position={userLiveCoords || selectedCommune.coords}
+                  label={userLiveCoords ? "Votre Position Client" : `Point Retrait : ${selectedCommune.name}`}
+                />
+
+                {/* 5. Interactive InfoWindow on Marker Click */}
+                {activeProduct && (
+                  <InfoWindow
+                    anchor={infoWindowAnchor}
+                    position={activeProduct.pickupCoords || selectedCommune.coords}
+                    onCloseClick={() => {
+                      setActiveProduct(null);
+                      setInfoWindowAnchor(null);
+                    }}
+                    maxWidth={280}
+                    className="text-slate-950 font-sans"
+                  >
+                    <div className="p-1 space-y-2">
+                      <div className="relative rounded-lg overflow-hidden border border-slate-200">
+                        <img
+                          src={activeProduct.imageUrl || activeProduct.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30'}
+                          alt={activeProduct.title}
+                          className="w-full h-24 object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                        {activeProduct.isB2BLot && (
+                          <span className="absolute top-1 left-1 bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shadow">
+                            {activeProduct.b2bSaleKind === 'liquidation' ? 'LIQUIDATION' : 'DÉSTOCKAGE B2B'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <h4 className="font-extrabold text-xs text-slate-900 leading-snug line-clamp-1">
+                          {activeProduct.title}
+                        </h4>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          📍 {activeProduct.commune} • {activeProduct.category}
+                        </p>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="font-mono font-black text-xs text-emerald-700">
+                            {activeProduct.currentPrice.toLocaleString('fr-FR')} FCFA
+                          </span>
+                          {activeProduct.bids?.length > 0 && (
+                            <span className="text-[10px] text-slate-500 font-bold">
+                              {activeProduct.bids.length} offre(s)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenProductDetail(activeProduct)}
+                        className="w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow transition-colors"
+                      >
+                        <span>Voir les Détails & Offre</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </InfoWindow>
+                )}
+              </Map>
             ) : (
               <APIProvider 
                 apiKey={googleMapsApiKey}
+                solutionChannel={GMP_ATTRIBUTION_ID}
+                libraries={['places', 'marker']}
+                region="CI"
+                language="fr"
                 onError={() => setMapSdkFailed(true)}
               >
                 <Map

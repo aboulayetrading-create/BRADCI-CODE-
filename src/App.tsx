@@ -45,11 +45,12 @@ import { ExpressCourierOrderModal } from './components/ExpressCourierOrderModal'
 import { ExpressCourierView } from './components/ExpressCourierView';
 import { CartInvoiceModal } from './components/CartInvoiceModal';
 import { NativePermissionModal } from './components/NativePermissionModal';
-import { VoiceSpeechFloatingHUD } from './components/VoiceSpeechFloatingHUD';
 import { SplashScreen } from './components/SplashScreen';
 import { OutbidAlertBanner } from './components/OutbidAlertBanner';
 import { NotificationManager } from './components/NotificationManager';
 import { useNotificationPermission } from './hooks/useNotificationPermission';
+import { APIProvider } from '@vis.gl/react-google-maps';
+import { GOOGLE_MAPS_API_KEY, GMP_ATTRIBUTION_ID } from './utils/googleMapsConfig';
 import { 
   ShieldCheck, 
   Lock, 
@@ -801,20 +802,33 @@ const AppContent: React.FC = () => {
         <NativePermissionModal />
       </ErrorBoundary>
 
-      {/* Floating HUD for live voice playback & wave visualization */}
-      <VoiceSpeechFloatingHUD />
-
       <ToastContainer />
     </div>
   );
 };
 
 export default function App() {
-  return (
+  const appTree = (
     <ErrorBoundary fallbackTitle="Application BRAD'CI">
       <AppProvider>
         <AppContent />
       </AppProvider>
     </ErrorBoundary>
   );
+
+  if (GOOGLE_MAPS_API_KEY) {
+    return (
+      <APIProvider
+        apiKey={GOOGLE_MAPS_API_KEY}
+        solutionChannel={GMP_ATTRIBUTION_ID}
+        libraries={['places', 'marker']}
+        region="CI"
+        language="fr"
+      >
+        {appTree}
+      </APIProvider>
+    );
+  }
+
+  return appTree;
 }

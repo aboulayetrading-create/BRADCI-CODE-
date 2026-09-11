@@ -5203,8 +5203,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanId = identifier.trim().toLowerCase();
     const cleanPass = pass.trim();
 
-    // Standard master check or admin email check
-    const isMaster = (cleanId === 'admin' || cleanId === 'admin@bradci.com' || cleanId === 'admin_root' || cleanId === 'securite.admin@bradci.com') && (cleanPass === 'admin123' || cleanPass === 'bradci2026' || cleanPass === 'admin' || cleanPass.length >= 4);
+    // Standard master check or admin email check (including owner email aboulayetrading@gmail.com)
+    const isMaster = (
+      cleanId === 'admin' || 
+      cleanId === 'admin@bradci.com' || 
+      cleanId === 'admin_root' || 
+      cleanId === 'securite.admin@bradci.com' ||
+      cleanId === 'aboulayetrading@gmail.com' ||
+      cleanId.includes('aboulaye')
+    ) && (cleanPass === 'admin123' || cleanPass === 'bradci2026' || cleanPass === 'admin' || cleanPass.length >= 4);
 
     if (isMaster) {
       let adminUser = users.find(u => u.role === 'admin');

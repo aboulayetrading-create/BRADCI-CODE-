@@ -31,6 +31,7 @@ import { ABIDJAN_COMMUNES, getCommuneCoords, findNearestCommune } from '../data/
 import { nativeBridge } from '../utils/nativeBridge';
 import { calculateCartDeliveryOptimization } from '../utils/cartOptimizationEngine';
 import { PaymentMethod, VehicleType } from '../types';
+import { GooglePlacesAddressAutocomplete } from './GooglePlacesAddressAutocomplete';
 
 export const CartModal: React.FC = () => {
   const { 
@@ -581,16 +582,37 @@ export const CartModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 block mb-1.5">
-                    {translate("Précision Adresse & Repère Visuel :", "Address Precision & Landmark:")}
-                  </label>
-                  <input
+                  <GooglePlacesAddressAutocomplete
                     id="cart-delivery-address-input"
-                    type="text"
                     value={deliveryAddress}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    placeholder="Ex: Cocody Angré 8ème Tranche, près de la pharmacie du carrefour"
-                    className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                    onChange={setDeliveryAddress}
+                    onPlaceSelect={(details) => {
+                      setDeliveryAddress(details.address);
+                      if (details.commune) {
+                        setDeliveryCommune(details.commune);
+                      }
+                      if (details.lat && details.lng) {
+                        setGpsCoords({ lat: details.lat, lng: details.lng });
+                        setGpsAccuracy(5);
+                        addToast(
+                          translate('📍 Adresse & Coordonnées Fixées', '📍 Address & Coords Fixed'),
+                          translate(
+                            `Adresse géolocalisée par Google Places (${details.commune || deliveryCommune}). Coordonnées GPS transmises au livreur.`,
+                            `Address geolocated via Google Places (${details.commune || deliveryCommune}). GPS coordinates sent to driver.`
+                          ),
+                          'success'
+                        );
+                      }
+                    }}
+                    selectedCoords={gpsCoords}
+                    showGpsButton={true}
+                    onGpsClick={handleCaptureGps}
+                    isLocatingGps={isLocating}
+                    label={translate("Précision Adresse & Repère (Google Places) :", "Address Precision & Landmark (Google Places):")}
+                    placeholder={translate(
+                      "Ex: Cocody Angré 8ème Tranche, Carrefour Duncan, Pharmacie...",
+                      "Ex: Cocody Angre 8th Stage, Duncan Junction, Pharmacy..."
+                    )}
                   />
                 </div>
               </div>

@@ -14,8 +14,11 @@ if (typeof window !== 'undefined') {
 // Register Service Worker for PWA and Mobile Push Notifications
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
   const registerSW = () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {
-      return navigator.serviceWorker.register('/sw.js');
+    navigator.serviceWorker.register('./sw.js?v=14').then((registration) => {
+      // Check for update immediately
+      registration.update().catch(() => {});
+    }).catch(() => {
+      return navigator.serviceWorker.register('/sw.js?v=14');
     }).catch((err) => {
       console.info('Service Worker registration notice:', err);
     });

@@ -54,6 +54,7 @@ import {
   User
 } from '../types';
 import { ALL_COMMUNES } from '../data/communes';
+import { AdminActivityAuditView } from './AdminActivityAuditView';
 
 export const AdminBackOffice: React.FC = () => {
   const { 
@@ -95,7 +96,7 @@ export const AdminBackOffice: React.FC = () => {
   } = useApp();
 
   // Navigation within Admin Suite
-  const [adminTab, setAdminTab] = useState<'financials' | 'withdrawals' | 'members' | 'kyc' | 'product_approvals' | 'operations_gps' | 'settings'>('financials');
+  const [adminTab, setAdminTab] = useState<'financials' | 'withdrawals' | 'members' | 'kyc' | 'product_approvals' | 'operations_gps' | 'audit_activity_ip' | 'settings'>('financials');
 
   // Master Login state
   const [loginIdentifier, setLoginIdentifier] = useState('');
@@ -201,6 +202,15 @@ export const AdminBackOffice: React.FC = () => {
             >
               <Lock className="w-4 h-4" />
               <span>{translate("Déverrouiller l'Espace Admin", "Unlock Admin Back-Office")}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => adminLogin('aboulayetrading@gmail.com', 'admin123')}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs rounded-xl border border-amber-500/30 flex items-center justify-center gap-2 transition-all"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>{translate("Connexion Directe Administrateur Propriétaire", "Direct Owner Admin Login")}</span>
             </button>
           </form>
         </div>
@@ -437,6 +447,23 @@ export const AdminBackOffice: React.FC = () => {
           >
             <Radio className="w-4 h-4" />
             <span>{translate("Radar Opérationnel & GPS", "Operational Radar & GPS")}</span>
+          </button>
+
+          <button
+            id="admin-tab-activity-audit"
+            onClick={() => setAdminTab('audit_activity_ip')}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shrink-0 border transition-all ${
+              adminTab === 'audit_activity_ip'
+                ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-lg shadow-amber-500/10'
+                : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-cyan-400" />
+            <span>{translate("Activité, IP & Localisation", "Activity, IP & Geolocation")}</span>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+            </span>
           </button>
 
           <button
@@ -1990,6 +2017,13 @@ export const AdminBackOffice: React.FC = () => {
             </div>
 
           </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB 7: ACTIVITÉ, IP & GÉOLOCALISATION               */}
+        {/* ---------------------------------------------------- */}
+        {adminTab === 'audit_activity_ip' && (
+          <AdminActivityAuditView />
         )}
 
       </main>

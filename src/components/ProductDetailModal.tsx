@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { PaymentMethod, VehicleType } from '../types';
 import { nativeBridge } from '../utils/nativeBridge';
+import { GooglePlacesAddressAutocomplete } from './GooglePlacesAddressAutocomplete';
 import { 
   getCommuneBadgeInfo,
   COMMUNE_NAMES_ABIDJAN,
@@ -1005,12 +1006,22 @@ export const ProductDetailModal: React.FC = () => {
                               </optgroup>
                             </select>
 
-                            <input
-                              type="text"
+                            <GooglePlacesAddressAutocomplete
+                              id="buyer-address-autocomplete"
                               value={buyerAddress}
-                              onChange={(e) => setBuyerAddress(e.target.value)}
-                              placeholder="Quartier, Rue, Repère exact..."
-                              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                              onChange={setBuyerAddress}
+                              onPlaceSelect={(details) => {
+                                setBuyerAddress(details.address);
+                                if (details.commune) {
+                                  setBuyerCommune(details.commune);
+                                }
+                                if (details.lat && details.lng) {
+                                  setBuyerCoords({ lat: details.lat, lng: details.lng });
+                                }
+                              }}
+                              selectedCoords={buyerCoords}
+                              placeholder={translate("Quartier, Repère exact (Google Places)...", "Neighborhood, exact landmark (Google Places)...")}
+                              inputClassName="px-2.5 py-1.5 text-xs"
                             />
                           </div>
 

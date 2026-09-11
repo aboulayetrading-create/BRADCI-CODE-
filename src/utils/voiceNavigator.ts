@@ -806,6 +806,11 @@ class VoiceNavigatorService {
         if (window.speechSynthesis.paused) {
           window.speechSynthesis.resume();
         }
+        // Force voices load if empty
+        if (this.cachedVoices.length === 0) {
+          const v = window.speechSynthesis.getVoices();
+          if (v && v.length > 0) this.cachedVoices = v;
+        }
       }
     } catch {
       // ignore
@@ -816,23 +821,26 @@ class VoiceNavigatorService {
     try {
       const ctx = getSharedAudioContext();
       if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
       const now = ctx.currentTime;
       const notes = [
-        { freq: 440, dur: 0.12 },   // A4
-        { freq: 554.37, dur: 0.12 },// C#5
-        { freq: 659.25, dur: 0.25 } // E5
+        { freq: 523.25, dur: 0.14 }, // C5
+        { freq: 659.25, dur: 0.14 }, // E5
+        { freq: 783.99, dur: 0.22 }  // G5
       ];
       notes.forEach((n, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(n.freq, now + i * 0.12);
-        gain.gain.setValueAtTime(0.2, now + i * 0.12);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.12 + n.dur);
+        osc.frequency.setValueAtTime(n.freq, now + i * 0.14);
+        gain.gain.setValueAtTime(0.24, now + i * 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.005, now + i * 0.14 + n.dur);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(now + i * 0.12);
-        osc.stop(now + i * 0.12 + n.dur);
+        osc.start(now + i * 0.14);
+        osc.stop(now + i * 0.14 + n.dur);
       });
     } catch {}
   }

@@ -31,6 +31,7 @@ import {
   calculateCommuneDistanceKm,
   getCommuneBadgeInfo 
 } from '../data/communes';
+import { GooglePlacesAddressAutocomplete } from './GooglePlacesAddressAutocomplete';
 
 interface QuickTemplate {
   id: string;
@@ -449,16 +450,19 @@ export const ExpressCourierOrderModal: React.FC = () => {
 
                   {/* Adresse A */}
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-400">
-                      {translate("Adresse / Quartier / Repère précis *", "Precise Address / Landmark *")}
-                    </label>
-                    <input
-                      type="text"
+                    <GooglePlacesAddressAutocomplete
+                      id="express-pickup-address-autocomplete"
                       value={pickupAddress}
-                      onChange={(e) => setPickupAddress(e.target.value)}
-                      placeholder="Ex: Angré 8e Tranche, Carrefour Duncan, Face Pharmacie"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-violet-500"
-                      required
+                      onChange={setPickupAddress}
+                      onPlaceSelect={(details) => {
+                        setPickupAddress(details.address);
+                        if (details.commune) {
+                          setPickupCommune(details.commune);
+                        }
+                      }}
+                      label={translate("Adresse / Quartier / Repère précis *", "Precise Address / Landmark *")}
+                      placeholder={translate("Ex: Angré 8e Tranche, Carrefour Duncan...", "Ex: Angre 8th Stage, Duncan Junction...")}
+                      inputClassName="px-3 py-2 text-xs focus:border-violet-500"
                     />
                   </div>
 
@@ -534,16 +538,19 @@ export const ExpressCourierOrderModal: React.FC = () => {
 
                   {/* Adresse B */}
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-400">
-                      {translate("Adresse / Rue / Repère de livraison *", "Delivery Address / Landmark *")}
-                    </label>
-                    <input
-                      type="text"
+                    <GooglePlacesAddressAutocomplete
+                      id="express-dropoff-address-autocomplete"
                       value={dropoffAddress}
-                      onChange={(e) => setDropoffAddress(e.target.value)}
-                      placeholder="Ex: Plateau, Avenue Chardy, Immeuble Postel 2001, 3e étage"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                      required
+                      onChange={setDropoffAddress}
+                      onPlaceSelect={(details) => {
+                        setDropoffAddress(details.address);
+                        if (details.commune) {
+                          setDropoffCommune(details.commune);
+                        }
+                      }}
+                      label={translate("Adresse / Rue / Repère de livraison *", "Delivery Address / Landmark *")}
+                      placeholder={translate("Ex: Plateau, Avenue Chardy, Immeuble Postel...", "Ex: Plateau, Chardy Ave, Postel Building...")}
+                      inputClassName="px-3 py-2 text-xs focus:border-emerald-500"
                     />
                   </div>
 
