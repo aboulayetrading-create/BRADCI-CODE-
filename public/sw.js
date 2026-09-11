@@ -1,5 +1,5 @@
-// Service Worker officiel BRAD'CI (Web, Mobile PWA & APK) - Cache & Push Notifications v12
-const CACHE_NAME = 'bradci-v12-png-final';
+// Service Worker officiel BRAD'CI (Web, Mobile PWA & APK) - Cache & Push Notifications Adaptive Icon v13
+const CACHE_NAME = 'bradci-adaptive-icon-v13';
 const ASSETS = ['./', './index.html', './icon.png', './manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -26,7 +26,7 @@ self.addEventListener('push', (e) => {
 // Interception réseau et cache hors-ligne
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (url.pathname.endsWith('icon.png') || url.pathname.endsWith('manifest.json') || url.pathname.endsWith('index.html') || url.pathname === '/') {
+  if (url.pathname.endsWith('icon.png') || url.pathname.endsWith('logo.png') || url.pathname.endsWith('manifest.json') || url.pathname.endsWith('index.html') || url.pathname === '/') {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
@@ -38,7 +38,7 @@ self.addEventListener('fetch', (event) => {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
           }
           return response;
-        }).catch(() => caches.match('./icon.png'));
+        }).catch(() => caches.match('./icon.png') || caches.match('./logo.png'));
       })
     );
   }

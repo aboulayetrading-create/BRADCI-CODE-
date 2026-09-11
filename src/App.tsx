@@ -45,6 +45,7 @@ import { ExpressCourierOrderModal } from './components/ExpressCourierOrderModal'
 import { ExpressCourierView } from './components/ExpressCourierView';
 import { CartInvoiceModal } from './components/CartInvoiceModal';
 import { NativePermissionModal } from './components/NativePermissionModal';
+import { VoiceSpeechFloatingHUD } from './components/VoiceSpeechFloatingHUD';
 import { SplashScreen } from './components/SplashScreen';
 import { OutbidAlertBanner } from './components/OutbidAlertBanner';
 import { NotificationManager } from './components/NotificationManager';
@@ -800,6 +801,8 @@ const AppContent: React.FC = () => {
         <NativePermissionModal />
       </ErrorBoundary>
 
+      {/* Floating HUD for live voice playback & wave visualization */}
+      <VoiceSpeechFloatingHUD />
 
       <ToastContainer />
     </div>

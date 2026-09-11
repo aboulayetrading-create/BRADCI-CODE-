@@ -8,15 +8,30 @@
 
 // --- Synthèse Vocale (Voix Off / Text-to-Speech) & Alertes Sonores ---
 
+// Shared AudioContext to prevent exceeding mobile Android hardware limit
+let sharedAudioCtx = null;
+const getAudioCtx = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return null;
+      sharedAudioCtx = new AudioContextClass();
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+};
+
 // Synthétiseur d'alerte sonore GPS (Double carillon d'attention VTC)
 export const playGpsChime = () => {
   try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
+    const ctx = getAudioCtx();
+    if (!ctx) return;
 
     const now = ctx.currentTime;
     // Note 1 (Mi / 659 Hz)
@@ -258,8 +273,23 @@ export const speakInstruction = (text, forcedLang = null) => {
       } catch (_) {}
     };
 
-    // Démarrage de la parole
-    window.speechSynthesis.speak(utterance);
+    const doSpeak = () => {
+      try {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn("[BRAD'CI AudioServices] speak error:", e);
+      }
+    };
+
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setTimeout(doSpeak, 60);
+    } else {
+      doSpeak();
+    }
   } catch (err) {
     console.warn("[BRAD'CI AudioServices] Exception speakInstruction:", err);
   }

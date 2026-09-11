@@ -25,10 +25,12 @@ export const LogoIcon: React.FC<{
   className?: string; 
   size?: number | string;
   id?: string;
+  preferImage?: boolean;
 }> = ({ 
   className = "w-10 h-10", 
   size,
-  id
+  id,
+  preferImage = false
 }) => {
   const [imgFailed, setImgFailed] = React.useState(false);
 
@@ -42,7 +44,7 @@ export const LogoIcon: React.FC<{
   const dropShadow = `shield_glow_${uid}`;
   const badgeGlow = `badge_glow_${uid}`;
 
-  if (!imgFailed) {
+  if (preferImage && !imgFailed) {
     return (
       <img 
         id={id}

@@ -59,6 +59,7 @@ import { ReferralDashboard } from './ReferralDashboard';
 import { SellerProSummaryView } from './SellerProSummaryView';
 import { nativeBridge } from '../utils/nativeBridge';
 import { KYC_DRAWING_DATA_URIS } from './KYCIllustrations';
+import { voiceNavigator } from '../utils/voiceNavigator';
 
 export const ClientDashboard: React.FC = () => {
   const { 
@@ -2699,15 +2700,14 @@ export const ClientDashboard: React.FC = () => {
                   id="btn-settings-test-voice"
                   type="button"
                   onClick={() => {
-                    if ('speechSynthesis' in window) {
-                      window.speechSynthesis.cancel();
-                      const utter = new SpeechSynthesisUtterance("Bienvenue sur BRAD'CI. L'assistance vocale est opérationnelle pour vous guider.");
-                      utter.lang = language === 'en' ? 'en-US' : 'fr-FR';
-                      window.speechSynthesis.speak(utter);
-                      addToast(translate("Extrait vocal", "Voice Sample"), translate("Message audio en cours de lecture.", "Playing sample voice prompt."), "info");
-                    } else {
-                      addToast(translate("Non disponible", "Unavailable"), translate("Synthèse vocale non supportée par ce navigateur.", "Text-to-speech not supported."), "warning");
-                    }
+                    voiceNavigator.unlockAudio();
+                    voiceNavigator.speak(
+                      language === 'en'
+                        ? "Welcome to BRAD'CI. Voice assistance is fully operational."
+                        : "Bienvenue sur BRAD'CI. L'assistance vocale est opérationnelle pour vous guider.",
+                      language
+                    );
+                    addToast(translate("Extrait vocal", "Voice Sample"), translate("Message audio en cours de diffusion.", "Playing audio voice prompt."), "info");
                   }}
                   className="p-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300 hover:text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                 >

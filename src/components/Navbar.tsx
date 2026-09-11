@@ -114,7 +114,7 @@ export const Navbar: React.FC = () => {
             >
               <BradCiLogo 
                 size="md" 
-                showIcon={false}
+                showIcon={true}
                 showSubtitle={true} 
                 subtitleText="ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS" 
               />

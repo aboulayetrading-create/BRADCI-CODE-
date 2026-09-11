@@ -534,12 +534,50 @@ export function generateAbidjanRoute(
   };
 }
 
+// =========================================================================
+// SHARED WEB AUDIO CONTEXT & RESILIENT AUDIO SYNTHESIZERS (WEB & ANDROID APK)
+// =========================================================================
+
+let sharedAudioContext: AudioContext | null = null;
+
+export function getSharedAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return null;
+      sharedAudioContext = new AudioContextClass();
+    }
+    if (sharedAudioContext.state === 'suspended') {
+      sharedAudioContext.resume().catch(() => {});
+    }
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+}
+
+// Auto-unlock audio on any first user interaction (click, tap, key)
+if (typeof window !== 'undefined') {
+  const unlockAudioUserInteraction = () => {
+    const ctx = getSharedAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+  };
+  window.addEventListener('click', unlockAudioUserInteraction, { passive: true });
+  window.addEventListener('touchstart', unlockAudioUserInteraction, { passive: true });
+  window.addEventListener('keydown', unlockAudioUserInteraction, { passive: true });
+}
+
 // Sound Synthesizers for UI alerts
 export function playGpsChime() {
   try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
     
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -548,7 +586,7 @@ export function playGpsChime() {
     osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
     osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12); // A5
     
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
     
     osc.connect(gain);
@@ -564,15 +602,10 @@ export function playGpsChime() {
 // Authentic Multi-Tone Delivery Ringtone for incoming orders (Courier sound alert)
 export function playDriverNewOrderRingtone() {
   try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
-    if (ctx.state === 'suspended') {
-      ctx.resume();
-    }
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
 
     // Melodic notes sequence: E5 (659Hz) -> G5 (784Hz) -> B5 (987Hz) -> E6 (1318Hz)
-    // Repeat with 2 attention-grabbing pulse bursts
     const notes = [
       { freq: 659.25, time: 0.00, dur: 0.14 },
       { freq: 783.99, time: 0.14, dur: 0.14 },
@@ -606,9 +639,8 @@ export function playDriverNewOrderRingtone() {
 
 export function playDriverProximityPing() {
   try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -635,9 +667,8 @@ export function playOrderAlertSound() {
 
 export function playOutbidAlertSound() {
   try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
     
     // Urgent dual tone alert: rising urgency for auction outbid
     const now = ctx.currentTime;
@@ -664,9 +695,8 @@ export function playOutbidAlertSound() {
 
 export function playSuccessChime() {
   try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
     
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -689,39 +719,6 @@ export function playSuccessChime() {
   }
 }
 
-// Shared Web Audio Context with automatic user gesture resume
-let sharedAudioContext: AudioContext | null = null;
-
-export function getSharedAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    if (!sharedAudioContext) {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextClass) return null;
-      sharedAudioContext = new AudioContextClass();
-    }
-    if (sharedAudioContext.state === 'suspended') {
-      sharedAudioContext.resume().catch(() => {});
-    }
-    return sharedAudioContext;
-  } catch {
-    return null;
-  }
-}
-
-// Auto-unlock audio on any first user interaction (click, tap, key)
-if (typeof window !== 'undefined') {
-  const unlockAudioUserInteraction = () => {
-    const ctx = getSharedAudioContext();
-    if (ctx && ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
-  };
-  window.addEventListener('click', unlockAudioUserInteraction, { passive: true });
-  window.addEventListener('touchstart', unlockAudioUserInteraction, { passive: true });
-  window.addEventListener('keydown', unlockAudioUserInteraction, { passive: true });
-}
-
 /**
  * Sirène radar / avertisseur sonore d'excès de vitesse (Aigu, deux tons, autoritaire)
  * Fonctionne impérativement dès que la vitesse maximale autorisée est dépassée
@@ -730,9 +727,6 @@ export function playOverspeedAlarm() {
   try {
     const ctx = getSharedAudioContext();
     if (!ctx) return;
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
 
     const now = ctx.currentTime;
     
@@ -791,28 +785,56 @@ class VoiceNavigatorService {
 
   private initVoices() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      this.cachedVoices = window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => {
-        this.cachedVoices = window.speechSynthesis.getVoices();
-      };
+      try {
+        this.cachedVoices = window.speechSynthesis.getVoices() || [];
+        window.speechSynthesis.onvoiceschanged = () => {
+          try {
+            this.cachedVoices = window.speechSynthesis.getVoices() || [];
+          } catch {}
+        };
+      } catch {}
     }
   }
 
   public unlockAudio() {
     try {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioContextClass) {
-        const ctx = new AudioContextClass();
-        if (ctx.state === 'suspended') {
-          ctx.resume();
-        }
+      const ctx = getSharedAudioContext();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
       }
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.resume();
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
       }
     } catch {
       // ignore
     }
+  }
+
+  public playMelodicVoiceFallback() {
+    try {
+      const ctx = getSharedAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      const notes = [
+        { freq: 440, dur: 0.12 },   // A4
+        { freq: 554.37, dur: 0.12 },// C#5
+        { freq: 659.25, dur: 0.25 } // E5
+      ];
+      notes.forEach((n, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(n.freq, now + i * 0.12);
+        gain.gain.setValueAtTime(0.2, now + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.12 + n.dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i * 0.12);
+        osc.stop(now + i * 0.12 + n.dur);
+      });
+    } catch {}
   }
 
   public setMuted(muted: boolean) {
@@ -824,6 +846,11 @@ class VoiceNavigatorService {
       window.speechSynthesis.cancel();
       this.isSpeakingState = false;
       this.clearResumeInterval();
+      try {
+        window.dispatchEvent(new CustomEvent('bradci-voice-speaking', { 
+          detail: { text: '', isSpeaking: false, lang: 'fr' } 
+        }));
+      } catch {}
     }
   }
 
@@ -844,71 +871,128 @@ class VoiceNavigatorService {
 
   public speak(text: string, lang?: AppLanguage, onEnd?: () => void) {
     if (this.isMuted) return;
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      console.warn('Speech synthesis not supported on this browser');
+    if (typeof window === 'undefined') return;
+
+    // Resolve active language (from argument or app state in localStorage)
+    const activeLang: AppLanguage = lang || (typeof localStorage !== 'undefined' ? (localStorage.getItem('bradci_lang') as AppLanguage) : 'fr') || 'fr';
+    const isEn = activeLang === 'en';
+    const spokenText = isEn ? translateGpsInstructionToEn(text) : text;
+
+    // Ensure audio hardware context is ready & play audible chime
+    this.unlockAudio();
+    playGpsChime();
+
+    // Broadcast visual HUD event
+    try {
+      window.dispatchEvent(new CustomEvent('bradci-voice-speaking', { 
+        detail: { text: spokenText, isSpeaking: true, lang: activeLang } 
+      }));
+    } catch {}
+
+    if (!('speechSynthesis' in window)) {
+      console.warn('[VoiceNavigator] Speech synthesis not supported on this browser/device');
+      this.playMelodicVoiceFallback();
+      if (onEnd) onEnd();
       return;
     }
 
-    try {
-      playGpsChime();
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.resume();
-
-      // Resolve active language (from argument or app state in localStorage)
-      const activeLang: AppLanguage = lang || (typeof localStorage !== 'undefined' ? (localStorage.getItem('bradci_lang') as AppLanguage) : 'fr') || 'fr';
-      const isEn = activeLang === 'en';
-
-      // Auto-translate to English if user interface is configured in English
-      const spokenText = isEn ? translateGpsInstructionToEn(text) : text;
-
-      const utterance = new SpeechSynthesisUtterance(spokenText);
-      utterance.lang = isEn ? 'en-US' : 'fr-FR';
-      utterance.rate = this.rate;
-      utterance.pitch = this.pitch;
-
-      const voices = this.cachedVoices.length > 0 ? this.cachedVoices : window.speechSynthesis.getVoices();
-      if (isEn) {
-        const enVoice = voices.find(v => v.lang && (v.lang.toLowerCase().startsWith('en-us') || v.lang.toLowerCase().startsWith('en-gb')))
-          || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en'))
-          || voices.find(v => v.name && (v.name.includes('English') || v.name.includes('Google US') || v.name.includes('Samantha')));
-        if (enVoice) utterance.voice = enVoice;
-      } else {
-        const frenchVoice = voices.find(v => v.lang && (v.lang.toLowerCase().startsWith('fr-fr') || v.lang.toLowerCase().startsWith('fr')))
-          || voices.find(v => v.name && (v.name.includes('French') || v.name.includes('Google Français') || v.name.includes('Thomas')));
-        if (frenchVoice) utterance.voice = frenchVoice;
-      }
-
-      this.isSpeakingState = true;
-
-      // Chrome / Android keepalive interval to prevent freezing on utterances
-      this.clearResumeInterval();
-      this.resumeInterval = setInterval(() => {
-        if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+    const executeSpeak = () => {
+      try {
+        if (window.speechSynthesis.paused) {
           window.speechSynthesis.resume();
-        } else {
-          this.clearResumeInterval();
         }
-      }, 5000);
 
-      utterance.onend = () => {
+        const utterance = new SpeechSynthesisUtterance(spokenText);
+        utterance.lang = isEn ? 'en-US' : 'fr-FR';
+        utterance.rate = this.rate;
+        utterance.pitch = this.pitch;
+
+        // Best available voice matching
+        const voices = this.cachedVoices.length > 0 ? this.cachedVoices : window.speechSynthesis.getVoices();
+        if (voices.length > 0) {
+          if (isEn) {
+            const enVoice = voices.find(v => v.lang && (v.lang.toLowerCase().startsWith('en-us') || v.lang.toLowerCase().startsWith('en-gb')))
+              || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en'))
+              || voices.find(v => v.name && (v.name.includes('English') || v.name.includes('Google US')));
+            if (enVoice) utterance.voice = enVoice;
+          } else {
+            const frenchVoice = voices.find(v => v.lang && (v.lang.toLowerCase().startsWith('fr-fr') || v.lang.toLowerCase().startsWith('fr')))
+              || voices.find(v => v.name && (v.name.includes('French') || v.name.includes('Google Français') || v.name.includes('Thomas')));
+            if (frenchVoice) utterance.voice = frenchVoice;
+          }
+        }
+
+        // CRITICAL FOR ANDROID CHROMIUM: Store globally to prevent Garbage Collection killing speech
+        (window as any).__bradCiSpeechUtterance = utterance;
+        this.currentUtterance = utterance;
+        this.isSpeakingState = true;
+
+        // Android / Chrome keepalive to prevent silent pause
         this.clearResumeInterval();
-        this.currentUtterance = null;
+        this.resumeInterval = setInterval(() => {
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+            window.speechSynthesis.resume();
+          } else {
+            this.clearResumeInterval();
+          }
+        }, 3000);
+
+        utterance.onstart = () => {
+          this.isSpeakingState = true;
+          try {
+            window.dispatchEvent(new CustomEvent('bradci-voice-speaking', { 
+              detail: { text: spokenText, isSpeaking: true, lang: activeLang } 
+            }));
+          } catch {}
+        };
+
+        utterance.onend = () => {
+          this.clearResumeInterval();
+          this.currentUtterance = null;
+          (window as any).__bradCiSpeechUtterance = null;
+          this.isSpeakingState = false;
+          try {
+            window.dispatchEvent(new CustomEvent('bradci-voice-speaking', { 
+              detail: { text: spokenText, isSpeaking: false, lang: activeLang } 
+            }));
+          } catch {}
+          if (onEnd) onEnd();
+        };
+
+        utterance.onerror = (err) => {
+          console.warn('[VoiceNavigator] Utterance error on device:', err?.error);
+          this.clearResumeInterval();
+          this.currentUtterance = null;
+          (window as any).__bradCiSpeechUtterance = null;
+          this.isSpeakingState = false;
+          try {
+            window.dispatchEvent(new CustomEvent('bradci-voice-speaking', { 
+              detail: { text: spokenText, isSpeaking: false, lang: activeLang } 
+            }));
+          } catch {}
+          // If native TTS failed (e.g. language-unavailable or synthesis-failed on Android),
+          // play melodic audio confirmation
+          this.playMelodicVoiceFallback();
+          if (onEnd) onEnd();
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('Voice navigation error:', err);
+        this.clearResumeInterval();
         this.isSpeakingState = false;
+        this.playMelodicVoiceFallback();
         if (onEnd) onEnd();
-      };
+      }
+    };
 
-      utterance.onerror = () => {
-        this.clearResumeInterval();
-        this.currentUtterance = null;
-        this.isSpeakingState = false;
-      };
-
-      this.currentUtterance = utterance;
-      window.speechSynthesis.speak(utterance);
-    } catch (err) {
-      console.warn('Voice navigation error:', err);
-      this.clearResumeInterval();
-      this.isSpeakingState = false;
+    // Fix Android Chrome cancel race condition:
+    // If already speaking, cancel and delay slightly so native Android speech thread resets
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setTimeout(executeSpeak, 60);
+    } else {
+      executeSpeak();
     }
   }
 
