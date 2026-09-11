@@ -17,10 +17,17 @@ export const Header = ({
         className={`flex items-center gap-2.5 ${onLogoClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
       >
         <img 
-          src="./icon.png" 
+          src="/logo.png" 
           alt="BRAD'CI Logo" 
           className="w-10 h-10 object-contain rounded-xl shadow-md"
-          onError={(e) => { e.target.src = 'icon.png'; }} 
+          onError={(e) => { 
+            const target = e.currentTarget;
+            if (target.getAttribute('src') === '/logo.png') {
+              target.src = '/icon.png';
+            } else {
+              target.src = './icon.png';
+            }
+          }} 
         />
         <div className="flex flex-col justify-center">
           <span className="text-white font-black text-xl tracking-tight leading-none font-['Syne',sans-serif]">

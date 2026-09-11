@@ -41,6 +41,8 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
     driverAcceptJob, 
     toggleDriverAvailability,
     userLocation,
+    driverPass,
+    setActiveDriverTab,
     addToast
   } = useApp();
 
@@ -76,10 +78,25 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
   // Sound alert trigger ref
   const lastAnnouncedJobIdRef = useRef<string | null>(null);
 
-  // Calculate distances for all available jobs
+  // Calculate distances for all available jobs and filter by driver pass eligibility
+  const isEligibleForDirectCourier = Boolean(
+    driverPass?.status === 'active' || 
+    driverPass?.isComingSoon || 
+    driverPass?.unlimitedDirectAccess || 
+    (driverPass?.freeCoursesRemaining && driverPass.freeCoursesRemaining > 0)
+  );
+
   const candidateJobs = useMemo(() => {
     return freightJobs
-      .filter(j => (j.status === 'available' || j.status === 'pending_driver') && !declinedJobIds.includes(j.id))
+      .filter(j => {
+        if (j.status !== 'available' && j.status !== 'pending_driver') return false;
+        if (declinedJobIds.includes(j.id)) return false;
+        // Si le livreur n'a pas de recharge pass et plus de courses offertes, seules les courses BradCI sont affichées
+        if (j.jobKind === 'direct_courier' && !isEligibleForDirectCourier) {
+          return false;
+        }
+        return true;
+      })
       .map(job => {
         const pickupDistKm = calculateCommuneDistanceKm(driverCommune, job.pickupCommune);
         const approachTimeMin = Math.max(2, Math.round(pickupDistKm * 2.2));
@@ -90,7 +107,7 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
         };
       })
       .sort((a, b) => a.pickupDistKm - b.pickupDistKm);
-  }, [freightJobs, declinedJobIds, driverCommune]);
+  }, [freightJobs, declinedJobIds, driverCommune, isEligibleForDirectCourier]);
 
   // Determine closest job within current search radius, fallback to first candidate
   const closestJob = useMemo(() => {
@@ -341,6 +358,17 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
                   className="w-10 h-10 rounded-xl object-cover border border-slate-700 bg-slate-900 shrink-0"
                 />
                 <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {currentOfferedJob.jobKind === 'direct_courier' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-violet-500/25 text-violet-300 border border-violet-500/40 flex items-center gap-1">
+                        ⚡ Course Commande Directe (Paiement physique sur votre compte • 0% Com BradCi)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/25 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                        🛒 Commande Livraison Brad'CI (Enchère / Boutique)
+                      </span>
+                    )}
+                  </div>
                   <h4 className="text-xs sm:text-sm font-black text-white truncate">
                     {currentOfferedJob.productTitle}
                   </h4>
@@ -415,6 +443,39 @@ export const DriverSmartOrdersView: React.FC<DriverSmartOrdersViewProps> = ({
           <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
             Dès qu'une enchère ou un achat est validé à <strong className="text-white">{driverCommune}</strong>, la course vous sera proposée en priorité avec un affichage Google Maps en direct (délai d'acceptation 30s).
           </p>
+        </div>
+
+        {/* Driver Pass & Free Courses Banner */}
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-violet-950/50 via-purple-950/40 to-amber-950/40 border border-violet-500/30 text-left flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-amber-300 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Offre Spéciale Lancement Courses Brad'CI</span>
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                0% Commission
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-snug">
+              {driverPass?.isComingSoon ? (
+                <>Le <strong>Pass Recharge 5.000 F</strong> est en mode <em>Bientôt</em> : toutes les options et courses commandes directes sont <strong>100% gratuites</strong> (5 courses offertes au lancement).</>
+              ) : driverPass?.status === 'active' ? (
+                <>Votre recharge est <strong>Active</strong>. 0% de commission sur vos courses de commandes.</>
+              ) : (
+                <>Sans recharge, seules les <strong>courses Brad'CI</strong> sont affichées. Rechargez le pass pour débloquer les commandes directes.</>
+              )}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setActiveDriverTab('pass_recharge')}
+            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs rounded-xl shadow shrink-0 flex items-center gap-1.5 cursor-pointer transition-transform active:scale-95"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Pass Recharge</span>
+          </button>
         </div>
 
         {/* Telemetry Status Grid */}

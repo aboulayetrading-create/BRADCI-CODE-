@@ -25,15 +25,13 @@ import {
 interface KYCDemoGuideModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApplyDemoPhoto?: (type: 'cni' | 'selfie' | 'driverLicense' | 'driverLicenseSelfie' | 'vehicleReg', url: string, docNumber?: string) => void;
 }
 
 export const KYCDemoGuideModal: React.FC<KYCDemoGuideModalProps> = ({
   isOpen,
-  onClose,
-  onApplyDemoPhoto
+  onClose
 }) => {
-  const { translate, addToast } = useApp();
+  const { translate } = useApp();
 
   if (!isOpen) return null;
 
@@ -181,27 +179,6 @@ export const KYCDemoGuideModal: React.FC<KYCDemoGuideModalProps> = ({
                     <p key={i} className="text-red-400/80">{r}</p>
                   ))}
                 </div>
-
-                {onApplyDemoPhoto && (
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onApplyDemoPhoto(item.type, item.demoUrl, item.docNum);
-                        onClose();
-                        addToast(
-                          translate("Modèle Démo Inséré", "Demo Graphic Inserted"),
-                          translate("Le schéma d'exemple conforme a été appliqué avec succès.", "The compliant example graphic was applied successfully."),
-                          'success'
-                        );
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>{translate("⚡ Utiliser ce modèle d'exemple", "⚡ Use this demo graphic")}</span>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           ))}

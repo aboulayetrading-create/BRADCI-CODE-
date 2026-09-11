@@ -265,7 +265,8 @@ export const DriverRadarView: React.FC = () => {
 
       const tileLayer = L.tileLayer(getTileUrl(mapStyle), {
         maxZoom: 19,
-        maxNativeZoom: mapStyle === 'dark' ? 16 : 19
+        maxNativeZoom: mapStyle === 'dark' ? 16 : 19,
+        attribution: ''
       }).addTo(map);
 
       tileLayerRef.current = tileLayer;
@@ -295,7 +296,8 @@ export const DriverRadarView: React.FC = () => {
     }
     const newLayer = L.tileLayer(getTileUrl(mapStyle), {
       maxZoom: 19,
-      maxNativeZoom: mapStyle === 'dark' ? 16 : 19
+      maxNativeZoom: mapStyle === 'dark' ? 16 : 19,
+      attribution: ''
     }).addTo(mapInstanceRef.current);
     tileLayerRef.current = newLayer;
   }, [mapStyle]);

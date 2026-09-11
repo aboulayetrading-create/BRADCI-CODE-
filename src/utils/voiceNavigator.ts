@@ -689,40 +689,78 @@ export function playSuccessChime() {
   }
 }
 
+// Shared Web Audio Context with automatic user gesture resume
+let sharedAudioContext: AudioContext | null = null;
+
+export function getSharedAudioContext(): AudioContext | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    if (!sharedAudioContext) {
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) return null;
+      sharedAudioContext = new AudioContextClass();
+    }
+    if (sharedAudioContext.state === 'suspended') {
+      sharedAudioContext.resume().catch(() => {});
+    }
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+}
+
+// Auto-unlock audio on any first user interaction (click, tap, key)
+if (typeof window !== 'undefined') {
+  const unlockAudioUserInteraction = () => {
+    const ctx = getSharedAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener('click', unlockAudioUserInteraction, { passive: true });
+  window.addEventListener('touchstart', unlockAudioUserInteraction, { passive: true });
+  window.addEventListener('keydown', unlockAudioUserInteraction, { passive: true });
+}
+
 /**
  * Sirène radar / avertisseur sonore d'excès de vitesse (Aigu, deux tons, autoritaire)
- * Fonctionne même si l'audio du guidage GPS est désactivé
+ * Fonctionne impérativement dès que la vitesse maximale autorisée est dépassée
  */
 export function playOverspeedAlarm() {
   try {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
     if (ctx.state === 'suspended') {
       ctx.resume().catch(() => {});
     }
 
     const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    
+    // Alarme sonore de survitesse : séquence de 3 bips radar percutants et rythmés
+    const pulses = [
+      { start: 0.00, dur: 0.12, freq: 1046.5 },  // C6 (bip 1)
+      { start: 0.15, dur: 0.12, freq: 1174.7 },  // D6 (bip 2)
+      { start: 0.30, dur: 0.25, freq: 1396.9 },  // F6 aigu alarmant (bip 3)
+      { start: 0.60, dur: 0.14, freq: 1046.5 },  // rappel C6
+      { start: 0.76, dur: 0.28, freq: 1396.9 }   // rappel F6
+    ];
 
-    osc.type = 'sawtooth';
-    // Séquence d'alerte radar rapide deux tons : 880Hz -> 659Hz -> 880Hz -> 987Hz
-    osc.frequency.setValueAtTime(880, now);
-    osc.frequency.setValueAtTime(659.25, now + 0.12);
-    osc.frequency.setValueAtTime(880, now + 0.24);
-    osc.frequency.setValueAtTime(659.25, now + 0.36);
-    osc.frequency.setValueAtTime(987.77, now + 0.48);
+    pulses.forEach(({ start, dur, freq }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    gain.gain.setValueAtTime(0.28, now);
-    gain.gain.setValueAtTime(0.32, now + 0.24);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.65);
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now + start);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.35, now + start);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + start + dur);
 
-    osc.start(now);
-    osc.stop(now + 0.65);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now + start);
+      osc.stop(now + start + dur);
+    });
 
     // Vibration haptique sur smartphone Android APK
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {

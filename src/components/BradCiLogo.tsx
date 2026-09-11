@@ -10,6 +10,7 @@ export interface BradCiLogoProps {
   variant?: 'full' | 'horizontal' | 'icon' | 'badge';
   showSubtitle?: boolean;
   subtitleText?: string;
+  showIcon?: boolean;
   onClick?: () => void;
   id?: string;
 }

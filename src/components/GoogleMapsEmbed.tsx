@@ -3,12 +3,8 @@ import {
   Navigation, 
   Volume2, 
   VolumeX, 
-  Play, 
-  Pause, 
-  RotateCcw, 
   MapPin, 
   ExternalLink, 
-  Compass, 
   Layers, 
   Bike, 
   Car, 
@@ -20,15 +16,27 @@ import {
   ArrowUp, 
   ShieldCheck, 
   CheckCircle2, 
-  AlertCircle,
-  Radio,
-  Sun,
-  Moon,
-  AlertOctagon,
-  Zap
+  AlertCircle, 
+  Radio, 
+  Sun, 
+  Moon, 
+  RotateCcw, 
+  Plus, 
+  Minus, 
+  AlertTriangle,
+  Check
 } from 'lucide-react';
-import { ALL_COMMUNES, ZoneCommune } from '../data/communes';
-import { generateAbidjanRoute, RouteStep, RoutePlan, voiceNavigator, announceOverspeedAlert, getSpeedLimitForRoad } from '../utils/voiceNavigator';
+import { ALL_COMMUNES } from '../data/communes';
+import { 
+  generateAbidjanRoute, 
+  RouteStep, 
+  RoutePlan, 
+  voiceNavigator, 
+  playOverspeedAlarm,
+  announceOverspeedAlert, 
+  playGpsChime, 
+  getSpeedLimitForRoad 
+} from '../utils/voiceNavigator';
 import { speakInstruction } from '../utils/audioServices';
 import { useApp } from '../context/AppContext';
 
@@ -49,28 +57,29 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
   dropoffCommune,
   vehicleType = 'moto',
   isReturning = false,
-  courierName = 'Kouamé Jean-Eudes',
-  courierPhone = '+225 07 48 19 20 33',
+  courierName = 'Bakary Traoré',
+  courierPhone = '+225 01 44 77 89 22',
   currentProgress = 50,
   onProgressChange,
   className = ''
 }) => {
-  const { language } = useApp();
+  const { language, addToast } = useApp();
   const isEn = language === 'en';
   const [mapLayer, setMapLayer] = useState<'roadmap' | 'satellite'>('roadmap');
-  const [navTheme, setNavTheme] = useState<'night' | 'day'>('night'); // Default to high-contrast night navigation
-  // Voice off by default: let official Google Maps handle voice navigation
+  const [navTheme, setNavTheme] = useState<'night' | 'day'>('night');
   const [isVoiceEnabled, setIsVoiceEnabled] = useState<boolean>(false);
-  const [autoPlayVoice, setAutoPlayVoice] = useState<boolean>(false);
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [routePlan, setRoutePlan] = useState<RoutePlan>(() => 
     generateAbidjanRoute(pickupCommune, dropoffCommune, isReturning, language)
   );
-  const [isNavigating, setIsNavigating] = useState<boolean>(true);
   const [localProgress, setLocalProgress] = useState<number>(currentProgress);
   const [speedKmh, setSpeedKmh] = useState<number>(38);
+  const [showSpeedControls, setShowSpeedControls] = useState<boolean>(false);
 
   const prevStepRef = useRef<number>(-1);
+  const overspeedIntervalRef = useRef<any>(null);
+  const lastOverspeedAlertTimeRef = useRef<number>(0);
+  const wasOverspeedRef = useRef<boolean>(false);
 
   // Re-generate route when communes or language change
   useEffect(() => {
@@ -95,60 +104,73 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
     if (safeIndex !== prevStepRef.current) {
       prevStepRef.current = safeIndex;
       const step = routePlan.steps[safeIndex];
-      if (step && (isVoiceEnabled || autoPlayVoice)) {
+      if (step && isVoiceEnabled) {
         speakInstruction(step.instruction, language);
       }
     }
-  }, [localProgress, routePlan, autoPlayVoice, isVoiceEnabled, language]);
+  }, [localProgress, routePlan, isVoiceEnabled, language]);
 
-  // Handle Voice Mute Toggle
-  const toggleVoiceMute = () => {
-    const nextState = !isVoiceEnabled;
-    setIsVoiceEnabled(nextState);
-    setAutoPlayVoice(nextState);
-    voiceNavigator.setMuted(!nextState);
-    if (nextState) {
-      const step = routePlan.steps[currentStepIndex];
-      const intro = step 
-        ? (isEn ? `BRAD'CI Voice Guidance activated. ${step.instruction}` : `Guidage Voix Off BRAD'CI activé. ${step.instruction}`)
-        : (isEn ? "BRAD'CI Voice Guidance activated." : "Guidage Voix Off BRAD'CI activé.");
-      speakInstruction(intro, language);
-    }
-  };
-
-  // Manual Speak current step (Répéter la manœuvre)
-  const handleSpeakCurrentStep = () => {
-    const step = routePlan.steps[currentStepIndex];
-    if (step) {
-      speakInstruction(step.instruction, language);
-    }
-  };
-
-  // Calculate remaining distance and ETA
-  const remainingFraction = Math.max(0, 1 - (localProgress / 100));
-  const remainingDistKm = (routePlan.totalDistanceKm * remainingFraction).toFixed(1);
-  const remainingMin = Math.max(1, Math.ceil(routePlan.totalDurationMin * remainingFraction));
-
-  // Current active step
+  // Active step & speed limit calculation
   const activeStep = routePlan.steps[currentStepIndex] || routePlan.steps[0];
-
-  // Vitesse autorisée sur la voie actuelle
   const currentSpeedLimit = activeStep?.speedLimitKmh || getSpeedLimitForRoad(activeStep?.streetName || '', 50);
   const isOverspeed = speedKmh > currentSpeedLimit;
   const overspeedDelta = Math.max(0, speedKmh - currentSpeedLimit);
-  const lastOverspeedAlertTimeRef = useRef<number>(0);
 
-  // Alerte vocale de signalisation en cas de dépassement de vitesse
-  // RÈGLE : Se déclenche impérativement MÊME SI LE GUIDAGE VOCAL EST COUPÉ (isVoiceEnabled = false)
+  // =========================================================================
+  // ALARME DE SURVITESSE : DÉCLENCHEMENT SONORE & VOCAL DÈS DÉPASSEMENT LIMITE
+  // =========================================================================
   useEffect(() => {
     if (isOverspeed) {
-      const now = Date.now();
-      if (now - lastOverspeedAlertTimeRef.current > 7500) {
-        lastOverspeedAlertTimeRef.current = now;
+      const triggerAlarmSound = () => {
+        // Faire retentir l'alarme sonore de radar aigu
+        playOverspeedAlarm();
+        // Annonce vocale de sécurité forçant l'alerte
         announceOverspeedAlert(speedKmh, currentSpeedLimit, activeStep?.streetName || '', language);
+      };
+
+      if (!wasOverspeedRef.current) {
+        wasOverspeedRef.current = true;
+        lastOverspeedAlertTimeRef.current = Date.now();
+        triggerAlarmSound();
+
+        addToast(
+          isEn ? "🚨 Speed Limit Exceeded!" : "🚨 Vitesse Maximale Dépassée !",
+          isEn 
+            ? `Speed: ${speedKmh} km/h (Limit: ${currentSpeedLimit} km/h). Alarm is ringing!`
+            : `Vitesse : ${speedKmh} km/h (Limite : ${currentSpeedLimit} km/h). L'alarme de sécurité sonne ! Ralentissez.`,
+          "error"
+        );
+      }
+
+      // Répéter l'alarme sonore tant que la vitesse dépasse le nombre maximum autorisé (toutes les 4 secondes)
+      if (overspeedIntervalRef.current) clearInterval(overspeedIntervalRef.current);
+      overspeedIntervalRef.current = setInterval(() => {
+        triggerAlarmSound();
+      }, 4000);
+
+    } else {
+      // Retour sous la vitesse autorisée : couper l'alarme immédiatement
+      if (overspeedIntervalRef.current) {
+        clearInterval(overspeedIntervalRef.current);
+        overspeedIntervalRef.current = null;
+      }
+      if (wasOverspeedRef.current) {
+        wasOverspeedRef.current = false;
+        playGpsChime();
+        addToast(
+          isEn ? "✅ Speed Compliant" : "✅ Vitesse Régulée Conforme",
+          isEn ? `Within the ${currentSpeedLimit} km/h limit. Alarm stopped.` : `Sous la limite de ${currentSpeedLimit} km/h. L'alarme s'est arrêtée.`,
+          "success"
+        );
       }
     }
-  }, [speedKmh, currentSpeedLimit, isOverspeed, activeStep, language]);
+
+    return () => {
+      if (overspeedIntervalRef.current) {
+        clearInterval(overspeedIntervalRef.current);
+      }
+    };
+  }, [speedKmh, currentSpeedLimit, isOverspeed, activeStep, language, isEn, addToast]);
 
   const handleAdjustSpeed = (delta: number) => {
     setSpeedKmh(prev => Math.max(15, Math.min(130, prev + delta)));
@@ -157,386 +179,278 @@ export const GoogleMapsEmbed: React.FC<GoogleMapsEmbedProps> = ({
   const handleTestOverspeed = () => {
     const forcedSpeed = currentSpeedLimit + 20;
     setSpeedKmh(forcedSpeed);
-    lastOverspeedAlertTimeRef.current = Date.now();
-    announceOverspeedAlert(forcedSpeed, currentSpeedLimit, activeStep?.streetName || '', language);
   };
+
+  const handleSlowDownToLegalSpeed = () => {
+    setSpeedKmh(Math.max(20, currentSpeedLimit - 5));
+  };
+
+  const toggleVoiceMute = () => {
+    const nextState = !isVoiceEnabled;
+    setIsVoiceEnabled(nextState);
+    voiceNavigator.setMuted(!nextState);
+    if (nextState) {
+      const step = routePlan.steps[currentStepIndex];
+      const intro = step 
+        ? (isEn ? `Voice guidance on. ${step.instruction}` : `Guidage vocal activé. ${step.instruction}`)
+        : (isEn ? "Voice guidance on." : "Guidage vocal activé.");
+      speakInstruction(intro, language);
+    }
+  };
+
+  // Remaining ETA and distance
+  const remainingFraction = Math.max(0, 1 - (localProgress / 100));
+  const remainingDistKm = (routePlan.totalDistanceKm * remainingFraction).toFixed(1);
+  const remainingMin = Math.max(1, Math.ceil(routePlan.totalDurationMin * remainingFraction));
 
   const getStepIcon = (iconType: RouteStep['icon']) => {
     switch (iconType) {
       case 'turn-right':
-        return <ArrowUpRight className="w-5 h-5 text-amber-400" />;
+        return <ArrowUpRight className="w-4 h-4 text-amber-400" />;
       case 'turn-left':
-        return <ArrowUpLeft className="w-5 h-5 text-amber-400" />;
-      case 'bridge':
-        return <Layers className="w-5 h-5 text-blue-400" />;
+        return <ArrowUpLeft className="w-4 h-4 text-amber-400" />;
       case 'destination':
-        return <CheckCircle2 className="w-5 h-5 text-emerald-400" />;
+        return <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
       case 'u-turn':
-        return <RotateCcw className="w-5 h-5 text-red-400" />;
+        return <RotateCcw className="w-4 h-4 text-red-400" />;
       default:
-        return <ArrowUp className="w-5 h-5 text-emerald-400" />;
+        return <ArrowUp className="w-4 h-4 text-emerald-400" />;
     }
   };
 
-  // Google Maps Embed Query URL
   const gmapsOrigin = encodeURIComponent(`${pickupCommune}, Abidjan, Côte d'Ivoire`);
   const gmapsDest = encodeURIComponent(`${dropoffCommune}, Abidjan, Côte d'Ivoire`);
   const gmapsEmbedUrl = `https://maps.google.com/maps?q=${gmapsOrigin}+to+${gmapsDest}&t=${mapLayer === 'satellite' ? 'k' : 'm'}&z=13&ie=UTF8&iwloc=&output=embed`;
 
   return (
-    <div id="google-maps-navigation-cockpit" className={`rounded-3xl bg-[#070B14] border border-slate-800 overflow-hidden shadow-2xl ${className}`}>
-      {/* 1. Cockpit Header Bar */}
-      <div className="p-4 bg-gradient-to-r from-slate-900 via-[#0A101D] to-slate-900 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
-            <Navigation className="w-5 h-5 animate-pulse" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm text-white font-display">
-                Google Maps Navigation Grand Abidjan
-              </span>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono-num font-bold text-[10px] flex items-center gap-1 border border-emerald-500/30">
-                <Radio className="w-2.5 h-2.5 animate-ping text-emerald-400" />
-                <span>GPS LIVE</span>
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              {routePlan.originCommune} → {routePlan.destinationCommune} ({routePlan.totalDistanceKm} km)
-            </p>
-          </div>
-        </div>
-
-        {/* Action Controls: Layer Switcher + Theme Switcher + Voice */}
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          {/* Layer Switcher: Native Google Maps Plan vs Satellite */}
-          <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
-            <button
-              onClick={() => setMapLayer('roadmap')}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
-                mapLayer === 'roadmap'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>🗺️ Plan</span>
-            </button>
-            <button
-              onClick={() => setMapLayer('satellite')}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
-                mapLayer === 'satellite'
-                  ? 'bg-emerald-700 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>🛰️ Satellite</span>
-            </button>
-          </div>
-
-          {/* Day / Night Driver Theme Toggle */}
-          <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 text-xs">
-            <button
-              onClick={() => setNavTheme('night')}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
-                navTheme === 'night'
-                  ? 'bg-slate-800 text-amber-300 shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="Mode Nuit (Lisibilité et contraste sombre)"
-            >
-              <Moon className="w-3 h-3" />
-              <span className="hidden sm:inline">Nuit</span>
-            </button>
-            <button
-              onClick={() => setNavTheme('day')}
-              className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1 ${
-                navTheme === 'day'
-                  ? 'bg-amber-500 text-slate-950 shadow'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="Mode Jour (Plein soleil)"
-            >
-              <Sun className="w-3 h-3" />
-              <span className="hidden sm:inline">Jour</span>
-            </button>
-          </div>
-
-          {/* Voice Mute / Unmute Button */}
-          <button
-            onClick={toggleVoiceMute}
-            className={`p-2 rounded-xl border transition-all flex items-center gap-1.5 ${
-              isVoiceEnabled
-                ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400 shadow-lg shadow-emerald-500/10'
-                : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
-            }`}
-            title={isVoiceEnabled ? 'Voix GPS activée (cliquer pour couper)' : 'Voix GPS muette (cliquer pour activer)'}
-          >
-            {isVoiceEnabled ? <Volume2 className="w-4 h-4 animate-pulse" /> : <VolumeX className="w-4 h-4" />}
-            <span className="text-[11px] font-bold hidden md:inline">
-              {isVoiceEnabled ? 'Voix On' : 'Muet'}
-            </span>
-          </button>
-
-          {/* External Google Maps Button */}
-          <a
-            href={routePlan.googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold flex items-center gap-1.5 transition-all"
-            title="Ouvrir l'itinéraire dans Google Maps"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Google Maps</span>
-          </a>
-        </div>
+    <div 
+      id="uber-pro-tracking-container"
+      className={`relative w-full h-[540px] sm:h-[620px] rounded-3xl overflow-hidden bg-[#040814] border border-slate-800 shadow-2xl select-none ${className}`}
+    >
+      {/* ========================================================================= */}
+      {/* 1. CARTE GPS VISIBLE À 100% SANS BOURRAGE (YANGO / UBER STYLE)             */}
+      {/* ========================================================================= */}
+      <div className="absolute inset-0 w-full h-full z-0 overflow-hidden bg-[#040814]">
+        <iframe
+          title="Live GPS Tracking Route"
+          src={gmapsEmbedUrl}
+          className={`absolute -top-16 sm:-top-20 -bottom-14 -left-2 -right-2 w-[calc(100%+16px)] h-[calc(100%+130px)] border-0 ${
+            navTheme === 'night' ? 'brightness-90 contrast-125' : ''
+          }`}
+          loading="lazy"
+          allowFullScreen
+        />
       </div>
 
-      {/* Official Google Maps Voice Guidance Direct Banner */}
-      <div className="bg-blue-950/40 border-b border-blue-500/30 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 border border-blue-500/30">
-            <Navigation className="w-4 h-4" />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-white flex items-center gap-2">
-              <span>Guidage Vocal Officiel Google Maps</span>
-              <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 font-semibold">
-                Voix GPS Native
-              </span>
-            </p>
-            <p className="text-[11px] text-slate-300">
-              Navigation vocale étape par étape assurée directement par Google Maps avec alertes de trafic en direct à Abidjan.
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            id="btn-launch-voice-guidance"
-            type="button"
-            onClick={() => {
-              setIsVoiceEnabled(true);
-              setAutoPlayVoice(true);
-              const step = routePlan.steps[currentStepIndex];
-              const textToSpeak = step 
-                ? `Guidage Voix Off BRAD'CI actif. ${step.instruction}`
-                : "Guidage Voix Off BRAD'CI actif.";
-              speakInstruction(textToSpeak);
-            }}
-            className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-black rounded-xl shadow-lg shadow-amber-500/20 flex items-center gap-2 shrink-0 transition-all cursor-pointer hover:scale-105 active:scale-95"
-          >
-            <Volume2 className="w-3.5 h-3.5" />
-            <span>Lancer la Voix Off</span>
-          </button>
-          <a
-            href={routePlan.googleMapsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-1.5 shrink-0 transition-all cursor-pointer hover:scale-105"
-            title="Ouvrir itinéraire dans l'application Google Maps"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Google Maps</span>
-          </a>
-        </div>
-      </div>
-
-      {/* 2. Turn-by-Turn Dynamic Voice Guidance Banner */}
-      <div className="bg-gradient-to-r from-[#0F172A] via-[#0E1F38] to-[#0F172A] p-4 border-b border-slate-800/90">
-        <div className="flex items-start sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/10">
+      {/* ========================================================================= */}
+      {/* 2. HUD FLOTTANT HAUT : MANŒUVRE + INDICATEUR DE VITESSE ULTRA-COMPACT      */}
+      {/* ========================================================================= */}
+      <div className="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 right-14 sm:right-16 z-20 pointer-events-auto">
+        <div className={`p-2 sm:p-2.5 rounded-2xl backdrop-blur-md border shadow-2xl flex items-center justify-between gap-2.5 transition-all ${
+          isOverspeed 
+            ? 'bg-red-950/95 border-red-500 ring-2 ring-red-500/50 shadow-red-500/40 animate-pulse' 
+            : 'bg-[#0B111E]/90 border-slate-800 text-white'
+        }`}>
+          {/* Manœuvre en cours */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 shadow">
               {getStepIcon(activeStep.icon)}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono-num font-black text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-mono font-black text-amber-400 bg-amber-500/15 px-1.5 py-0.2 rounded border border-amber-500/30">
                   {activeStep.distanceText}
                 </span>
-                <span className="text-[11px] text-slate-400 font-medium">
+                <span className="text-[10px] text-slate-400 font-semibold truncate">
                   {activeStep.streetName}
                 </span>
               </div>
-              <p className="text-sm sm:text-base font-extrabold text-white mt-1 leading-snug">
+              <p className="text-xs font-bold text-white truncate leading-tight mt-0.5">
                 {activeStep.instruction}
               </p>
-              {activeStep.warning && (
-                <p className="text-[11px] text-amber-300 flex items-center gap-1 mt-1">
-                  <AlertCircle className="w-3 h-3 text-amber-400 shrink-0" />
-                  <span>{activeStep.warning}</span>
-                </p>
-              )}
             </div>
           </div>
 
-          {/* Quick Vocal Replay & Step Selector */}
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
-            <button
-              id="btn-repeat-manoeuvre"
-              type="button"
-              onClick={handleSpeakCurrentStep}
-              className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <Volume2 className="w-3.5 h-3.5" />
-              <span>Répéter la manœuvre</span>
-            </button>
-            <span className="text-[10px] text-slate-400 font-mono-num">
-              Étape {currentStepIndex + 1} / {routePlan.steps.length}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2.1 Alerte Vocale d'Urgence - Excès de Vitesse (Forcée même si guidage vocal coupé) */}
-      {isOverspeed && (
-        <div 
-          id="gmaps-overspeed-alarm-banner"
-          className="p-3 bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white border-b-2 border-red-300 ring-2 ring-red-500/60 flex items-center justify-between gap-3 animate-pulse"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-white border-[3px] border-red-600 flex items-center justify-center shadow-lg shrink-0">
-              <span className="text-slate-950 font-black text-xs tracking-tight">{currentSpeedLimit}</span>
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="px-1.5 py-0.2 rounded bg-black/40 text-[9px] font-black uppercase tracking-wider text-amber-300">
-                  ALERTE SÉCURITÉ VITESSE
-                </span>
-                <span className="text-[10px] text-white/90">
-                  (Signal vocal forcé même si guidage coupé)
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm font-black text-white mt-0.5 truncate">
-                Vitesse : {speedKmh} km/h • Limite {currentSpeedLimit} km/h • Ralentissez immédiatement !
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setSpeedKmh(Math.max(20, currentSpeedLimit - 5))}
-            className="px-3 py-1 bg-white hover:bg-slate-100 text-red-700 font-black text-xs rounded-xl shadow shrink-0 active:scale-95 cursor-pointer"
-          >
-            Ralentir
-          </button>
-        </div>
-      )}
-
-      {/* 3. Main Map Canvas Area: 85%-90% Screen Height, Google Widgets Cropped */}
-      <div className="relative w-full h-[75vh] sm:h-[85vh] min-h-[520px] bg-[#040812] overflow-hidden">
-        <div className="w-full h-full relative overflow-hidden">
-          {/* Iframe cropped to eliminate Google Maps white headers and copyright bars */}
-          <iframe
-            title="Google Maps Route Navigation"
-            src={gmapsEmbedUrl}
-            className={`absolute -top-16 sm:-top-20 -bottom-12 -left-1 -right-1 w-[calc(100%+8px)] h-[calc(100%+120px)] border-0 ${navTheme === 'night' ? 'brightness-90 contrast-125' : ''}`}
-            loading="lazy"
-            allowFullScreen
-          />
-
-          {/* Live Telemetry Overlay Pill in Top Left (Dynamic Vehicle Icon & Speed Limit Sign) */}
-          <div className={`absolute top-3 left-3 backdrop-blur-md border p-2 sm:p-2.5 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs z-10 transition-all ${
-            isOverspeed ? 'bg-red-950/95 border-red-500 shadow-red-600/40 text-white animate-pulse ring-2 ring-red-500' : 'bg-[#0B111E]/95 border-slate-800 text-white'
-          }`}>
-            <div className="flex items-center gap-1.5 text-blue-400 font-bold">
-              {vehicleType === 'voiture' || vehicleType === 'car' ? (
-                <Car className="w-4 h-4 animate-pulse text-amber-400" />
-              ) : vehicleType === 'cargo' ? (
-                <Truck className="w-4 h-4 animate-pulse text-purple-400" />
-              ) : (
-                <Bike className="w-4 h-4 animate-bounce text-emerald-400" />
-              )}
-              <span>
-                {vehicleType === 'voiture' || vehicleType === 'car' ? 'Voiture' : vehicleType === 'cargo' ? 'Camionnette' : 'Moto'} • {courierName}
-              </span>
-            </div>
-
-            <div className="w-px h-4 bg-slate-700" />
-
-            {/* Panneau de Limitation */}
+          {/* Speedometer & Speed Limit Sign Pill */}
+          <div className="flex items-center gap-1.5 shrink-0 pl-2 border-l border-slate-700/60">
+            {/* Panneau rond blanc officiel de vitesse */}
             <div 
               className="w-7 h-7 rounded-full bg-white border-2 border-red-600 flex items-center justify-center shadow shrink-0"
-              title={`Limite : ${currentSpeedLimit} km/h`}
+              title={`Vitesse maximale autorisée : ${currentSpeedLimit} km/h. L'alarme sonne si dépassée.`}
             >
               <span className="text-slate-950 font-black text-[10px] leading-none">{currentSpeedLimit}</span>
             </div>
 
-            {/* Speed Value */}
-            <span className={`font-mono-num font-black ${isOverspeed ? 'text-red-400 animate-bounce' : 'text-amber-400'}`}>
-              {speedKmh} km/h
-            </span>
+            {/* Vitesse actuelle */}
+            <div className="leading-tight text-right">
+              <div className="flex items-baseline gap-0.5">
+                <span className={`text-sm sm:text-base font-mono font-black ${isOverspeed ? 'text-red-300' : 'text-amber-400'}`}>
+                  {speedKmh}
+                </span>
+                <span className="text-[8px] font-bold text-slate-400 uppercase">km/h</span>
+              </div>
+              {isOverspeed ? (
+                <span className="text-[8px] font-black text-red-400 uppercase tracking-tighter block animate-bounce">
+                  🚨 ALARME SONNE (+{overspeedDelta})
+                </span>
+              ) : (
+                <span className="text-[8px] font-bold text-emerald-400 uppercase block">
+                  MAX {currentSpeedLimit}
+                </span>
+              )}
+            </div>
 
-            {/* Micro Speed Adjusters */}
-            <div className="flex items-center gap-1 pl-1 border-l border-slate-700/60">
+            {/* If overspeed: instant "Ralentir" button; otherwise micro controls */}
+            {isOverspeed ? (
               <button
                 type="button"
-                onClick={() => handleAdjustSpeed(5)}
-                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-[10px] font-black cursor-pointer"
-                title="+5 km/h"
+                onClick={handleSlowDownToLegalSpeed}
+                className="py-1 px-2 rounded-xl bg-white hover:bg-slate-100 text-red-700 font-black text-[10px] shadow active:scale-95 cursor-pointer flex items-center gap-1 shrink-0"
+                title="Ralentir pour couper l'alarme"
               >
-                +
+                <Check className="w-3 h-3" />
+                <span>Ralentir</span>
               </button>
-              <button
-                type="button"
-                onClick={() => handleAdjustSpeed(-5)}
-                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center text-[10px] font-black cursor-pointer"
-                title="-5 km/h"
-              >
-                -
-              </button>
-              <button
-                type="button"
-                onClick={handleTestOverspeed}
-                className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-[9px] font-bold cursor-pointer"
-                title="Tester alerte vocale d'excès de vitesse"
-              >
-                Test Alerte
-              </button>
+            ) : (
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleAdjustSpeed(-5)}
+                  className="w-5 h-5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-[10px] flex items-center justify-center cursor-pointer border border-slate-800"
+                  title="Diminuer vitesse (-5 km/h)"
+                >
+                  <Minus className="w-2.5 h-2.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustSpeed(5)}
+                  className="w-5 h-5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-bold text-[10px] flex items-center justify-center cursor-pointer border border-slate-800"
+                  title="Augmenter vitesse (+5 km/h) - Dépasse la limite pour faire sonner l'alarme"
+                >
+                  <Plus className="w-2.5 h-2.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestOverspeed}
+                  className="px-1.5 py-0.5 rounded-lg bg-red-950/80 hover:bg-red-900 text-red-300 hover:text-white font-black text-[8px] border border-red-800/60 cursor-pointer"
+                  title="Tester l'alarme sonore de vitesse excessive"
+                >
+                  Test Alarme
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 3. DOCK LATÉRAL DROIT : OPTIONS EN TOUT PETIT & ULTRA PROFESSIONNEL        */}
+      {/* ========================================================================= */}
+      <div className="absolute top-2.5 sm:top-3 right-2.5 sm:right-3 z-20 flex flex-col items-end gap-1.5 pointer-events-auto">
+        {/* Layer Toggle: Plan / Satellite */}
+        <button
+          type="button"
+          onClick={() => setMapLayer(prev => prev === 'roadmap' ? 'satellite' : 'roadmap')}
+          className="w-8 h-8 rounded-xl bg-[#0B111E]/90 hover:bg-slate-800 border border-slate-700/80 text-sky-400 shadow-xl flex items-center justify-center transition-transform active:scale-95 cursor-pointer backdrop-blur-md"
+          title={mapLayer === 'roadmap' ? "Activer Satellite" : "Activer Plan Standard"}
+        >
+          <Layers className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Night / Day Mode */}
+        <button
+          type="button"
+          onClick={() => setNavTheme(prev => prev === 'night' ? 'day' : 'night')}
+          className="w-8 h-8 rounded-xl bg-[#0B111E]/90 hover:bg-slate-800 border border-slate-700/80 text-amber-400 shadow-xl flex items-center justify-center transition-transform active:scale-95 cursor-pointer backdrop-blur-md"
+          title={navTheme === 'night' ? "Mode Jour" : "Mode Nuit"}
+        >
+          {navTheme === 'night' ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+        </button>
+
+        {/* Voice Toggle */}
+        <button
+          type="button"
+          onClick={toggleVoiceMute}
+          className={`w-8 h-8 rounded-xl border shadow-xl flex items-center justify-center transition-transform active:scale-95 cursor-pointer backdrop-blur-md ${
+            isVoiceEnabled
+              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+              : 'bg-[#0B111E]/90 border-slate-700/80 text-slate-400 hover:text-white'
+          }`}
+          title={isVoiceEnabled ? "Couper la voix GPS" : "Activer la voix GPS"}
+        >
+          {isVoiceEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> : <VolumeX className="w-3.5 h-3.5" />}
+        </button>
+
+        {/* External Google Maps launch */}
+        <a
+          href={routePlan.googleMapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-8 h-8 rounded-xl bg-[#0B111E]/90 hover:bg-blue-600/30 border border-slate-700/80 text-blue-400 shadow-xl flex items-center justify-center transition-transform active:scale-95 cursor-pointer backdrop-blur-md"
+          title="Ouvrir dans Google Maps"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 4. BARRE INFÉRIEURE FLOTTANTE : SUIVI DE COURSE & CONTACT LIVREUR           */}
+      {/* ========================================================================= */}
+      <div className="absolute bottom-2.5 sm:bottom-3 left-2.5 sm:left-3 right-2.5 sm:right-3 z-20 pointer-events-auto">
+        <div className="bg-[#0B111E]/95 backdrop-blur-md rounded-2xl border border-slate-800 p-2.5 sm:p-3 shadow-2xl flex items-center justify-between gap-3">
+          {/* Véhicule & Nom Livreur */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`w-9 h-9 rounded-xl border flex items-center justify-center shrink-0 ${
+              vehicleType === 'voiture' || vehicleType === 'car'
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                : vehicleType === 'cargo'
+                ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            }`}>
+              {vehicleType === 'voiture' || vehicleType === 'car' ? (
+                <Car className="w-4 h-4" />
+              ) : vehicleType === 'cargo' ? (
+                <Truck className="w-4 h-4" />
+              ) : (
+                <Bike className="w-4 h-4 animate-bounce" />
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-xs text-white truncate">{courierName}</span>
+                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/15 px-1.5 py-0.2 rounded">
+                  GPS LIVE
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 truncate">
+                {pickupCommune} → <strong className="text-slate-200">{dropoffCommune}</strong>
+              </p>
             </div>
           </div>
 
-          {/* In-Map Top-Right Telemetry Card */}
-          <div className="absolute top-3 right-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 sm:p-3 rounded-2xl shadow-2xl flex flex-col gap-1 text-right z-10">
-            <span className="text-[10px] text-slate-400 block uppercase font-bold">Distance Restante</span>
-            <span className="text-sm font-mono-num font-black text-emerald-400">
-              {remainingDistKm} km ({remainingMin} min)
-            </span>
-          </div>
-
-          {/* In-Map Bottom-Left Origin & Destination Badges */}
-          <div className="absolute bottom-3 left-3 bg-[#0B111E]/95 backdrop-blur-md border border-slate-800 p-2.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs z-10">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-[10px]">
-                A
-              </div>
-              <div>
-                <span className="text-[9px] text-slate-400 block">Départ</span>
-                <span className="font-bold text-white text-xs">{routePlan.originCommune}</span>
-              </div>
+          {/* ETA & Distance restante */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="text-right">
+              <span className="text-xs sm:text-sm font-mono font-black text-emerald-400 block">
+                {remainingMin} min
+              </span>
+              <span className="text-[10px] font-mono text-slate-400 block">
+                {remainingDistKm} km restant
+              </span>
             </div>
-            <ArrowRight className="w-4 h-4 text-slate-500 shrink-0" />
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[10px]">
-                B
-              </div>
-              <div>
-                <span className="text-[9px] text-slate-400 block">Arrivée</span>
-                <span className="font-bold text-white text-xs">{routePlan.destinationCommune}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Floating Recenter GPS Button in Bottom Right */}
-          <div className="absolute bottom-3 right-3 z-20">
-            <button
-              onClick={() => {
-                if (isVoiceEnabled) {
-                  voiceNavigator.speak(`Recentrage GPS sur l'itinéraire de ${routePlan.originCommune} vers ${routePlan.destinationCommune}.`);
-                }
-              }}
-              className="w-12 h-12 rounded-full bg-[#1A2524] hover:bg-[#253634] text-white border-2 border-slate-700/80 shadow-2xl flex items-center justify-center transition-transform hover:scale-110 active:scale-95 cursor-pointer group"
-              title="Recentrer le GPS"
-            >
-              <Navigation className="w-5 h-5 text-white transition-transform group-hover:rotate-45" />
-            </button>
+            {/* Quick Call Button */}
+            {courierPhone && (
+              <a
+                href={`tel:${courierPhone}`}
+                className="p-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 transition-all cursor-pointer shadow active:scale-95"
+                title={`Appeler ${courierName}`}
+              >
+                <Clock className="w-3.5 h-3.5 hidden" />
+                <span className="text-xs font-bold font-mono">📞</span>
+              </a>
+            )}
           </div>
         </div>
       </div>

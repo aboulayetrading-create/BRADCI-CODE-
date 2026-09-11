@@ -19,7 +19,8 @@ import {
   isRunningInIframe,
   isPlatformIOS,
   isPlatformAndroid,
-  sendUniversalPush
+  sendUniversalPush,
+  sendTestNotification
 } from '../utils/universalNotifications';
 
 export type NotificationPermissionState = NotificationPermission | 'unsupported';
@@ -31,10 +32,15 @@ export type NotificationPermissionState = NotificationPermission | 'unsupported'
 export function useNotificationManager() {
   const { addToast, translate, pushBrowserNotification } = useApp();
   const [permission, setPermission] = useState<NotificationPermissionState>(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      return Notification.permission;
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('bradci_browser_notifications') === 'true') {
+        return 'granted';
+      }
+      if ('Notification' in window) {
+        return Notification.permission;
+      }
     }
-    return 'unsupported';
+    return 'default';
   });
   
   const [pushToken, setPushToken] = useState<string | null>(() => {
@@ -101,11 +107,11 @@ export function useNotificationManager() {
           'success'
         );
 
-        // Envoyer une notification d'accueil
+        // Envoyer une notification d'accueil visible et sonore
         try {
-          await pushBrowserNotification(
+          await sendTestNotification(
             "BRAD'CI : Notifications Activées ⚡",
-            "Parfait ! Vous serez alerté en temps réel dès qu'un utilisateur surenchérit ou qu'un livreur arrive."
+            "Parfait ! Vous recevrez désormais les alertes d'enchères et le suivi des livreurs."
           );
         } catch {
           // Fallback silencieux
@@ -125,23 +131,29 @@ export function useNotificationManager() {
 
   // Actualiser l'état de la permission (notamment quand l'utilisateur revient des paramètres Android)
   const refreshPermissionState = useCallback(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      const current = Notification.permission;
-      setPermission(prev => {
-        if (prev !== current) {
-          if (current === 'granted') {
-            registerPushToken();
-            setIsBannerDismissed(true);
-            addToast(
-              translate("Notifications Réactivées", "Notifications Reactivated"),
-              translate("Merci ! Vos alertes d'enchères sont désormais actives.", "Thank you! Your auction alerts are now active."),
-              'success'
-            );
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('bradci_browser_notifications') === 'true') {
+        setPermission('granted');
+        return;
+      }
+      if ('Notification' in window) {
+        const current = Notification.permission;
+        setPermission(prev => {
+          if (prev !== current) {
+            if (current === 'granted') {
+              registerPushToken();
+              setIsBannerDismissed(true);
+              addToast(
+                translate("Notifications Réactivées", "Notifications Reactivated"),
+                translate("Merci ! Vos alertes d'enchères sont désormais actives.", "Thank you! Your auction alerts are now active."),
+                'success'
+              );
+            }
+            return current;
           }
-          return current;
-        }
-        return prev;
-      });
+          return prev;
+        });
+      }
     }
   }, [registerPushToken, addToast, translate]);
 
@@ -153,7 +165,12 @@ export function useNotificationManager() {
     });
 
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      setPermission('unsupported');
+      if (typeof window !== 'undefined' && localStorage.getItem('bradci_browser_notifications') === 'true') {
+        setPermission('granted');
+        registerPushToken();
+      } else {
+        setPermission('default');
+      }
       return;
     }
 

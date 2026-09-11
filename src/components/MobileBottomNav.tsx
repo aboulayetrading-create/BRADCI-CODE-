@@ -185,62 +185,89 @@ export const MobileBottomNav: React.FC = () => {
         <button
           id="btn-mobile-nav-explore"
           onClick={() => setActiveTab('explore')}
-          className={`flex flex-col items-center justify-center w-11 py-1 rounded-xl transition-all ${
+          className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'explore' || activeTab === 'feed'
               ? 'text-[#FF5B00] font-bold'
               : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <Gavel className={`w-5 h-5 ${activeTab === 'explore' ? 'text-[#FF5B00] scale-110' : ''}`} />
-          <span className="text-[10px] mt-0.5 tracking-tight">{translate("Enchères", "Auctions")}</span>
+          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">
+            {translate("Enchères", "Auctions")}
+          </span>
         </button>
 
-        {/* 2. Cart Tab with Live Badge */}
+        {/* 2. NOUVEL ONGLET : COURSIER EXPRESS (POINT A ➔ POINT B) */}
+        <button
+          id="btn-mobile-nav-express-courier"
+          onClick={() => setActiveTab('express_courier')}
+          className={`relative flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl transition-all cursor-pointer ${
+            activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
+              ? 'text-violet-400 font-bold'
+              : 'text-slate-400 hover:text-violet-300'
+          }`}
+        >
+          <div className="relative">
+            <Bike className={`w-5 h-5 ${
+              activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
+                ? 'text-violet-400 scale-110' 
+                : 'text-slate-400'
+            }`} />
+            <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-[7.5px] font-black uppercase tracking-tighter scale-90">
+              EXP
+            </span>
+          </div>
+          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">
+            {translate("Coursier", "Courier")}
+          </span>
+        </button>
+
+        {/* 3. Cart Tab with Live Badge */}
         <button
           id="btn-mobile-nav-cart"
           onClick={() => setCartModalOpen(true)}
-          className="relative flex flex-col items-center justify-center w-11 py-1 rounded-xl text-slate-400 hover:text-amber-400 transition-all"
+          className="relative flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl text-slate-400 hover:text-amber-400 transition-all cursor-pointer"
         >
           <ShoppingCart className="w-5 h-5 text-amber-400" />
           {cart.length > 0 && (
-            <span className="absolute top-0 right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[9px] flex items-center justify-center border border-[#0B1021]">
+            <span className="absolute top-0 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[8.5px] flex items-center justify-center border border-[#0B1021]">
               {cart.reduce((s, i) => s + i.quantity, 0)}
             </span>
           )}
-          <span className="text-[10px] mt-0.5 tracking-tight">{translate("Panier", "Cart")}</span>
+          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">{translate("Panier", "Cart")}</span>
         </button>
 
-        {/* 3. Central Sell Action Button (Prominent Vibrant Orange #FF5B00) */}
+        {/* 4. Central Sell Action Button (Prominent Vibrant Orange #FF5B00) */}
         <button
           id="btn-mobile-nav-sell"
           onClick={handleSellClick}
-          className="flex flex-col items-center justify-center -mt-4 bg-[#FF5B00] hover:bg-[#E05000] text-white w-12 h-12 rounded-2xl shadow-xl shadow-[#FF5B00]/30 border-2 border-[#0B1021] active:scale-95 transition-all cursor-pointer"
-          title={translate("Publier une enchère", "Post an auction")}
+          className="flex flex-col items-center justify-center -mt-3.5 bg-[#FF5B00] hover:bg-[#E05000] text-white w-11 h-11 sm:w-12 sm:h-12 rounded-2xl shadow-xl shadow-[#FF5B00]/30 border-2 border-[#0B1021] active:scale-95 transition-all cursor-pointer shrink-0"
+          title={translate("Publier une annonce ou enchère", "Post an auction")}
         >
           <PlusCircle className="w-6 h-6 stroke-[2.5]" />
           <span className="sr-only">{translate("Vendre", "Sell")}</span>
         </button>
 
-        {/* 4. Notifications Tab with Live Badge */}
+        {/* 5. Notifications Tab with Live Badge */}
         <button
           id="btn-mobile-nav-notifs"
           onClick={() => setNotificationsModalOpen(true)}
-          className="relative flex flex-col items-center justify-center w-11 py-1 rounded-xl text-slate-400 hover:text-[#FF5B00] transition-all"
+          className="relative flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl text-slate-400 hover:text-[#FF5B00] transition-all cursor-pointer"
         >
           <Bell className="w-5 h-5" />
           {unreadNotificationsCount > 0 && (
-            <span className="absolute top-0 right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[9px] flex items-center justify-center border border-[#0B1021] animate-pulse">
+            <span className="absolute top-0 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[8.5px] flex items-center justify-center border border-[#0B1021] animate-pulse">
               {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
             </span>
           )}
-          <span className="text-[10px] mt-0.5 tracking-tight">{translate("Notifs", "Notifs")}</span>
+          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">{translate("Notifs", "Notifs")}</span>
         </button>
 
-        {/* 5. Profile / Role Space */}
+        {/* 6. Profile / Role Space */}
         <button
           id="btn-mobile-nav-profile"
           onClick={handleProfileClick}
-          className={`flex flex-col items-center justify-center w-11 py-1 rounded-xl transition-all ${
+          className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl transition-all cursor-pointer ${
             isProfileActive
               ? 'text-[#1E53E5] font-bold'
               : 'text-slate-400 hover:text-slate-200'
@@ -253,7 +280,7 @@ export const MobileBottomNav: React.FC = () => {
           ) : (
             <User className="w-5 h-5" />
           )}
-          <span className="text-[10px] mt-0.5 tracking-tight">
+          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">
             {currentUser 
               ? (currentUser.role === 'driver' ? translate('Livreur', 'Courier') : currentUser.role === 'admin' ? 'Admin' : translate('Moi', 'Me'))
               : translate('Profil', 'Profile')}

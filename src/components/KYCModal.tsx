@@ -36,25 +36,13 @@ import {
   SelfieVectorDrawing, 
   SelfieWithCardVectorDrawing, 
   DriverLicenseVectorDrawing, 
-  VehicleRegVectorDrawing, 
-  KYC_DRAWING_DATA_URIS 
+  VehicleRegVectorDrawing
 } from './KYCIllustrations';
 
 interface KYCModalProps {
   isOpen?: boolean;
   onClose?: () => void;
 }
-
-// Authentic demonstration drawings conforming to fintech, banking & courier standards
-const DEMO_KYC_PHOTOS = {
-  cni: KYC_DRAWING_DATA_URIS.cni,
-  selfie: KYC_DRAWING_DATA_URIS.selfie,
-  selfieWithId: KYC_DRAWING_DATA_URIS.selfieWithId,
-  driverLicense: KYC_DRAWING_DATA_URIS.driverLicense,
-  driverLicenseVerso: KYC_DRAWING_DATA_URIS.driverLicense,
-  driverLicenseSelfie: KYC_DRAWING_DATA_URIS.driverLicenseSelfie,
-  vehicleReg: KYC_DRAWING_DATA_URIS.vehicleReg
-};
 
 // Popular vehicle models and presets used in Abidjan delivery fleets
 interface VehiclePresetItem {
@@ -187,24 +175,6 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
 
   if (!isOpen) return null;
 
-  const handleApplyDemoPhotoFromGuide = (type: string, url: string, docNum?: string) => {
-    if (type === 'cni') {
-      setDocPhoto(url);
-      if (docNum) setDocNumber(docNum);
-    } else if (type === 'selfie') {
-      setSelfiePhoto(url);
-    } else if (type === 'selfieWithId') {
-      setSelfieWithIdPhoto(url);
-    } else if (type === 'driverLicense') {
-      setDriverLicensePhoto(url);
-      if (docNum) setDocNumber(docNum);
-    } else if (type === 'driverLicenseSelfie') {
-      setSelfieWithIdPhoto(url);
-    } else if (type === 'vehicleReg') {
-      setVehicleRegPhoto(url);
-    }
-  };
-
   // Stop Camera Stream
   const stopCamera = () => {
     if (streamRef.current) {
@@ -288,8 +258,20 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     }
   };
 
-  // Handle manual file selection
+  // Check if current step requires live camera biometric capture (no gallery upload)
+  const isSelfieStep = (!isDriver && (currentStep === 2 || currentStep === 3)) || (isDriver && currentStep === 2);
+
+  // Handle manual file selection (only permitted for official documents, not for live selfies)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isSelfieStep) {
+      addToast(
+        translate('Caméra en direct requise', 'Live camera required'),
+        translate('Pour des raisons de conformité et sécurité biométrique, le selfie doit être capturé en direct avec votre caméra.', 'For biometric security and anti-fraud compliance, selfies must be captured live via camera.'),
+        'error'
+      );
+      if (e.target) e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -297,8 +279,8 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
         if (event.target?.result) {
           assignPhotoForCurrentStep(event.target.result as string);
           addToast(
-            translate('Photo importée', 'Photo imported'),
-            translate('Le fichier est prêt pour la vérification.', 'File ready for verification.'),
+            translate('Document importé', 'Document imported'),
+            translate('Le document est prêt pour la vérification.', 'Document ready for verification.'),
             'success'
           );
         }
@@ -315,7 +297,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
       else if (currentStep === 3) setSelfieWithIdPhoto(url);
     } else {
       if (currentStep === 1) setDocPhoto(url);
-      else if (currentStep === 2) setSelfieWithIdPhoto(url);
+      else if (currentStep === 2) setSelfiePhoto(url);
       else if (currentStep === 3) {
         if (!driverLicensePhoto) setDriverLicensePhoto(url);
         else setDriverLicenseVersoPhoto(url);
@@ -331,7 +313,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
       if (currentStep === 3) return selfieWithIdPhoto;
     } else {
       if (currentStep === 1) return docPhoto;
-      if (currentStep === 2) return selfieWithIdPhoto;
+      if (currentStep === 2) return selfiePhoto;
       if (currentStep === 3) return driverLicensePhoto;
       if (currentStep === 4) return vehicleRegPhoto;
     }
@@ -346,7 +328,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
       if (currentStep === 2) return Boolean(selfiePhoto);
       if (currentStep === 3) return Boolean(selfieWithIdPhoto);
     } else {
-      if (currentStep === 2) return Boolean(selfieWithIdPhoto);
+      if (currentStep === 2) return Boolean(selfiePhoto);
       if (currentStep === 3) return Boolean(driverLicensePhoto);
       if (currentStep === 4) return Boolean(vehicleRegPhoto) && vehiclePlate.trim().length >= 3;
     }
@@ -375,8 +357,8 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
 
     // AI Biometric Check
     const bioResult = await verifyFacialBiometrics(
-      selfiePhoto || selfieWithIdPhoto || DEMO_KYC_PHOTOS.selfie,
-      docPhoto || DEMO_KYC_PHOTOS.cni
+      selfiePhoto || selfieWithIdPhoto,
+      docPhoto
     );
 
     if (!bioResult.success) {
@@ -388,11 +370,11 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     const result = submitKYC({
       docType,
       docNumber: docNumber || 'CI003928174',
-      photoUrl: docPhoto || DEMO_KYC_PHOTOS.cni,
-      selfieUrl: selfiePhoto || DEMO_KYC_PHOTOS.selfie,
-      driverLicenseUrl: driverLicensePhoto || (isDriver ? DEMO_KYC_PHOTOS.driverLicense : undefined),
-      driverLicenseSelfieUrl: selfieWithIdPhoto || (isDriver ? DEMO_KYC_PHOTOS.driverLicenseSelfie : undefined),
-      vehicleRegistrationUrl: vehicleRegPhoto || (isDriver ? DEMO_KYC_PHOTOS.vehicleReg : undefined),
+      photoUrl: docPhoto,
+      selfieUrl: selfiePhoto,
+      driverLicenseUrl: isDriver ? driverLicensePhoto : undefined,
+      driverLicenseSelfieUrl: isDriver ? selfieWithIdPhoto : undefined,
+      vehicleRegistrationUrl: isDriver ? vehicleRegPhoto : undefined,
       vehiclePlate: isDriver ? vehiclePlate.trim().toUpperCase() : undefined,
       vehicleColor: isDriver ? vehicleColor.trim() : undefined,
       vehicleModel: isDriver ? vehicleModel.trim() : undefined,
@@ -528,35 +510,8 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Exemple de cadrage conforme (Dessin vectoriel professionnel)</span>
+              <span>Exemple de cadrage conforme (Guide visuel)</span>
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                let sampleUri = KYC_DRAWING_DATA_URIS.cni;
-                if (!isDriver) {
-                  if (currentStep === 1) sampleUri = KYC_DRAWING_DATA_URIS.cni;
-                  else if (currentStep === 2) sampleUri = KYC_DRAWING_DATA_URIS.selfie;
-                  else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.selfieWithId;
-                } else {
-                  if (currentStep === 1) sampleUri = KYC_DRAWING_DATA_URIS.cni;
-                  else if (currentStep === 2) sampleUri = KYC_DRAWING_DATA_URIS.selfie;
-                  else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.driverLicense;
-                  else if (currentStep === 4) sampleUri = KYC_DRAWING_DATA_URIS.vehicleReg;
-                }
-                if (currentStep === 1) setDocPhoto(sampleUri);
-                else if (currentStep === 2) setSelfiePhoto(sampleUri);
-                else if (currentStep === 3) {
-                  if (isDriver) setDriverLicensePhoto(sampleUri);
-                  else setSelfieWithIdPhoto(sampleUri);
-                } else if (currentStep === 4 && isDriver) {
-                  setVehicleRegPhoto(sampleUri);
-                }
-              }}
-              className="text-[10px] bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold transition-all flex items-center gap-1"
-            >
-              <span>⚡ Utiliser cet exemple</span>
-            </button>
           </div>
 
           <div className="rounded-xl overflow-hidden bg-slate-900 border border-slate-800 p-1 flex items-center justify-center">
@@ -973,51 +928,23 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
             <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
               <button
                 type="button"
-                onClick={() => startCamera('user')}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                onClick={() => startCamera(isSelfieStep ? 'user' : 'environment')}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-900/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
               >
-                <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                <Camera className="w-4 h-4 text-white" />
                 <span>{translate("Prendre Photo (Caméra)", "Take Photo (Camera)")}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
-              >
-                <Upload className="w-3.5 h-3.5 text-blue-400" />
-                <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  let sampleUri = KYC_DRAWING_DATA_URIS.cni;
-                  if (!isDriver) {
-                    if (currentStep === 1) sampleUri = KYC_DRAWING_DATA_URIS.cni;
-                    else if (currentStep === 2) sampleUri = KYC_DRAWING_DATA_URIS.selfie;
-                    else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.selfieWithId;
-                  } else {
-                    if (currentStep === 1) sampleUri = KYC_DRAWING_DATA_URIS.cni;
-                    else if (currentStep === 2) sampleUri = KYC_DRAWING_DATA_URIS.selfie;
-                    else if (currentStep === 3) sampleUri = KYC_DRAWING_DATA_URIS.driverLicense;
-                    else if (currentStep === 4) sampleUri = KYC_DRAWING_DATA_URIS.vehicleReg;
-                  }
-                  if (currentStep === 1) setDocPhoto(sampleUri);
-                  else if (currentStep === 2) setSelfiePhoto(sampleUri);
-                  else if (currentStep === 3) {
-                    if (isDriver) setDriverLicensePhoto(sampleUri);
-                    else setSelfieWithIdPhoto(sampleUri);
-                  } else if (currentStep === 4 && isDriver) {
-                    setVehicleRegPhoto(sampleUri);
-                  }
-                }}
-                className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition-all"
-                title="Appliquer le schéma vectoriel d'exemple conforme"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>{translate("Appliquer Dessin Conforme", "Apply Compliant Drawing")}</span>
-              </button>
+              {!isSelfieStep && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5 text-blue-400" />
+                  <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1059,7 +986,6 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
         <KYCDemoGuideModal 
           isOpen={demoGuideOpen} 
           onClose={() => setDemoGuideOpen(false)}
-          onApplyDemoPhoto={handleApplyDemoPhotoFromGuide}
         />
       </div>
     </div>

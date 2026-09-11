@@ -358,6 +358,15 @@ export const GpsTrackingModal: React.FC = () => {
                       : '📦 Enlèvement en cours'}
                   </span>
                   <span className="text-xs text-slate-400">Mission #{job.id.slice(-6)}</span>
+                  {job.jobKind === 'direct_courier' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-violet-500/20 text-violet-300 border border-violet-500/40 flex items-center gap-1">
+                      ⚡ Course Commande Directe
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                      🛒 Commande Brad'CI
+                    </span>
+                  )}
                 </div>
                 <h2 className="text-lg sm:text-xl font-bold text-white mt-1 flex items-center gap-2">
                   <span>{job.productTitle}</span>

@@ -41,9 +41,10 @@ import { TermsAndConditionsModal } from './components/TermsAndConditionsModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { B2BLiquidationHub } from './components/B2BLiquidationHub';
 import { CartModal } from './components/CartModal';
+import { ExpressCourierOrderModal } from './components/ExpressCourierOrderModal';
+import { ExpressCourierView } from './components/ExpressCourierView';
 import { CartInvoiceModal } from './components/CartInvoiceModal';
 import { NativePermissionModal } from './components/NativePermissionModal';
-import { PermissionsGuard } from './components/PermissionsGuard';
 import { SplashScreen } from './components/SplashScreen';
 import { OutbidAlertBanner } from './components/OutbidAlertBanner';
 import { NotificationManager } from './components/NotificationManager';
@@ -200,6 +201,7 @@ const AppContent: React.FC = () => {
         <ErrorBoundary fallbackTitle="Vue Principale">
           {(activeTab === 'explore' || activeTab === 'feed') && <VisitorFeed />}
           {(activeTab === 'b2b_liquidation' || activeTab === 'destockage_b2b' || activeTab === 'b2b') && <B2BLiquidationHub />}
+          {(activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier') && <ExpressCourierView />}
           {(activeTab === 'dashboard_client' || activeTab === 'client_dashboard') && <ClientDashboard />}
           {(activeTab === 'dashboard_driver' || activeTab === 'driver_dashboard') && <DriverDashboard />}
           {(activeTab === 'dashboard_admin' || activeTab === 'admin_backoffice') && <AdminBackOffice />}
@@ -791,6 +793,9 @@ const AppContent: React.FC = () => {
         <CartModal />
         <CartInvoiceModal />
       </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Commander un Coursier Express">
+        <ExpressCourierOrderModal />
+      </ErrorBoundary>
       <ErrorBoundary fallbackTitle="Autorisations Système & Permissions Android">
         <NativePermissionModal />
       </ErrorBoundary>
@@ -805,9 +810,7 @@ export default function App() {
   return (
     <ErrorBoundary fallbackTitle="Application BRAD'CI">
       <AppProvider>
-        <PermissionsGuard>
-          <AppContent />
-        </PermissionsGuard>
+        <AppContent />
       </AppProvider>
     </ErrorBoundary>
   );

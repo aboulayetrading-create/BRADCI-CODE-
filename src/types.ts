@@ -297,16 +297,60 @@ export interface FraudIncidentRecord {
   adminNotes?: string;
 }
 
+export type DeliveryJobKind = 'marketplace' | 'direct_courier';
+
+export interface DriverRechargePass {
+  dailyCostFCFA: number; // 5000 FCFA
+  status: 'active' | 'expired' | 'coming_soon';
+  expiresAt: string; // ISO string 24h countdown
+  freeCoursesRemaining: number; // 5 courses offertes au lancement
+  totalFreeCoursesGranted: number; // 5
+  isComingSoon: boolean; // currently true (mode bientôt)
+  unlimitedDirectAccess: boolean; // true during launch offer
+  lastRechargedAt?: string;
+}
+
+export interface DirectCourierOrderInput {
+  pickupCommune: string;
+  pickupAddress: string;
+  senderName: string;
+  senderPhone: string;
+  senderNote?: string;
+  dropoffCommune: string;
+  dropoffAddress: string;
+  recipientName: string;
+  recipientPhone: string;
+  recipientNote?: string;
+  packageDescription: string;
+  packageSize?: 'document' | 'small' | 'medium' | 'large';
+  requiredVehicle?: VehicleType;
+  deliveryFee?: number;
+  itemValue?: number;
+  declaredValue?: number;
+}
+
 export interface DeliveryJob {
   id: string;
+  jobKind?: DeliveryJobKind; // 'marketplace' (Achat/Enchère) vs 'direct_courier' (Colis A ➔ B)
+  senderName?: string;
+  senderPhone?: string;
+  senderNote?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  recipientNote?: string;
+  packageDescription?: string;
+  packageSize?: 'document' | 'small' | 'medium' | 'large';
+  paymentMode?: 'cash_to_driver' | 'escrow'; // 'cash_to_driver' = Paiement direct au livreur (0% com)
   productId: string;
   productTitle: string;
   productImage: string;
+  sellerId?: string;
   sellerName: string;
   sellerPhone: string;
   pickupCommune: string;
   pickupAddress: string;
   pickupCoords: { lat: number; lng: number };
+  buyerId?: string;
   buyerName: string;
   buyerPhone: string;
   dropoffCommune: string;
@@ -325,6 +369,8 @@ export interface DeliveryJob {
   driverId?: string;
   orderId?: string;
   otpGeneratedAt?: string;
+  pickupSecretOtp?: string;
+  deliverySecretOtp?: string;
   driverArrivedAtDestination?: boolean;
   inspectionStatus?: 'pending_arrival' | 'arrived_inspecting' | 'client_confirmed_good' | 'client_confirmed_bad';
   arrivalTimestamp?: string;
@@ -635,7 +681,8 @@ export type DriverTab =
   | 'radar_map' 
   | 'available_orders' 
   | 'active_mission' 
-  | 'profile';
+  | 'profile'
+  | 'pass_recharge';
 
 export type PaymentMethod = 'Wave' | 'Orange Money' | 'MTN MoMo' | 'Moov Money' | 'Carte Bancaire';
 

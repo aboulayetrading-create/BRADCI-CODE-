@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { Product, ShopProfile, PaymentMethod, DeliveryJob } from '../types';
 import { ReferralDashboard } from './ReferralDashboard';
+import { SellerProSummaryView } from './SellerProSummaryView';
 import { nativeBridge } from '../utils/nativeBridge';
 import { KYC_DRAWING_DATA_URIS } from './KYCIllustrations';
 
@@ -65,6 +66,7 @@ export const ClientDashboard: React.FC = () => {
     products, 
     freightJobs, 
     escrowRecords,
+    reviews,
     userLocation,
     gpsPermissionStatus,
     setGpsModalOpen,
@@ -89,6 +91,8 @@ export const ClientDashboard: React.FC = () => {
     withdrawalRequests,
     financialTransactions,
     openOfficialReceipt,
+    setActiveTab,
+    setExpressCourierModalOpen,
     setKycModalOpen,
     setProfileAvatarModalOpen,
     addToast,
@@ -108,7 +112,7 @@ export const ClientDashboard: React.FC = () => {
     requestBrowserNotificationPermission
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'sales' | 'expeditions' | 'shop' | 'purchases' | 'transactions' | 'kyc' | 'referral' | 'settings'>('sales');
+  const [activeSubTab, setActiveSubTab] = useState<'pro_summary' | 'sales' | 'expeditions' | 'shop' | 'purchases' | 'transactions' | 'kyc' | 'referral' | 'settings'>('sales');
   const [transactionFilter, setTransactionFilter] = useState<'all' | 'withdrawals' | 'sales' | 'purchases' | 'subscriptions'>('all');
 
   // Notification Preferences State
@@ -348,10 +352,38 @@ export const ClientDashboard: React.FC = () => {
                 if (!checkKycVerifiedOrPrompt('sell')) return;
                 setNewProductModalOpen(true);
               }}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span>{translate("Publier un Article", "Post Item")}</span>
+            </button>
+
+            {/* Quick Button: Synthèse Vendeur Pro */}
+            <button
+              id="btn-open-pro-summary-cta"
+              onClick={() => setActiveSubTab('pro_summary')}
+              className="px-3.5 py-2.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 border border-amber-500/40 font-black text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Accéder à la vue simplifiée vendeur professionnel (articles vendus, revenus et évaluations)"
+            >
+              <Crown className="w-4 h-4 text-amber-400" />
+              <span>{translate("Synthèse Pro", "Pro Summary")}</span>
+              <span className="px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase">
+                KPI
+              </span>
+            </button>
+
+            {/* Quick Button: Commande Coursier Express */}
+            <button
+              id="btn-open-express-courier-cta"
+              onClick={() => setActiveTab('express_courier')}
+              className="px-3.5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-lg shadow-violet-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Accéder au portail Coursier Express (Envoi de colis immédiat d'un point A à un point B avec calcul de prix)"
+            >
+              <Bike className="w-4 h-4 text-amber-300" />
+              <span>{translate("Coursier Express", "Express Courier")}</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[9px] font-black uppercase">
+                A ➔ B
+              </span>
             </button>
 
             {currentUser.sellerPlan !== 'pro' && (
@@ -385,6 +417,24 @@ export const ClientDashboard: React.FC = () => {
           className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-1.5 shadow-xl"
         >
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            <button
+              id="subtab-btn-pro-summary"
+              onClick={() => setActiveSubTab('pro_summary')}
+              className={`px-3.5 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 shrink-0 transition-all ${
+                activeSubTab === 'pro_summary'
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/20 font-black'
+                  : 'text-amber-300/90 hover:text-white hover:bg-slate-800/70 border border-amber-500/30 bg-amber-500/5'
+              }`}
+            >
+              <Crown className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span>{translate("Synthèse Pro", "Pro Summary")}</span>
+              <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.2 rounded font-black ${
+                activeSubTab === 'pro_summary' ? 'bg-slate-950 text-amber-300' : 'bg-amber-500/20 text-amber-300'
+              }`}>
+                PRO
+              </span>
+            </button>
+
             <button
               id="subtab-btn-sales"
               onClick={() => setActiveSubTab('sales')}
@@ -821,6 +871,30 @@ export const ClientDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* SUB-TAB 0: VUE SIMPLIFIÉE VENDEUR PRO (ARTICLES VENDUS, REVENUS, ÉVALUATIONS) */}
+      {activeSubTab === 'pro_summary' && (
+        <SellerProSummaryView
+          currentUser={currentUser}
+          products={products}
+          freightJobs={freightJobs}
+          escrowRecords={escrowRecords}
+          reviews={reviews}
+          financialTransactions={financialTransactions}
+          translate={translate}
+          onSwitchTab={(tab) => setActiveSubTab(tab)}
+          onRequestWithdrawal={() => {
+            setWithdrawAmount(currentUser.walletBalance.toString());
+            setWithdrawalModalOpen(true);
+          }}
+          onNewProduct={() => {
+            if (!checkKycVerifiedOrPrompt('sell')) return;
+            setNewProductModalOpen(true);
+          }}
+          onOpenShop={() => setActiveSubTab('shop')}
+          onOpenReceipt={(job, role) => openOfficialReceipt(job, role)}
+        />
+      )}
+
       {/* SUB-TAB 1: MES VENTES */}
       {activeSubTab === 'sales' && (
         <div className="space-y-5">
@@ -847,6 +921,15 @@ export const ClientDashboard: React.FC = () => {
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
+                onClick={() => setActiveSubTab('pro_summary')}
+                className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                title="Consulter la vue simplifiée vendeur pro"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>{translate("Synthèse Pro", "Pro Summary")}</span>
+              </button>
+
+              <button
                 onClick={() => setActiveSubTab('shop')}
                 className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center justify-center gap-1.5 transition-colors"
               >
@@ -865,6 +948,39 @@ export const ClientDashboard: React.FC = () => {
                 <span>{translate("Publier un Article", "Post Item")}</span>
               </button>
             </div>
+          </div>
+
+          {/* Direct Banner: Vue Simplifiée Vendeur Pro */}
+          <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#0B111E] via-slate-900 to-[#0C121E] border border-amber-500/30 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                <Crown className="w-6 h-6" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-extrabold text-white">
+                    {translate("Vue Simplifiée Vendeur Pro", "Pro Seller Simplified View")}
+                  </h4>
+                  <span className="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black">
+                    Nouveau
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  {translate(
+                    "Visualisez d'un coup d'œil vos articles vendus, vos revenus cumulés et les évaluations de vos acheteurs.",
+                    "Quickly review your sold items, generated revenue, and verified buyer reviews."
+                  )}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab('pro_summary')}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20 shrink-0 cursor-pointer"
+            >
+              <span>{translate("Ouvrir la Synthèse Pro", "Open Pro View")}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           {/* List of Published Products */}
@@ -982,9 +1098,19 @@ export const ClientDashboard: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Courses Actives :</span>
-              <span className="text-base font-extrabold text-blue-400 font-mono-num">{myExpeditions.length}</span>
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              <button
+                id="btn-expeditions-order-courier"
+                onClick={() => setActiveTab('express_courier')}
+                className="px-3.5 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Bike className="w-3.5 h-3.5 text-amber-300" />
+                <span>⚡ {translate("Coursier Express (Point A ➔ B)", "Express Courier (Point A ➔ B)")}</span>
+              </button>
+              <div className="text-right shrink-0">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Courses Actives :</span>
+                <span className="text-base font-extrabold text-blue-400 font-mono-num">{myExpeditions.length}</span>
+              </div>
             </div>
           </div>
 

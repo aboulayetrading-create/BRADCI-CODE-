@@ -15,7 +15,6 @@ import {
   TrendingUp, 
   ArrowRight,
   CheckCircle2,
-  Compass,
   Store,
   Power,
   Package,
@@ -36,7 +35,6 @@ import {
   COMMUNE_NAMES_ENVIRONS, 
   getCommuneBadgeInfo 
 } from '../data/communes';
-import { InteractiveAbidjanMap } from './InteractiveAbidjanMap';
 
 export const VisitorFeed: React.FC = () => {
   const { 
@@ -65,7 +63,6 @@ export const VisitorFeed: React.FC = () => {
   const [selectedVehicle, setSelectedVehicle] = useState<string>('Tous');
   const [selectedFeedType, setSelectedFeedType] = useState<'all' | 'auction' | 'shop' | 'five_bids' | 'b2b'>('all');
   const [driverOnlyFilter, setDriverOnlyFilter] = useState<boolean>(false);
-  const [isMapExpanded, setIsMapExpanded] = useState<boolean>(false);
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
 
   const isDriver = currentUser?.role === 'driver';
@@ -182,13 +179,6 @@ export const VisitorFeed: React.FC = () => {
         </section>
       )}
 
-      {/* Expanded Interactive Grand Abidjan Map Section */}
-      {isMapExpanded && (
-        <section className="animate-in fade-in slide-in-from-top-4 duration-300">
-          <InteractiveAbidjanMap onClose={() => setIsMapExpanded(false)} />
-        </section>
-      )}
-
       {/* Filters & Search Toolbar - Ultra Clean Command Bar */}
       <section className="bg-[#0B111D] border border-slate-800/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-xl space-y-3.5">
         {/* Top line: Search Bar & Structured Commune Picker */}
@@ -219,7 +209,7 @@ export const VisitorFeed: React.FC = () => {
             )}
           </div>
 
-          {/* Commune, Map Toggle & Quick Reset */}
+          {/* Commune & Quick Reset */}
           <div className="flex items-center gap-2 w-full md:w-auto">
             <div className="relative flex items-center bg-slate-900/95 border border-slate-800 hover:border-amber-500/40 rounded-xl px-3 py-2.5 text-xs text-slate-200 w-full md:w-auto shadow-inner transition-colors">
               <MapPin className="w-4 h-4 text-amber-400 shrink-0 mr-2" />
@@ -250,22 +240,6 @@ export const VisitorFeed: React.FC = () => {
                 </optgroup>
               </select>
             </div>
-
-            {/* Map toggle button */}
-            <button
-              id="feed-btn-toggle-map"
-              type="button"
-              onClick={() => setIsMapExpanded(prev => !prev)}
-              className={`px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm ${
-                isMapExpanded
-                  ? 'bg-blue-600 border-blue-400 text-white shadow-blue-500/20'
-                  : 'bg-slate-900/95 hover:bg-slate-800 border-slate-800 hover:border-blue-500/40 text-blue-300'
-              }`}
-              title={translate("Afficher / Masquer la carte GPS", "Show / Hide GPS Map")}
-            >
-              <Compass className={`w-4 h-4 text-blue-400 ${isMapExpanded ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isMapExpanded ? translate('Fermer Carte', 'Close Map') : translate('Carte GPS', 'GPS Map')}</span>
-            </button>
 
             {/* Quick reset button if any filter is active */}
             {(searchQuery || selectedCategory !== 'Tous' || selectedCommune !== 'Toutes' || selectedFeedType !== 'all' || selectedVehicle !== 'Tous') && (

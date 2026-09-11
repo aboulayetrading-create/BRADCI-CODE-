@@ -152,6 +152,11 @@ export const BRAD_CI_TERMS = {
       id: "secret_delivery",
       title: "5. Protocole de Livraison & Inspection Obligatoire",
       desc: "Le livreur doit présenter le code de ramassage au vendeur. L'acheteur dispose de 10 minutes pour tester et inspecter l'article en présence du livreur avant de communiquer son Code Secret de validation ou son code de retour."
+    },
+    {
+      id: "intermediary_and_returns",
+      title: "6. Rôle d'Outil de Mise en Relation & Politique de Retour",
+      desc: "À l'instar des plateformes de mise en relation indépendantes, BRAD'CI agit uniquement en tant qu'outil technologique connectant acheteurs, vendeurs, expéditeurs et coursiers. La carte GPS temps réel est un service strictement dédié au suivi du colis par son propriétaire (acheteur ou expéditeur) et le coursier. En cas de non-conformité lors de l'inspection physique, l'acheteur refuse le colis sans communiquer son code secret OTP : le livreur effectue le retour immédiat et les fonds sous séquestre sont intégralement recrédités."
     }
   ]
 };

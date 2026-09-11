@@ -13,10 +13,15 @@ export type NotificationPermissionState = NotificationPermission | 'unsupported'
  */
 export function useNotificationPermission() {
   const [permission, setPermission] = useState<NotificationPermissionState>(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      return Notification.permission;
+    if (typeof window !== 'undefined') {
+      if (localStorage.getItem('bradci_browser_notifications') === 'true') {
+        return 'granted';
+      }
+      if ('Notification' in window) {
+        return Notification.permission;
+      }
     }
-    return 'unsupported';
+    return 'default';
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);

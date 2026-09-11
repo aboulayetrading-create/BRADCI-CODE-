@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   Bike,
   Car,
-  Truck
+  Truck,
+  Zap
 } from 'lucide-react';
 import { DriverTab } from '../types';
 import { DriverRadarView } from './DriverRadarView';
@@ -18,6 +19,7 @@ import { DriverSmartOrdersView } from './DriverSmartOrdersView';
 import { DriverEarningsView } from './DriverEarningsView';
 import { DriverHistoryView } from './DriverHistoryView';
 import { DriverSettingsView } from './DriverSettingsView';
+import { DriverPassRechargeView } from './DriverPassRechargeView';
 
 export const DriverDashboard: React.FC = () => {
   const { 
@@ -189,7 +191,24 @@ export const DriverDashboard: React.FC = () => {
             </span>
           </button>
 
-          {/* Tab 5: Paramètres */}
+          {/* Tab 5: Pass Recharge Quotidien 5.000 F */}
+          <button
+            id="driver-tab-pass-recharge"
+            onClick={() => setActiveDriverTab('pass_recharge')}
+            className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer ${
+              activeDriverTab === 'pass_recharge'
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md shadow-amber-500/20 font-black'
+                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Zap className="w-4 h-4 text-amber-400" />
+            <span>Pass Recharge</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-500/30 text-[9px] font-black uppercase">
+              Bientôt
+            </span>
+          </button>
+
+          {/* Tab 6: Paramètres */}
           <button
             id="driver-tab-settings"
             onClick={() => setActiveDriverTab('settings')}
@@ -230,6 +249,11 @@ export const DriverDashboard: React.FC = () => {
         {/* 5. NOUVEL ONGLET PARAMÈTRES: KYC, Thème sombre/clair, Langue, Voix Off / Alertes sonores */}
         {(activeDriverTab === 'settings' || activeDriverTab === 'profile') && (
           <DriverSettingsView />
+        )}
+
+        {/* 6. ONGLET PASS RECHARGE: 5.000 F / 24h, 0% Commission BradCi, Solde & Chrono */}
+        {activeDriverTab === 'pass_recharge' && (
+          <DriverPassRechargeView />
         )}
       </div>
     </div>

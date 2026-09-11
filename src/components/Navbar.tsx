@@ -114,6 +114,7 @@ export const Navbar: React.FC = () => {
             >
               <BradCiLogo 
                 size="md" 
+                showIcon={false}
                 showSubtitle={true} 
                 subtitleText="ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS" 
               />
@@ -239,6 +240,23 @@ export const Navbar: React.FC = () => {
                 }`}
               >
                 {translate("Enchères", "Auctions")}
+              </button>
+
+              {/* Coursier Express (Point A ➔ Point B) */}
+              <button
+                id="nav-tab-express-courier"
+                onClick={() => setActiveTab('express_courier')}
+                className={`px-2 lg:px-2.5 xl:px-3 py-1 lg:py-1.5 rounded-lg xl:rounded-xl text-[11px] lg:text-xs xl:text-sm font-medium transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                  activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
+                    ? 'bg-violet-600/30 text-violet-300 border border-violet-500/40 font-bold shadow-sm' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
+                }`}
+              >
+                <Bike className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>{translate("Coursier Express", "Express Courier")}</span>
+                <span className="hidden xl:inline-block text-[9px] bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold px-1.5 py-0.2 rounded shadow">
+                  A ➔ B
+                </span>
               </button>
 
               {/* B2B Liquidation Hub */}
@@ -747,7 +765,7 @@ export const Navbar: React.FC = () => {
                 </div>
 
                 {/* Section Navigation Tabs */}
-                <div className="grid grid-cols-3 gap-2 px-2 pb-2">
+                <div className="grid grid-cols-2 gap-2 px-2 pb-2">
                   <button
                     onClick={() => { setActiveTab('explore'); setMobileMenuOpen(false); }}
                     className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all ${
@@ -757,6 +775,18 @@ export const Navbar: React.FC = () => {
                     }`}
                   >
                     {translate("Enchères", "Auctions")}
+                  </button>
+
+                  <button
+                    onClick={() => { setActiveTab('express_courier'); setMobileMenuOpen(false); }}
+                    className={`p-2.5 rounded-xl text-xs font-bold text-center border transition-all flex items-center justify-center gap-1.5 ${
+                      activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
+                        ? 'bg-violet-600/30 text-violet-300 border-violet-500/40' 
+                        : 'bg-slate-900 text-violet-300 border-slate-800'
+                    }`}
+                  >
+                    <Bike className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{translate("Coursier Express", "Courier")}</span>
                   </button>
 
                   <button

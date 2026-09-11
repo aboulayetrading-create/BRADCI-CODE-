@@ -13,13 +13,19 @@ if (typeof window !== 'undefined') {
 
 // Register Service Worker for PWA and Mobile Push Notifications
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-  window.addEventListener('load', () => {
+  const registerSW = () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {
       return navigator.serviceWorker.register('/sw.js');
     }).catch((err) => {
       console.info('Service Worker registration notice:', err);
     });
-  });
+  };
+
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    registerSW();
+  } else {
+    window.addEventListener('load', registerSW);
+  }
 }
 
 // Global Unhandled Error & Promise Rejection Interceptors (Anti-White-Screen Shield)

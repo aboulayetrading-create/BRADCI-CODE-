@@ -35,7 +35,10 @@ import {
   CartSellerGroup,
   CartPickupStop,
   CartDeliveryOptimization,
-  CartOrderRecord
+  CartOrderRecord,
+  DriverRechargePass,
+  DirectCourierOrderInput,
+  DeliveryJobKind
 } from '../types';
 import { 
   createCartItemFromProduct,
@@ -54,7 +57,7 @@ import {
   INITIAL_ADMIN_ALERTS,
   INITIAL_REFERRALS
 } from '../data/mockData';
-import { calculateHaversineDistance, findNearestCommune, getCommuneCoords, calculateDeliveryFee } from '../data/communes';
+import { calculateHaversineDistance, findNearestCommune, getCommuneCoords, calculateDeliveryFee, calculateCommuneDistanceKm } from '../data/communes';
 import { getTranslation, TranslationKey } from '../utils/translations';
 import { detectFraudulentContact, detectImageFraud, BRAD_CI_TERMS } from '../utils/fraudFilter';
 import { 
@@ -73,7 +76,11 @@ import {
   getStoredAuditLogs
 } from '../utils/paymentAuditReceiptService';
 import { nativeBridge, NativePhotoSource, NativeCameraFacing } from '../utils/nativeBridge';
-import { sendUniversalPush, BRADCI_NOTIFICATION_CHANNEL_ID } from '../utils/universalNotifications';
+import { 
+  sendUniversalPush, 
+  requestUniversalNotificationPermission,
+  BRADCI_NOTIFICATION_CHANNEL_ID 
+} from '../utils/universalNotifications';
 import { sendOtpEmail } from '../services/resendEmailService';
 
 interface ToastNotification {
@@ -200,6 +207,15 @@ interface AppContextType {
   setProfileAvatarModalOpen: (open: boolean) => void;
   updateUserAvatar: (avatarUrl: string) => void;
   updateUserProfile: (data: Partial<User>) => void;
+
+  // Express Courier & Point A ➔ B Delivery Orders & Driver Recharge Pass
+  expressCourierModalOpen: boolean;
+  setExpressCourierModalOpen: (open: boolean) => void;
+  createDirectCourierJob: (input: DirectCourierOrderInput) => DeliveryJob;
+  driverPass: DriverRechargePass;
+  rechargeDriverPass: () => void;
+  decrementFreeCourierCourse: () => void;
+  setDriverPassTestingState?: (state: 'active' | 'expired') => void;
 
   toasts: ToastNotification[];
   addToast: (title: string, desc: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -499,6 +515,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [fiveBiddersModalProduct, setFiveBiddersModalProduct] = useState<Product | null>(null);
   const [buyerDepositModalProduct, setBuyerDepositModalProduct] = useState<Product | null>(null);
   const [newProductModalOpen, setNewProductModalOpen] = useState(false);
+  const [expressCourierModalOpen, setExpressCourierModalOpen] = useState(false);
+
+  // Driver Pass Recharge State
+  const [driverPass, setDriverPass] = useState<DriverRechargePass>(() => {
+    const saved = localStorage.getItem('bradci_driver_recharge_pass');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // fallback
+      }
+    }
+    return {
+      dailyCostFCFA: 5000,
+      status: 'active', // 100% active during launch!
+      expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      freeCoursesRemaining: 5,
+      totalFreeCoursesGranted: 5,
+      isComingSoon: true, // "Mode Bientôt"
+      unlimitedDirectAccess: true,
+      lastRechargedAt: new Date().toISOString()
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('bradci_driver_recharge_pass', JSON.stringify(driverPass));
+  }, [driverPass]);
+
+  const rechargeDriverPass = useCallback(() => {
+    setDriverPass(prev => ({
+      ...prev,
+      status: 'active',
+      expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      lastRechargedAt: new Date().toISOString()
+    }));
+  }, []);
+
+  const decrementFreeCourierCourse = useCallback(() => {
+    setDriverPass(prev => ({
+      ...prev,
+      freeCoursesRemaining: Math.max(0, (prev.freeCoursesRemaining ?? 5) - 1)
+    }));
+  }, []);
+
+  const setDriverPassTestingState = useCallback((state: 'active' | 'expired') => {
+    setDriverPass(prev => ({
+      ...prev,
+      status: state,
+      expiresAt: state === 'active' 
+        ? new Date(Date.now() + 24 * 3600 * 1000).toISOString() 
+        : new Date(Date.now() - 3600 * 1000).toISOString()
+    }));
+  }, []);
+
   const [gpsTrackingJob, setGpsTrackingJob] = useState<DeliveryJob | null>(null);
   const [selectedShopForView, setSelectedShopForView] = useState<ShopProfile | null>(null);
   const [receiptModalData, setReceiptModalData] = useState<{ transactionData: TransactionAuditInput; auditLog: PaymentAuditLog; initialMode?: 'buyer' | 'seller' | 'driver'; lockedMode?: 'buyer' | 'seller' | 'driver' } | null>(null);
@@ -515,6 +585,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       removeToast(id);
     }, 5000);
   }, [removeToast]);
+
+  const createDirectCourierJob = useCallback((input: DirectCourierOrderInput): DeliveryJob => {
+    const pickupCoords = getCommuneCoords(input.pickupCommune);
+    const dropoffCoords = getCommuneCoords(input.dropoffCommune);
+    const calculatedFee = input.deliveryFee || calculateDeliveryFee(input.pickupCommune, input.dropoffCommune, input.requiredVehicle || 'moto');
+    const distanceKm = calculateCommuneDistanceKm(input.pickupCommune, input.dropoffCommune);
+    const etaMinutes = Math.max(15, Math.round(distanceKm * 2.8) + 10);
+
+    const randomPickupCode = Math.floor(1000 + Math.random() * 9000).toString();
+    const randomDeliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+
+    const newJob: DeliveryJob = {
+      id: 'course-directe-' + Date.now().toString().slice(-6),
+      jobKind: 'direct_courier',
+      paymentMode: 'cash_to_driver',
+      productId: 'colis-' + Date.now(),
+      productTitle: `Colis Express A➔B : ${input.packageDescription}`,
+      productImage: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=600&auto=format&fit=crop&q=80',
+      itemValue: input.itemValue || 0,
+      deliveryFee: calculatedFee,
+      requiredVehicle: input.requiredVehicle || 'moto',
+      status: 'available',
+      orderStatus: 'PENDING',
+      paymentStatus: 'PENDING',
+      pickupCommune: input.pickupCommune,
+      pickupAddress: input.pickupAddress,
+      pickupCoords,
+      sellerName: input.senderName,
+      sellerPhone: input.senderPhone,
+      senderName: input.senderName,
+      senderPhone: input.senderPhone,
+      senderNote: input.senderNote,
+      buyerName: input.recipientName,
+      buyerPhone: input.recipientPhone,
+      recipientName: input.recipientName,
+      recipientPhone: input.recipientPhone,
+      dropoffCommune: input.dropoffCommune,
+      dropoffAddress: input.dropoffAddress,
+      dropoffCoords,
+      packageDescription: input.packageDescription,
+      packageSize: input.packageSize || 'small',
+      pickupCode: randomPickupCode,
+      deliveryOtpCode: randomDeliveryOtp,
+      distanceKm,
+      etaMinutes,
+      createdAt: new Date().toISOString(),
+    };
+
+    setFreightJobs(prev => [newJob, ...prev]);
+
+    try {
+      playOrderAlertSound();
+    } catch {
+      // audio fallback
+    }
+
+    addToast(
+      'Coursier Express Commandé !',
+      `Course de ${input.pickupCommune} vers ${input.dropoffCommune} créée (Prix : ${calculatedFee.toLocaleString('fr-FR')} FCFA).`,
+      'success'
+    );
+
+    return newJob;
+  }, [addToast]);
 
   // ================= SHOPPING CART & MULTI-ITEM ORDERS STATE =================
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -976,7 +1110,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [browserNotificationsEnabled, setBrowserNotificationsEnabled] = useState<boolean>(() => {
-    return typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
+    if (typeof window === 'undefined') return false;
+    const stored = localStorage.getItem('bradci_browser_notifications');
+    if (stored === 'true') return true;
+    if ('Notification' in window) {
+      return Notification.permission === 'granted';
+    }
+    return false;
   });
 
   useEffect(() => {
@@ -1026,17 +1166,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [pushBrowserNotification]);
 
   const requestBrowserNotificationPermission = async (): Promise<boolean> => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      addToast('Notifications Non Supportées', 'Ce navigateur ne supporte pas les notifications push.', 'warning');
-      return false;
-    }
-
     try {
-      const perm = await Notification.requestPermission();
-      const granted = perm === 'granted';
-      setBrowserNotificationsEnabled(granted);
+      const result = await requestUniversalNotificationPermission();
+      const isGranted = result.granted || result.permissionState === 'granted';
 
-      if (granted) {
+      if (isGranted) {
+        setBrowserNotificationsEnabled(true);
+
         // Enregistrement du jeton (token) localement pour recevoir les alertes push
         let existingToken = localStorage.getItem('bradci_push_token');
         if (!existingToken) {
@@ -1047,11 +1183,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('bradci_browser_notifications', 'true');
         setPushToken(existingToken);
 
-        // Notification de test immédiate demandée par le cahier des charges
+        // Notification de confirmation immédiate
         const testTitle = "Notifications BRAD'CI activées !";
         const testBody = "Notifications BRAD'CI activées ! Vous recevrez désormais les alertes de vos enchères et livreurs.";
 
-        // Déclenche la notification système push
+        // Déclenche la notification système push universelle
         await pushBrowserNotification(testTitle, testBody, './icon.png');
 
         // Ajoute également dans l'historique visuel in-app
@@ -1068,13 +1204,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (voiceNavigator && !voiceNavigator.getIsMuted()) {
           voiceNavigator.speak(testBody, language);
         }
+        return true;
+      } else if (result.permissionState === 'denied') {
+        addToast('Notifications Refusées', 'Vous pouvez les réactiver dans les paramètres de votre appareil ou navigateur.', 'info');
+        return false;
       } else {
-        addToast('Notifications Refusées', 'Vous pouvez les réactiver dans les paramètres de votre navigateur.', 'info');
+        // Mode de secours : activation in-app et locale assurée
+        setBrowserNotificationsEnabled(true);
+        localStorage.setItem('bradci_browser_notifications', 'true');
+
+        const fallbackTitle = "Alertes BRAD'CI Activées";
+        const fallbackBody = "Alertes sonores et in-app activées pour vos courses et enchères.";
+
+        addNotification({
+          title: fallbackTitle,
+          message: fallbackBody,
+          type: 'system',
+          urgency: 'high'
+        });
+
+        playSuccessChime();
+        addToast(fallbackTitle, fallbackBody, 'success');
+        return true;
       }
-      return granted;
     } catch (e) {
-      console.error('Notification request permission error:', e);
-      return false;
+      console.warn('Notification activation fallback:', e);
+      // Sécurité anti-blocage : activation in-app
+      setBrowserNotificationsEnabled(true);
+      localStorage.setItem('bradci_browser_notifications', 'true');
+      addToast("Notifications In-App Activées", "Alertes visuelles et sonores activées avec succès.", 'success');
+      return true;
     }
   };
 
@@ -5721,7 +5880,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cartOrders,
         cartInvoiceModalOrder,
         setCartInvoiceModalOrder,
-        driverConfirmStopPickup
+        driverConfirmStopPickup,
+
+        // Express Courier Point A ➔ B & Driver Pass Recharge
+        expressCourierModalOpen,
+        setExpressCourierModalOpen,
+        createDirectCourierJob,
+        driverPass,
+        rechargeDriverPass,
+        decrementFreeCourierCourse,
+        setDriverPassTestingState
       }}
     >
       {children}

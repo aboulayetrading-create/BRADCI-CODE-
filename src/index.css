@@ -396,3 +396,79 @@ html.light .fintech-grid {
   animation: vtc-dash 1.4s linear infinite;
 }
 
+/* =========================================================================
+   CLEAN YANGO / UBER PRO TRACKING MAP: ZERO API CREDITS & UNOBSTRUCTED PATH
+   ========================================================================= */
+.leaflet-container {
+  font-family: inherit;
+  outline: none;
+  background-color: #040814;
+}
+
+/* 1. Remove all unnecessary API credit text, attribution badges, and watermarks */
+.leaflet-container .leaflet-control-attribution,
+.leaflet-control-attribution,
+.leaflet-container .leaflet-attribution-flag,
+.leaflet-container .leaflet-control-scale,
+.leaflet-container [class*="attribution"],
+.leaflet-container [class*="watermark"],
+.leaflet-container [class*="leaflet-control-attribution"],
+.leaflet-container a[href*="leaflet"],
+.leaflet-container a[href*="openstreetmap"],
+.leaflet-container a[href*="arcgis"],
+.leaflet-container a[href*="esri"],
+.leaflet-container a[href*="carto"],
+.leaflet-container .leaflet-control-zoom {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  line-height: 0 !important;
+  font-size: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+/* 2. Eliminate default leaflet bottom/top control chrome if empty */
+.leaflet-container .leaflet-bottom,
+.leaflet-container .leaflet-top,
+.leaflet-container .leaflet-control-container .leaflet-bottom,
+.leaflet-container .leaflet-control-container .leaflet-top {
+  pointer-events: none !important;
+}
+
+.leaflet-container .leaflet-bottom .leaflet-control,
+.leaflet-container .leaflet-top .leaflet-control {
+  margin: 0 !important;
+}
+
+/* 3. Ensure map markers and the delivery path are always crisp, smooth and unobstructed */
+.leaflet-container .leaflet-pane.leaflet-overlay-pane {
+  z-index: 400 !important;
+}
+
+.leaflet-container .leaflet-pane.leaflet-marker-pane {
+  z-index: 600 !important;
+}
+
+.leaflet-container .leaflet-marker-icon,
+.leaflet-container .driver-live-marker {
+  pointer-events: auto !important;
+}
+
+/* 4. Delivery Route Polylines smooth glow */
+.delivery-route-glow {
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
+}
+.delivery-route-pulse {
+  animation: routePulse 2s ease-in-out infinite alternate;
+}
+@keyframes routePulse {
+  from { opacity: 0.85; }
+  to { opacity: 1; }
+}
+
+

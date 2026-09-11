@@ -6,6 +6,7 @@ export interface LogoProps {
   variant?: 'full' | 'horizontal' | 'icon' | 'badge';
   showSubtitle?: boolean;
   subtitleText?: string;
+  showIcon?: boolean;
   onClick?: () => void;
   id?: string;
 }
@@ -45,14 +46,17 @@ export const LogoIcon: React.FC<{
     return (
       <img 
         id={id}
-        src="./icon.png" 
+        src="/logo.png" 
         alt="BRAD'CI Logo" 
         className={`select-none shrink-0 object-contain rounded-xl ${className}`}
         style={size ? { width: size, height: size } : undefined}
         onError={(e) => { 
           const target = e.currentTarget as HTMLImageElement;
-          if (target.getAttribute('src') !== 'icon.png') {
-            target.src = 'icon.png';
+          const currentSrc = target.getAttribute('src');
+          if (currentSrc === '/logo.png') {
+            target.src = '/icon.png';
+          } else if (currentSrc === '/icon.png') {
+            target.src = './icon.png';
           } else {
             setImgFailed(true);
           }
@@ -258,6 +262,7 @@ export const Logo: React.FC<LogoProps> = ({
   size = 'md',
   variant = 'horizontal',
   showSubtitle = true,
+  showIcon = true,
   subtitleText = "ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS",
   onClick,
   id = "bradci-logo"
@@ -320,9 +325,11 @@ export const Logo: React.FC<LogoProps> = ({
         className={`flex flex-col items-center justify-center text-center p-3 select-none ${onClick ? 'cursor-pointer' : ''} ${className}`}
       >
         {/* Emblem with subtle hover/breath effect */}
-        <div className="relative mb-2 transition-transform duration-300 hover:scale-105">
-          <LogoIcon className={selectedSize.icon} />
-        </div>
+        {showIcon && (
+          <div className="relative mb-2 transition-transform duration-300 hover:scale-105">
+            <LogoIcon className={selectedSize.icon} />
+          </div>
+        )}
 
         {/* Main "BRAD'CI" Typography */}
         <div className={`flex items-baseline justify-center font-display ${selectedSize.title} tracking-tight leading-none text-white drop-shadow-md`}>
@@ -351,9 +358,11 @@ export const Logo: React.FC<LogoProps> = ({
       className={`flex items-center gap-2 sm:gap-2.5 select-none ${onClick ? 'cursor-pointer group' : ''} ${className}`}
     >
       {/* Shield Emblem */}
-      <div className="shrink-0 transition-transform duration-200 group-hover:scale-105">
-        <LogoIcon className={selectedSize.icon} />
-      </div>
+      {showIcon && (
+        <div className="shrink-0 transition-transform duration-200 group-hover:scale-105">
+          <LogoIcon className={selectedSize.icon} />
+        </div>
+      )}
 
       {/* Text block */}
       <div className="flex flex-col justify-center min-w-0">
@@ -388,11 +397,18 @@ export const BradCiLogoImg: React.FC<{ className?: string; alt?: string; onClick
   onClick
 }) => (
   <img 
-    src="./icon.png" 
+    src="/logo.png" 
     alt={alt} 
     className={className} 
     onClick={onClick}
-    onError={(e) => { (e.target as HTMLImageElement).src = 'icon.png'; }} 
+    onError={(e) => { 
+      const target = e.currentTarget as HTMLImageElement;
+      if (target.getAttribute('src') === '/logo.png') {
+        target.src = '/icon.png';
+      } else {
+        target.src = './icon.png';
+      }
+    }} 
   />
 );
 
