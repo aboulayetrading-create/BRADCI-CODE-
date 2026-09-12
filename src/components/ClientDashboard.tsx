@@ -305,8 +305,8 @@ export const ClientDashboard: React.FC = () => {
                     ? 'bg-blue-500/15 text-blue-300 border-blue-500/40'
                     : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
                 }`}>
-                  {currentUser.sellerPlan === 'pro' ? '👑 VIP OR (2.5% comm.)' :
-                   currentUser.sellerPlan === 'standard' ? '✨ Pass Certifié (5% comm.)' : '🌱 Gratuit (10% comm.)'}
+                  {currentUser.sellerPlan === 'pro' ? '👑 Pass Gold VIP (1.5% comm.)' :
+                   currentUser.sellerPlan === 'standard' ? '✨ Pass Pro (2.5% comm.)' : '🌱 Pass Gratuit (5.0% comm.)'}
                 </span>
 
                 {currentUser.kycStatus === 'verified' ? (
@@ -357,20 +357,6 @@ export const ClientDashboard: React.FC = () => {
             >
               <PlusCircle className="w-4 h-4" />
               <span>{translate("Publier un Article", "Post Item")}</span>
-            </button>
-
-            {/* Quick Button: Synthèse Vendeur Pro */}
-            <button
-              id="btn-open-pro-summary-cta"
-              onClick={() => setActiveSubTab('pro_summary')}
-              className="px-3.5 py-2.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 text-amber-300 border border-amber-500/40 font-black text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
-              title="Accéder à la vue simplifiée vendeur professionnel (articles vendus, revenus et évaluations)"
-            >
-              <Crown className="w-4 h-4 text-amber-400" />
-              <span>{translate("Synthèse Pro", "Pro Summary")}</span>
-              <span className="px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 text-[9px] font-black uppercase">
-                KPI
-              </span>
             </button>
 
             {/* Quick Button: Commande Coursier Express */}
@@ -913,9 +899,9 @@ export const ClientDashboard: React.FC = () => {
                   </span>
                 </h3>
                 <p className="text-xs text-slate-400">
-                  {currentUser.sellerPlan === 'pro' ? '👑 Pass VIP Or • Commission minimale 2.5%' :
-                   currentUser.sellerPlan === 'standard' ? '✨ Pass Certifié • Commission 5%' :
-                   '🌱 Pass Gratuit • Vente directe sécurisée POD (10%)'}
+                  {currentUser.sellerPlan === 'pro' ? '👑 Pass Gold VIP • Commission 1.5%' :
+                   currentUser.sellerPlan === 'standard' ? '✨ Pass Pro • Commission 2.5%' :
+                   '🌱 Pass Gratuit • Vente directe sécurisée POD (5.0%)'}
                 </p>
               </div>
             </div>
@@ -1401,16 +1387,16 @@ export const ClientDashboard: React.FC = () => {
                 <Crown className="w-4 h-4 text-amber-400" />
                 <span className="text-xs font-bold text-white">Niveau de Boutique :</span>
                 <span className="text-xs font-extrabold text-amber-400 uppercase">
-                  {currentUser.sellerPlan === 'pro' ? 'Boutique Officielle Or VIP (Pass Or 10 000 F)' :
-                   currentUser.sellerPlan === 'standard' ? 'Boutique Certifiée Pro (Pass Certifié 5 000 F)' : 'Boutique Basique (Compte Gratuit)'}
+                  {currentUser.sellerPlan === 'pro' ? 'Boutique Officielle Gold VIP (Pass Gold 5 000 F / 30j)' :
+                   currentUser.sellerPlan === 'standard' ? 'Boutique Pro Vérifiée (Pass Pro 2 500 F / 30j)' : 'Boutique Standard (Pass Gratuit)'}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 {currentUser.sellerPlan === 'pro' 
-                  ? 'Vous bénéficiez du badge Or VIP, commission record minimale à 2.5%, algorithme prioritaire et support dédié 7j/7.'
+                  ? 'Vous bénéficiez du badge VIP Gold, commission record minimale à 1.5%, visibilité prioritaire et support dédié 7j/7.'
                   : currentUser.sellerPlan === 'standard'
-                  ? 'Vous bénéficiez du badge Vendeur Certifié, commission réduite à 5% et vitrine personnalisée.'
-                  : 'Passez au Pass Vendeur Certifié (5 000 F - 5% com.) ou Pass Vendeur Or VIP (10 000 F - 2.5% com.) pour maximiser vos marges nettes.'}
+                  ? 'Vous bénéficiez du badge Vendeur Pro vérifié, commission réduite à 2.5% et vitrine personnalisée.'
+                  : 'Passez au Pass Pro (2 500 F - 2.5% com.) ou Pass Gold VIP (5 000 F - 1.5% com.) pour maximiser vos marges nettes.'}
               </p>
             </div>
 
@@ -2430,16 +2416,16 @@ export const ClientDashboard: React.FC = () => {
                     </h4>
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
                       {currentUser.sellerPlan === 'pro'
-                        ? 'OR VIP (2.5%)'
+                        ? 'GOLD VIP (1.5%)'
                         : currentUser.sellerPlan === 'standard'
-                        ? 'PRO CERTIFIÉ (5%)'
-                        : 'COMPTE GRATUIT (10%)'}
+                        ? 'PRO (2.5%)'
+                        : 'PASS GRATUIT (5.0%)'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {translate(
-                      "Réduisez vos commissions jusqu'à 2.5%, affichez le badge officiel et propulsez vos annonces en tête du radar Abidjan.",
-                      "Lower your commission fees down to 2.5%, show verified badge, and boost listings to the top of Abidjan radar."
+                      "Réduisez vos commissions jusqu'à 1.5%, affichez le badge officiel et propulsez vos annonces en tête du radar Abidjan.",
+                      "Lower your commission fees down to 1.5%, show verified badge, and boost listings to the top of Abidjan radar."
                     )}
                   </p>
                 </div>
@@ -2461,21 +2447,21 @@ export const ClientDashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
               <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1">
-                <span className="text-[10px] text-amber-400 font-bold uppercase block tracking-wider">Boost Flash (1 000 F)</span>
-                <p className="text-xs font-bold text-white">48h en tête de fil</p>
-                <p className="text-[11px] text-slate-400">5x plus d'acheteurs & d'enchérisseurs</p>
+                <span className="text-[10px] text-amber-400 font-bold uppercase block tracking-wider">Booster Flash (1 000 F)</span>
+                <p className="text-xs font-bold text-white">24h en tête de fil</p>
+                <p className="text-[11px] text-slate-400">Mise en vedette prioritaire de l'annonce</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1">
-                <span className="text-[10px] text-blue-400 font-bold uppercase block tracking-wider">Pass Pro Certifié (5 000 F/m)</span>
-                <p className="text-xs font-bold text-white">Commission 5%</p>
-                <p className="text-[11px] text-slate-400">Badge Certifié & Vitrine Boutique</p>
+                <span className="text-[10px] text-blue-400 font-bold uppercase block tracking-wider">Pass Pro (2 500 F / 30j)</span>
+                <p className="text-xs font-bold text-white">Commission 2.5%</p>
+                <p className="text-[11px] text-slate-400">Badge Pro vérifié & Vitrine Boutique</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-1">
-                <span className="text-[10px] text-amber-300 font-bold uppercase block tracking-wider">Pass Vendeur Or VIP (10 000 F/m)</span>
-                <p className="text-xs font-bold text-white">Commission record 2.5%</p>
-                <p className="text-[11px] text-slate-400">Top Algorithme & Support Dédié VIP</p>
+                <span className="text-[10px] text-amber-300 font-bold uppercase block tracking-wider">Pass Gold VIP (5 000 F / 30j)</span>
+                <p className="text-xs font-bold text-white">Commission record 1.5%</p>
+                <p className="text-[11px] text-slate-400">Badge VIP Gold & Priorité d'affichage</p>
               </div>
             </div>
 

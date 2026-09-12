@@ -120,8 +120,8 @@ export const DriverSettingsView: React.FC = () => {
             }}
             className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 text-xs font-black rounded-xl transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
-            <span>Consulter le Pass Livreur</span>
-            <span className="text-[10px] bg-slate-950/20 px-2 py-0.5 rounded font-mono">6 000 F/m</span>
+            <span>Consulter les Pass Livreurs</span>
+            <span className="text-[10px] bg-slate-950/20 px-2 py-0.5 rounded font-mono">Dès 2 000 F</span>
           </button>
         </div>
 
@@ -134,7 +134,7 @@ export const DriverSettingsView: React.FC = () => {
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Toutes les courses sont sans frais d'abonnement. Lors du lancement officiel du Pass Livreur VIP, 5 courses gratuites d'essai vous seront offertes avant l'activation.
+              Recharge 24h Chrono Livraison Express (2 000 F) ou Pass Mensuel Commandes BRAD'CI (5 000 F / 30j) avec 0% de commission Brad'CI sur vos courses.
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-amber-300 text-xs font-bold shrink-0">

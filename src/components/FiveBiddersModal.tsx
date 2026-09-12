@@ -13,6 +13,7 @@ import {
   UserX,
   Volume2
 } from 'lucide-react';
+import { calculateSellerCommission, getSellerPlanDetails } from '../utils/commissionEngine';
 
 export const FiveBiddersModal: React.FC = () => {
   const { 
@@ -44,8 +45,11 @@ export const FiveBiddersModal: React.FC = () => {
     ? bids.find(b => b.bidderId === selectedBidderId && !declinedIds.includes(b.bidderId)) || highestEligibleBid 
     : highestEligibleBid;
 
-  const commission = currentSelection ? currentSelection.amount * prod.commissionRate : 0;
-  const sellerNet = currentSelection ? currentSelection.amount - commission : 0;
+  const effectivePlan = prod.sellerPlan || currentUser?.sellerPlan || 'basic';
+  const planDetails = getSellerPlanDetails(effectivePlan);
+  const finCalc = calculateSellerCommission(currentSelection ? currentSelection.amount : 0, effectivePlan);
+  const commission = finCalc.commissionAmount;
+  const sellerNet = finCalc.sellerNetAmount;
 
   const handleValidate = () => {
     if (!currentSelection) return;
@@ -195,7 +199,7 @@ export const FiveBiddersModal: React.FC = () => {
               </div>
               <div className="flex justify-between text-slate-400">
                 <span>
-                  {translate("Commission Brad'CI", "Brad'CI Fee")} ({(prod.commissionRate * 100).toFixed(1)}% - Plan {prod.sellerPlan?.toUpperCase()}) :
+                  {translate("Commission Brad'CI", "Brad'CI Fee")} ({finCalc.percent.toFixed(1)}% - {planDetails.name}) :
                 </span>
                 <span className="font-mono-num text-red-400">
                   - {commission.toLocaleString('fr-FR')} FCFA

@@ -1979,20 +1979,24 @@ export const AdminBackOffice: React.FC = () => {
                 <h3 className="font-bold text-sm text-white">Barème des Commissions BRAD'CI</h3>
                 <div className="space-y-2 text-xs text-slate-300 pt-1">
                   <div className="flex justify-between p-2.5 bg-slate-900 rounded-xl">
-                    <span>Vendeur Sans Forfait (Basic) :</span>
-                    <strong className="text-amber-400 font-mono">10,0% par vente</strong>
+                    <span>Pass Gratuit (0 FCFA) :</span>
+                    <strong className="text-amber-400 font-mono">5.0% par vente</strong>
                   </div>
                   <div className="flex justify-between p-2.5 bg-slate-900 rounded-xl">
-                    <span>Pass Standard (5 000 FCFA/mois) :</span>
-                    <strong className="text-blue-400 font-mono">7,5% par vente</strong>
+                    <span>Pass Pro (2 500 FCFA/30j) :</span>
+                    <strong className="text-blue-400 font-mono">2.5% par vente</strong>
                   </div>
                   <div className="flex justify-between p-2.5 bg-slate-900 rounded-xl">
-                    <span>Pass Vendeur Pro (10 000 FCFA/mois) :</span>
-                    <strong className="text-emerald-400 font-mono">5,0% par vente</strong>
+                    <span>Pass Gold VIP (5 000 FCFA/30j) :</span>
+                    <strong className="text-emerald-400 font-mono">1.5% par vente</strong>
                   </div>
                   <div className="flex justify-between p-2.5 bg-slate-900 rounded-xl">
-                    <span>Pass Livreur VIP Illimité :</span>
-                    <strong className="text-purple-400 font-mono">6 000 FCFA/mois</strong>
+                    <span>Recharge 24h Chrono (Livraison Express) :</span>
+                    <strong className="text-purple-400 font-mono">2 000 FCFA (0% comm.)</strong>
+                  </div>
+                  <div className="flex justify-between p-2.5 bg-slate-900 rounded-xl">
+                    <span>Pass Mensuel (Commandes BRAD'CI 30j) :</span>
+                    <strong className="text-indigo-400 font-mono">5 000 FCFA (0% comm.)</strong>
                   </div>
                 </div>
               </div>

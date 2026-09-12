@@ -53,6 +53,8 @@ export const VisitorFeed: React.FC = () => {
     language,
     translate,
     t,
+    currency,
+    formatCurrency,
     addToCart,
     setCartModalOpen
   } = useApp();
@@ -609,13 +611,19 @@ export const VisitorFeed: React.FC = () => {
                           <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">
                             {isShop ? translate('Prix Direct Boutique', 'Store Price') : translate('Offre Actuelle', 'Current bid')}
                           </span>
-                          <div className="flex items-baseline gap-1">
-                            <span className={`text-lg sm:text-xl font-black font-mono-num ${
-                              isShop ? 'text-emerald-400' : 'text-amber-400'
-                            }`}>
-                              {displayPrice.toLocaleString('fr-FR')}
-                            </span>
-                            <span className="text-xs font-bold text-slate-400">FCFA</span>
+                          <div>
+                            <div className="flex items-baseline gap-1">
+                              <span className={`text-lg sm:text-xl font-black font-mono-num ${
+                                isShop ? 'text-emerald-400' : 'text-amber-400'
+                              }`}>
+                                {formatCurrency(displayPrice)}
+                              </span>
+                            </div>
+                            {currency !== 'FCFA' && (
+                              <span className="text-[10px] text-slate-400 font-mono font-medium block -mt-0.5">
+                                ≈ {displayPrice.toLocaleString('fr-FR')} FCFA
+                              </span>
+                            )}
                           </div>
                         </div>
 

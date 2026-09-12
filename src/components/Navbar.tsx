@@ -35,7 +35,9 @@ import {
   Moon,
   Globe,
   SlidersHorizontal,
-  ChevronDown
+  ChevronDown,
+  Coins,
+  Check
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -55,6 +57,9 @@ export const Navbar: React.FC = () => {
     setNotificationsModalOpen,
     language,
     setLanguage,
+    currency,
+    setCurrency,
+    formatCurrency,
     t,
     translate,
     theme,
@@ -76,12 +81,17 @@ export const Navbar: React.FC = () => {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileDropdownOpen(false);
+      }
+      if (currencyRef.current && !currencyRef.current.contains(e.target as Node)) {
+        setCurrencyDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -362,6 +372,137 @@ export const Navbar: React.FC = () => {
               </span>
             </button>
 
+            {/* Currency Selector (FCFA / EUR / USD) for International Users & Auction Tracking */}
+            <div className="relative shrink-0" ref={currencyRef}>
+              <button
+                id="btn-navbar-currency"
+                type="button"
+                onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
+                className={`h-9 px-2 sm:px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-sm ${
+                  currencyDropdownOpen
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                    : 'bg-slate-900/90 border-slate-800 text-slate-200 hover:text-white hover:bg-slate-800 hover:border-slate-700'
+                }`}
+                title={translate("Devise d'affichage (FCFA, EUR, USD) pour suivre les enchères", "Display currency (FCFA, EUR, USD) to track auctions")}
+              >
+                <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-[11px] sm:text-xs font-extrabold flex items-center gap-1 font-mono-num">
+                  <span>{currency === 'FCFA' ? '🇨🇮' : currency === 'EUR' ? '🇪🇺' : '🇺🇸'}</span>
+                  <span>{currency === 'FCFA' ? 'FCFA' : currency === 'EUR' ? 'EUR' : 'USD'}</span>
+                </span>
+                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${currencyDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {currencyDropdownOpen && (
+                <div
+                  id="navbar-currency-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-[#0B1224] border border-slate-700/80 rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2"
+                >
+                  <div className="px-2.5 py-1.5 border-b border-slate-800/90 mb-1.5">
+                    <div className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <Coins className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{translate("Devise des Enchères", "Auctions Currency")}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {translate("Suivi des offres pour acheteurs internationaux", "Offer tracking for international buyers")}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    {/* FCFA */}
+                    <button
+                      id="opt-currency-fcfa"
+                      type="button"
+                      onClick={() => {
+                        setCurrency('FCFA');
+                        setCurrencyDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                        currency === 'FCFA'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base leading-none">🇨🇮</span>
+                        <div>
+                          <div className="font-bold flex items-center gap-1.5">
+                            <span>Franc CFA</span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/30 text-amber-300 font-mono font-black">FCFA</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block">{translate("Monnaie locale officielle (XOF)", "Official local currency (XOF)")}</span>
+                        </div>
+                      </div>
+                      {currency === 'FCFA' && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                    </button>
+
+                    {/* EUR */}
+                    <button
+                      id="opt-currency-eur"
+                      type="button"
+                      onClick={() => {
+                        setCurrency('EUR');
+                        setCurrencyDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                        currency === 'EUR'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base leading-none">🇪🇺</span>
+                        <div>
+                          <div className="font-bold flex items-center gap-1.5">
+                            <span>Euro</span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 font-mono font-black">EUR (€)</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block">1 € = 655,957 FCFA</span>
+                        </div>
+                      </div>
+                      {currency === 'EUR' && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                    </button>
+
+                    {/* USD */}
+                    <button
+                      id="opt-currency-usd"
+                      type="button"
+                      onClick={() => {
+                        setCurrency('USD');
+                        setCurrencyDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                        currency === 'USD'
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                          : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base leading-none">🇺🇸</span>
+                        <div>
+                          <div className="font-bold flex items-center gap-1.5">
+                            <span>Dollar US</span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono font-black">USD ($)</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block">1 $ ≈ 610 FCFA</span>
+                        </div>
+                      </div>
+                      {currency === 'USD' && <Check className="w-4 h-4 text-amber-400 shrink-0" />}
+                    </button>
+                  </div>
+
+                  <div className="mt-2 pt-2 border-t border-slate-800/80 px-2 py-1">
+                    <p className="text-[9.5px] text-slate-400 leading-tight">
+                      {translate(
+                        "Règlement légal en FCFA à la livraison. Les montants en EUR/USD permettent aux acheteurs internationaux de jauger les enchères.",
+                        "Direct delivery payments settle in FCFA. EUR/USD amounts enable international buyers to easily evaluate bids."
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* 1. Shopping Cart Button - Visible on Desktop, in drawer/bottom nav on Mobile */}
             {!isDriver && (
               <button
@@ -605,6 +746,36 @@ export const Navbar: React.FC = () => {
               <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                 SÉCURISÉ
               </span>
+            </div>
+
+            {/* Mobile Currency Selector Bar */}
+            <div className="px-3 py-2 bg-slate-900/90 rounded-2xl mx-3 border border-slate-800">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                  <Coins className="w-3.5 h-3.5" />
+                  <span>{translate("Devise des Enchères", "Auction Currency")}</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {currency === 'FCFA' ? '🇨🇮 CFA (XOF)' : currency === 'EUR' ? '🇪🇺 1€ = 655,957 F' : '🇺🇸 1$ ≈ 610 F'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
+                {(['FCFA', 'EUR', 'USD'] as const).map((curr) => (
+                  <button
+                    key={curr}
+                    type="button"
+                    onClick={() => setCurrency(curr)}
+                    className={`py-1.5 px-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                      currency === curr
+                        ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <span className="text-xs">{curr === 'FCFA' ? '🇨🇮' : curr === 'EUR' ? '🇪🇺' : '🇺🇸'}</span>
+                    <span>{curr === 'FCFA' ? 'FCFA' : curr === 'EUR' ? 'EUR (€)' : 'USD ($)'}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             {isDriver ? (
               <div className="px-3 space-y-3">

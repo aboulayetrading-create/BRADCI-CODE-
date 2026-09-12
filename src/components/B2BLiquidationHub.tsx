@@ -113,8 +113,8 @@ export const B2BLiquidationHub: React.FC = () => {
 
           <p className="text-slate-300 text-xs sm:text-sm mt-3 leading-relaxed max-w-2xl">
             {translate(
-              "Plateforme institutionnelle dédiée aux entreprises, distributeurs et grossistes pour liquider leurs surplus, fins de séries ou parcs informatiques renouvelés en lots complets aux enchères. Commission réduite à 5% par lot & inspection en entrepôt.",
-              "Institutional platform dedicated to enterprises, distributors, and wholesalers to clear surplus inventory, end-of-lines, or renewed IT fleets in full bulk lots via auction. Reduced 5% commission per lot & warehouse inspections."
+              "Plateforme institutionnelle dédiée aux entreprises, distributeurs et grossistes pour liquider leurs surplus, fins de séries ou parcs informatiques renouvelés en lots complets aux enchères. Commission réduite dès 1.5% selon Pass Vendeur (Pass Gratuit 5.0%, Pass Pro 2.5%, Pass Gold 1.5%) & inspection en entrepôt.",
+              "Institutional platform dedicated to enterprises, distributors, and wholesalers to clear surplus inventory, end-of-lines, or renewed IT fleets in full bulk lots via auction. Reduced commission from 1.5% based on Seller Pass (Free 5.0%, Pro 2.5%, Gold 1.5%) & warehouse inspection."
             )}
           </p>
 
@@ -133,8 +133,8 @@ export const B2BLiquidationHub: React.FC = () => {
               <span className="text-[11px] text-slate-400">{translate("Volume d'enchères", "Auction Volume")}</span>
             </div>
             <div className="bg-[#0C162E]/90 border border-blue-900/50 p-3 rounded-2xl">
-              <span className="text-amber-400 font-bold text-xs block">{translate("Commission 5%", "5% Commission")}</span>
-              <span className="text-[11px] text-slate-400">{translate("Par article / lot", "Per item / lot")}</span>
+              <span className="text-amber-400 font-bold text-xs block">{translate("Dès 1.5% Com.", "From 1.5% Com.")}</span>
+              <span className="text-[11px] text-slate-400">{translate("Selon Pass Vendeur", "Per Seller Pass")}</span>
             </div>
           </div>
 

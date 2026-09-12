@@ -68,10 +68,10 @@ const INITIAL_LOGS: UserActivityLog[] = [
     device: 'macOS Sonoma (MacBook Pro M3)',
     browser: 'Safari 17.5',
     actionType: 'vip_call_request',
-    actionTitle: 'Demande d\'Appel VIP 85 min soumise',
-    description: 'Demande d\'accompagnement téléphonique prioritaire pour arbitrage vendeur et gestion boutique.',
+    actionTitle: 'Demande d\'Assistance Prioritaire Dédiée soumise',
+    description: 'Demande d\'accompagnement prioritaire pour arbitrage vendeur et gestion boutique.',
     severity: 'normal',
-    metadata: { maxDurationMinutes: 85, ticketId: 'VIP-CALL-85-4412' }
+    metadata: { priority: 'haute', ticketId: 'VIP-CALL-4412' }
   },
   {
     id: 'log-003',
@@ -391,10 +391,10 @@ export class ActivityAuditService {
         passTier: params.passTier,
         commune: communeObj.name,
         actionType: 'vip_call_request',
-        actionTitle: `Demande d'Appel VIP 85 min (${newRequest.id})`,
-        description: `Réservation d'appel téléphonique 85 min enregistrée pour "${params.subject}". Téléphone: ${params.userPhone}.`,
+        actionTitle: `Demande d'Assistance Prioritaire (${newRequest.id})`,
+        description: `Demande d'accompagnement prioritaire enregistrée pour "${params.subject}". Contact: ${params.userPhone}.`,
         severity: 'normal',
-        metadata: { ticketId: newRequest.id, maxDurationMinutes: 85 }
+        metadata: { ticketId: newRequest.id, priority: 'haute' }
       });
     } catch {
       // fallback

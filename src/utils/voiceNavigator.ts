@@ -877,7 +877,12 @@ class VoiceNavigatorService {
     }
   }
 
-  public speak(text: string, lang?: AppLanguage, onEnd?: () => void) {
+  public speak(
+    text: string, 
+    lang?: AppLanguage, 
+    onEnd?: () => void,
+    options?: { pitch?: number; rate?: number; gender?: 'female' | 'male'; voiceIndex?: number; advisorIndex?: number }
+  ) {
     if (this.isMuted) return;
     if (typeof window === 'undefined') return;
 
@@ -912,21 +917,77 @@ class VoiceNavigatorService {
 
         const utterance = new SpeechSynthesisUtterance(spokenText);
         utterance.lang = isEn ? 'en-US' : 'fr-FR';
-        utterance.rate = this.rate;
-        utterance.pitch = this.pitch;
+        utterance.rate = options?.rate ?? this.rate;
+        utterance.pitch = options?.pitch ?? this.pitch;
 
-        // Best available voice matching
+        // Best available voice matching across all system and neural voices
         const voices = this.cachedVoices.length > 0 ? this.cachedVoices : window.speechSynthesis.getVoices();
         if (voices.length > 0) {
+          const advIdx = options?.voiceIndex ?? options?.advisorIndex ?? 0;
           if (isEn) {
-            const enVoice = voices.find(v => v.lang && (v.lang.toLowerCase().startsWith('en-us') || v.lang.toLowerCase().startsWith('en-gb')))
-              || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('en'))
-              || voices.find(v => v.name && (v.name.includes('English') || v.name.includes('Google US')));
-            if (enVoice) utterance.voice = enVoice;
+            const enVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('en'));
+            if (options?.gender === 'male') {
+              const maleVoices = enVoices.filter(v => v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('david') || v.name.toLowerCase().includes('george'));
+              const pool = maleVoices.length > 0 ? maleVoices : enVoices;
+              if (pool.length > 0) utterance.voice = pool[advIdx % pool.length];
+            } else {
+              const femaleVoices = enVoices.filter(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('samantha') || v.name.toLowerCase().includes('zira'));
+              const pool = femaleVoices.length > 0 ? femaleVoices : enVoices;
+              if (pool.length > 0) utterance.voice = pool[advIdx % pool.length];
+            }
           } else {
-            const frenchVoice = voices.find(v => v.lang && (v.lang.toLowerCase().startsWith('fr-fr') || v.lang.toLowerCase().startsWith('fr')))
-              || voices.find(v => v.name && (v.name.includes('French') || v.name.includes('Google Français') || v.name.includes('Thomas')));
-            if (frenchVoice) utterance.voice = frenchVoice;
+            const frVoices = voices.filter(v => v.lang && (v.lang.toLowerCase().startsWith('fr-fr') || v.lang.toLowerCase().startsWith('fr')));
+            if (options?.gender === 'male') {
+              const maleVoices = frVoices.filter(v => {
+                const n = v.name.toLowerCase();
+                return (
+                  n.includes('male') || 
+                  n.includes('homme') || 
+                  n.includes('frb') || 
+                  n.includes('frd') || 
+                  n.includes('thomas') || 
+                  n.includes('nicolas') || 
+                  n.includes('paul') ||
+                  n.includes('pierre') ||
+                  n.includes('antoine') ||
+                  n.includes('standard-b') ||
+                  n.includes('standard-c') ||
+                  n.includes('neural2-b') ||
+                  n.includes('wavenet-b') ||
+                  n.includes('wavenet-d') ||
+                  n.includes('guy') ||
+                  n.includes('bernard')
+                );
+              });
+              const pool = maleVoices.length > 0 ? maleVoices : (frVoices.length > 0 ? frVoices : voices);
+              if (pool.length > 0) utterance.voice = pool[advIdx % pool.length];
+            } else {
+              const femaleVoices = frVoices.filter(v => {
+                const n = v.name.toLowerCase();
+                return (
+                  n.includes('female') || 
+                  n.includes('femme') || 
+                  n.includes('fra') || 
+                  n.includes('frc') || 
+                  n.includes('hortense') || 
+                  n.includes('julie') || 
+                  n.includes('celine') || 
+                  n.includes('standard-a') ||
+                  n.includes('standard-d') ||
+                  n.includes('neural2-a') ||
+                  n.includes('neural2-c') ||
+                  n.includes('wavenet-a') ||
+                  n.includes('wavenet-c') ||
+                  n.includes('amelie') ||
+                  n.includes('alice') ||
+                  n.includes('audrey') ||
+                  n.includes('aurelie') ||
+                  n.includes('siwis')
+                );
+              });
+              const pool = femaleVoices.length > 0 ? femaleVoices : (frVoices.length > 0 ? frVoices : voices);
+              if (pool.length > 0) utterance.voice = pool[advIdx % pool.length];
+            }
           }
         }
 
@@ -1243,4 +1304,69 @@ export function announceSaleSuccess(productTitle: string, lang: AppLanguage = 'f
       : `Nouvelle vente enregistrée pour ${productTitle}. Recherche de livreur en cours.`,
     lang
   );
+}
+
+/**
+ * Realistic in-app phone ringing tone generator using Web Audio API
+ * Dual-frequency telecom telephone ring: 440 Hz + 480 Hz
+ */
+export function createPhoneRingtoneController(): { start: () => void; stop: () => void } {
+  let timerId: any = null;
+  let isPlaying = false;
+
+  const playBurst = () => {
+    try {
+      const ctx = getSharedAudioContext();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const now = ctx.currentTime;
+      
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(440, now);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(480, now);
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+      gain.gain.setValueAtTime(0.12, now + 1.4);
+      gain.gain.linearRampToValueAtTime(0, now + 1.5);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 1.5);
+      osc2.stop(now + 1.5);
+    } catch (err) {
+      console.warn('Phone ring audio policy warning:', err);
+    }
+  };
+
+  return {
+    start: () => {
+      if (isPlaying) return;
+      isPlaying = true;
+      playBurst();
+      timerId = setInterval(() => {
+        if (isPlaying) {
+          playBurst();
+        }
+      }, 3500);
+    },
+    stop: () => {
+      isPlaying = false;
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+    }
+  };
 }

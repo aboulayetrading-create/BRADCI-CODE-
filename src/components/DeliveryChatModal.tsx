@@ -240,20 +240,6 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const quickPhrases = currentRole === 'driver'
-    ? [
-        "J'arrive dans 5 minutes.",
-        "Je suis au portail / point de rendez-vous.",
-        "Avez-vous un repère pour trouver facilement ?",
-        "Colis récupéré et bien calé."
-      ]
-    : [
-        "Je suis disponible à l'adresse indiquée.",
-        "Appelez-moi dès votre arrivée.",
-        "Mon code secret est prêt.",
-        "Quel est votre véhicule ?"
-      ];
-
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-3 sm:p-4 flex items-center justify-center animate-in fade-in">
       <div className="w-full max-w-lg bg-[#0C121E] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[85vh] max-h-[680px]">
@@ -367,22 +353,6 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
             );
           })}
           <div ref={messagesEndRef} />
-        </div>
-
-        {/* Quick Phrases */}
-        <div className="px-3 py-2 bg-slate-900 border-t border-slate-800/80 flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-          {quickPhrases.map((phrase, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => {
-                setInputText(phrase);
-              }}
-              className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] whitespace-nowrap border border-slate-700/80 transition-colors cursor-pointer"
-            >
-              {phrase}
-            </button>
-          ))}
         </div>
 
         {/* Input Bar or Active Recording Bar */}

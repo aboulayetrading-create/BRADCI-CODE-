@@ -25,6 +25,7 @@ import {
   findNearestCommune,
   calculateDeliveryFee
 } from '../data/communes';
+import { GooglePlacesAddressAutocomplete } from './GooglePlacesAddressAutocomplete';
 
 export const BuyerDepositModal: React.FC = () => {
   const { 
@@ -212,12 +213,22 @@ export const BuyerDepositModal: React.FC = () => {
               </optgroup>
             </select>
 
-            <input
-              type="text"
+            <GooglePlacesAddressAutocomplete
+              id="buyer-deposit-address-autocomplete"
               value={buyerAddress}
-              onChange={(e) => setBuyerAddress(e.target.value)}
-              placeholder="Quartier, Rue, Repère exact..."
-              className="w-full bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+              onChange={setBuyerAddress}
+              onPlaceSelect={(details) => {
+                setBuyerAddress(details.address);
+                if (details.commune) {
+                  setBuyerCommune(details.commune);
+                }
+                if (details.lat && details.lng) {
+                  setBuyerCoords({ lat: details.lat, lng: details.lng });
+                }
+              }}
+              selectedCoords={buyerCoords}
+              placeholder={translate("Quartier, Repère exact (Google Places)...", "Neighborhood, exact landmark (Google Places)...")}
+              inputClassName="px-2.5 py-1.5 text-xs"
             />
           </div>
         </div>

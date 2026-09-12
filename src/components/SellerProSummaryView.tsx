@@ -107,10 +107,11 @@ export const SellerProSummaryView: React.FC<SellerProSummaryViewProps> = ({
     return Math.max(combined, 1450000);
   }, [soldProducts, completedJobs, currentUser.walletBalance, timeRange]);
 
-  // Commission savings calculation: Pro rate is 2.5%, compared to 10% standard rate -> 7.5% net saved!
+  // Commission savings calculation: Pro rate is 2.5% (or Gold VIP 1.5%), compared to 5.0% Free Pass rate
   const commissionSaved = useMemo(() => {
-    return Math.round(totalRevenue * 0.075);
-  }, [totalRevenue]);
+    const rateSaved = currentUser.sellerPlan === 'pro' ? 0.035 : 0.025;
+    return Math.round(totalRevenue * rateSaved);
+  }, [totalRevenue, currentUser.sellerPlan]);
 
   const blockedFunds = useMemo(() => {
     return currentUser.blockedBalance || (inTransitJobs.reduce((acc, j) => acc + (j.itemValue || 0), 0) || 125000);
@@ -525,10 +526,14 @@ export const SellerProSummaryView: React.FC<SellerProSummaryViewProps> = ({
               <div className="space-y-0.5">
                 <span className="text-[11px] font-bold text-emerald-300 flex items-center gap-1">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>{translate("Économie Pass Pro (2.5%)", "Pro Pass Savings (2.5%)")}</span>
+                  <span>
+                    {currentUser.sellerPlan === 'pro'
+                      ? translate("Économie Pass Gold (1.5%)", "Gold Pass Savings (1.5%)")
+                      : translate("Économie Pass Pro (2.5%)", "Pro Pass Savings (2.5%)")}
+                  </span>
                 </span>
                 <span className="text-[10px] text-slate-400 block">
-                  {translate("Au lieu des 10% standard de commission", "Versus 10% standard marketplace fee")}
+                  {translate("Au lieu des 5.0% du Pass Gratuit", "Versus 5.0% Free Pass fee")}
                 </span>
               </div>
               <div className="text-sm font-black text-emerald-400 font-mono-num text-right">

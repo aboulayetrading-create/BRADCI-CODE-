@@ -71,7 +71,7 @@ export const DriverPassRechargeView: React.FC = () => {
     rechargeDriverPass();
     addToast(
       translate("Pass Recharge 24h Activé !", "24h Recharge Pass Activated!"),
-      translate("Votre chrono de 24h a été réinitialisé à 5.000 F (Offre gratuite active).", "Your 24h timer was reset (Free launch active)."),
+      translate("Votre chrono 24h a été activé (Recharge 24h Chrono - Livraison Express 2 000 F / 0% commission).", "Your 24h timer was activated (24h Express Delivery Pass 2,000 F / 0% commission)."),
       "success"
     );
   };
@@ -106,16 +106,16 @@ export const DriverPassRechargeView: React.FC = () => {
 
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold">
               <Clock className="w-3.5 h-3.5" />
-              <span>Option Pass Quotidien : Mode Bientôt</span>
+              <span>Pass Livraison Express & Pass Mensuel</span>
             </div>
           </div>
 
           <div className="space-y-2">
             <h2 className="text-2xl sm:text-3xl font-black text-white font-display">
-              Pass Recharge Quotidien Livreur • 5.000 F / jour
+              Pass Livreurs BRAD'CI • Recharge 24h Chrono (2 000 F) & Pass Mensuel (5 000 F)
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Profitez d'un accès illimité à toutes les <strong className="text-violet-300">Courses Commandes Directes (Point A ➔ Point B)</strong> avec <strong className="text-emerald-400">0% de commission Brad'CI</strong> ! Vous encaissez 100% de la somme en direct auprès du client.
+              <strong className="text-violet-300">Recharge 24h Chrono (2 000 FCFA)</strong> pour les courses de <strong className="text-violet-300">Livraison Express (Point A ➔ Point B)</strong> & <strong className="text-amber-300">Pass Mensuel (5 000 FCFA / 30j)</strong> pour les <strong className="text-amber-300">Commandes BRAD'CI</strong>. <strong className="text-emerald-400">0% de commission Brad'CI</strong> ! Vous conservez 100% de vos gains.
             </p>
           </div>
 
@@ -212,11 +212,15 @@ export const DriverPassRechargeView: React.FC = () => {
           {/* Status Details */}
           <div className="space-y-2 text-xs">
             <div className="flex justify-between text-slate-400">
-              <span>Prix de la recharge :</span>
-              <strong className="text-white font-mono">5.000 FCFA / jour</strong>
+              <span>Recharge 24h Chrono (Livraison Express) :</span>
+              <strong className="text-white font-mono">2 000 FCFA</strong>
             </div>
             <div className="flex justify-between text-slate-400">
-              <span>Commission BradCi sur colis :</span>
+              <span>Pass Mensuel (Commandes BRAD'CI 30j) :</span>
+              <strong className="text-white font-mono">5 000 FCFA</strong>
+            </div>
+            <div className="flex justify-between text-slate-400">
+              <span>Commission Brad'CI sur livraison :</span>
               <strong className="text-emerald-400 font-mono">0% (100% pour vous)</strong>
             </div>
             <div className="flex justify-between text-slate-400">
@@ -333,12 +337,12 @@ export const DriverPassRechargeView: React.FC = () => {
                 <strong className="text-white">💵 Espèces directes au livreur</strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Frais BradCi retenus :</span>
+                <span className="text-slate-400">Frais Brad'CI retenus :</span>
                 <strong className="text-emerald-400">0 FCFA</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Condition d'accès :</span>
-                <strong className="text-violet-300">Recharge 24h ou Courses Offertes</strong>
+                <strong className="text-violet-300">Recharge 24h Chrono (2 000 F) ou Courses Offertes</strong>
               </div>
             </div>
           </div>
@@ -364,12 +368,12 @@ export const DriverPassRechargeView: React.FC = () => {
                 <strong className="text-white">🔒 Compte Séquestre Sécurisé</strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Frais BradCi :</span>
-                <strong className="text-amber-400">Commission standard de vente</strong>
+                <span className="text-slate-400">Frais Brad'CI sur livraison :</span>
+                <strong className="text-emerald-400">0% pour le livreur</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Condition d'accès :</span>
-                <strong className="text-slate-200">Toujours accessible à 100%</strong>
+                <strong className="text-amber-300">Pass Mensuel BRAD'CI (5 000 F / 30j)</strong>
               </div>
             </div>
           </div>

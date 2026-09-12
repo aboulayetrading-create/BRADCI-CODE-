@@ -39,7 +39,9 @@ import {
   getCommuneCoords,
   findNearestCommune
 } from '../data/communes';
+import { calculateSellerCommission, getSellerCommissionPercentage, getSellerPlanDetails } from '../utils/commissionEngine';
 import { nativeBridge } from '../utils/nativeBridge';
+import { GooglePlacesAddressAutocomplete } from './GooglePlacesAddressAutocomplete';
 
 export const NewProductModal: React.FC = () => {
   const { 
@@ -84,6 +86,14 @@ export const NewProductModal: React.FC = () => {
   const [requiredVehicle, setRequiredVehicle] = useState<VehicleType>('moto');
   const [isBoosted, setIsBoosted] = useState<boolean>(false);
   const [boostPaymentMethod, setBoostPaymentMethod] = useState<'wave' | 'orange' | 'mtn' | 'moov'>('wave');
+
+  // Calcul automatique de la commission selon le statut actif du vendeur (Pass Gratuit 5%, Pass Pro 2.5%, Pass Gold 1.5%)
+  const estimatedSellingAmount = isB2BLot 
+    ? (b2bUnitPrice * b2bTotalUnitsCount) 
+    : (listingType === 'shop' ? buyNowPrice : startingPrice);
+
+  const activeCommission = calculateSellerCommission(estimatedSellingAmount, currentUser?.sellerPlan);
+  const planDetails = getSellerPlanDetails(currentUser?.sellerPlan);
 
   const captureDeviceGPS = async () => {
     setIsLocatingGps(true);
@@ -517,9 +527,10 @@ export const NewProductModal: React.FC = () => {
                 <Building2 className="w-4 h-4 text-blue-400" />
                 <span>Paramètres Déstockage / Liquidation (Produits en Stock)</span>
               </span>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1">
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-500/30 flex items-center gap-1.5">
                 <span>Commission Brad'CI :</span>
-                <span className="font-black text-white">5% par vente</span>
+                <span className="font-black text-white">{activeCommission.ratePercent}% ({planDetails.name})</span>
+                <span className="text-emerald-400 font-mono">({activeCommission.commissionAmount.toLocaleString('fr-FR')} FCFA)</span>
               </span>
             </div>
 
@@ -781,13 +792,22 @@ export const NewProductModal: React.FC = () => {
                   <label className="text-xs text-slate-300 font-medium block mb-1">
                     {translate("Adresse & Repères Précis de Retrait (Obligatoire) :", "Exact Pickup Street & Landmarks (Mandatory):")}
                   </label>
-                  <input
-                    type="text"
+                  <GooglePlacesAddressAutocomplete
+                    id="new-product-pickup-address-autocomplete"
                     value={pickupAddress}
-                    onChange={(e) => setPickupAddress(e.target.value)}
-                    placeholder="Ex: Deux-Plateaux Vallons, Rue des Jardins, Immeuble Horizon 2e étage"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
-                    required
+                    onChange={setPickupAddress}
+                    onPlaceSelect={(details) => {
+                      setPickupAddress(details.address);
+                      if (details.commune) {
+                        setCommune(details.commune);
+                      }
+                      if (details.lat && details.lng) {
+                        setPickupCoords({ lat: details.lat, lng: details.lng });
+                      }
+                    }}
+                    selectedCoords={pickupCoords || undefined}
+                    placeholder={translate("Quartier, Rue, Repères exacts (Google Places)...", "Neighborhood, Street, landmarks (Google Places)...")}
+                    inputClassName="px-3 py-2 text-xs"
                   />
                 </div>
               </div>
@@ -1321,16 +1341,12 @@ export const NewProductModal: React.FC = () => {
             {/* Submit */}
             <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="text-[11px] text-slate-300">
-                <span className="text-slate-400">{translate("Commission sur vente : ", "Sales commission: ")}</span>
+                <span className="text-slate-400">{translate("Commission Brad'CI : ", "Brad'CI commission: ")}</span>
                 <span className="font-bold text-amber-400">
-                  {listingType === 'auction'
-                    ? '10% (' + translate('Règle fixe toutes enchères', 'Fixed rate all auctions') + ')'
-                    : currentUser?.sellerPlan === 'pro'
-                    ? '2.5% (' + translate('Pass VIP Or', 'VIP Gold Pass') + ')'
-                    : currentUser?.sellerPlan === 'standard'
-                    ? '5% (' + translate('Pass Certifié', 'Certified Pass') + ')'
-                    : '10% (' + translate('Compte Basique sans abonnement', 'Basic Account no sub') + ')'
-                  }
+                  {activeCommission.ratePercent}% ({planDetails.name})
+                </span>
+                <span className="text-slate-400 text-[10px] ml-1.5">
+                  • {translate("Déduction :", "Deduction:")} <strong className="text-emerald-400 font-mono-num">{activeCommission.commissionAmount.toLocaleString('fr-FR')} FCFA</strong> {translate("(Net vendeur :", "(Net to seller:")} <strong className="text-white font-mono-num">{activeCommission.netSellerAmount.toLocaleString('fr-FR')} FCFA</strong>)
                 </span>
               </div>
               <button

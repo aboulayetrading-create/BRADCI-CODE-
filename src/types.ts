@@ -1,7 +1,7 @@
 export type UserRole = 'visitor' | 'client' | 'driver' | 'admin';
 
-export type SellerPlan = 'basic' | 'standard' | 'pro'; // basic: Gratuit (3 items), standard: Pass Pro Boutique Inférieure 5 000 F (15 items), pro: Pass Illimité Boutique Supérieure 10 000 F (unlimited)
-export type DriverPlan = 'trial' | 'vip_pass';
+export type SellerPlan = 'basic' | 'standard' | 'pro' | 'gold'; // basic: Pass Gratuit (0 F, 5.0%), standard: Pass Pro (2 500 F/30j, 2.5% + Badge Pro), pro / gold: Pass Gold (5 000 F/30j, 1.5% + Badge VIP Gold & Priorité d'affichage)
+export type DriverPlan = 'trial' | 'daily_pass' | 'vip_pass' | 'monthly_pass'; // trial: 5 courses offertes, daily_pass: Recharge 24h Chrono - Livraison Express (2 000 F), vip_pass / monthly_pass: Pass Mensuel - Commandes BRAD'CI (5 000 F/30j)
 
 export type KYCStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
@@ -40,6 +40,7 @@ export interface ShopProfile {
 }
 
 export type AppLanguage = 'fr' | 'en';
+export type AppCurrency = 'FCFA' | 'EUR' | 'USD';
 export type AppTheme = 'dark' | 'light' | 'auto';
 export type MapProvider = 'google' | 'satellite' | 'radar';
 
@@ -269,7 +270,7 @@ export interface Product {
   paymentStatus?: 'PENDING' | 'PAYMENT_SUCCESS' | 'PAID' | 'COMPLETED' | 'FAILED';
   paidAt?: string;
   otpGeneratedAt?: string;
-  commissionRate: number; // 0.10 (Basic), 0.05 (Standard/Intermédiaire), 0.025 (Pro)
+  commissionRate: number; // 0.05 (Pass Gratuit), 0.025 (Pass Pro), 0.015 (Pass Gold)
   stockQuantity?: number; // Obligatoire pour les boutiques (ex: 5 unités en stock)
   soldCount?: number; // Nombre d'unités déjà vendues pour cette annonce boutique
   isOutOfStock?: boolean; // Vrai si le stock est tombé à 0
@@ -300,7 +301,8 @@ export interface FraudIncidentRecord {
 export type DeliveryJobKind = 'marketplace' | 'direct_courier';
 
 export interface DriverRechargePass {
-  dailyCostFCFA: number; // 5000 FCFA
+  dailyCostFCFA: number; // 2000 FCFA (Recharge 24h Chrono - Livraison Express)
+  monthlyCostFCFA?: number; // 5000 FCFA (Pass Mensuel - Commandes BRAD'CI)
   status: 'active' | 'expired' | 'coming_soon';
   expiresAt: string; // ISO string 24h countdown
   freeCoursesRemaining: number; // 5 courses offertes au lancement
@@ -308,6 +310,7 @@ export interface DriverRechargePass {
   isComingSoon: boolean; // currently true (mode bientôt)
   unlimitedDirectAccess: boolean; // true during launch offer
   lastRechargedAt?: string;
+  activePassType?: 'daily' | 'monthly';
 }
 
 export interface DirectCourierOrderInput {
@@ -572,7 +575,7 @@ export interface DirectPaymentRecord {
   sellerAmount?: number; // Montant net versé au vendeur (productPrice - commission)
   sellerPayout?: number;
   commissionAmount: number; // Montant commission BRAD'CI
-  commissionRatePercent?: number; // 10% (Basic), 5% (Intermédiaire), 2.5% (Pro)
+  commissionRatePercent?: number; // 5.0% (Pass Gratuit), 2.5% (Pass Pro), 1.5% (Pass Gold)
   commissionPercent?: number;
   platformFee?: number;
   driverAmount?: number; // Montant versé au livreur (deliveryFee)
@@ -595,7 +598,7 @@ export interface EscrowRecord {
   amount: number; // Total Pay on Delivery
   sellerAmount: number; // Net versé au vendeur
   commissionAmount: number; // Brad'CI cut
-  commissionRatePercent: number; // 10%, 5%, 2.5%
+  commissionRatePercent: number; // 5.0%, 2.5%, 1.5%
   deliveryFee: number;
   buyerName: string;
   sellerName: string;

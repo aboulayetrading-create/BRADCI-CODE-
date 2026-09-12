@@ -151,7 +151,7 @@ export const INITIAL_USERS: User[] = [
     phone: '+225 07 11 33 55 99',
     role: 'driver',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    driverPlan: 'vip_pass', // 6 000 FCFA/mo active
+    driverPlan: 'vip_pass', // 5 000 FCFA/30j actif (Pass Mensuel Commandes BRAD'CI)
     trialDeliveriesRemaining: 0,
     productsPublishedCount: 0,
     kycStatus: 'verified',
@@ -1836,10 +1836,10 @@ export const INITIAL_FINANCIAL_TRANSACTIONS: FinancialTransaction[] = [
   {
     id: 'ft-004',
     type: 'subscription_pass_driver',
-    description: 'Pass VIP Livreur Abidjan Illimité (6 000 FCFA / mois)',
+    description: 'Pass Mensuel - Commandes BRAD\'CI (5 000 FCFA / 30j)',
     category: 'subscription',
-    grossAmount: 6000,
-    netRevenueBradCi: 6000,
+    grossAmount: 5000,
+    netRevenueBradCi: 5000,
     userName: 'Yaya Touré',
     userRole: 'driver',
     paymentMethod: 'Wave',

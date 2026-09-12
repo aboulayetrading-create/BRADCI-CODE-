@@ -65,6 +65,8 @@ export const ProductDetailModal: React.FC = () => {
     getShopBySellerId,
     translate,
     userLocation,
+    currency,
+    formatCurrency,
     applyReferralBalanceToPurchase,
     addToast,
     addToCart,
@@ -585,11 +587,18 @@ export const ProductDetailModal: React.FC = () => {
                                 : 'text-[#FF5B00] drop-shadow-sm'
                           }`}
                         >
-                          {(isB2BLot ? b2bUnitPrice : fixedPrice).toLocaleString('fr-FR')} F
+                          {currency === 'FCFA'
+                            ? `${(isB2BLot ? b2bUnitPrice : fixedPrice).toLocaleString('fr-FR')} F`
+                            : formatCurrency(isB2BLot ? b2bUnitPrice : fixedPrice)
+                          }
                         </motion.span>
                       </AnimatePresence>
                       <span className="text-xs text-slate-400 ml-1.5 font-semibold">
-                        {isB2BLot ? "CFA / article" : "CFA"}
+                        {currency === 'FCFA' 
+                          ? (isB2BLot ? "CFA / article" : "CFA") 
+                          : isB2BLot 
+                            ? `/ article (≈ ${(isB2BLot ? b2bUnitPrice : fixedPrice).toLocaleString('fr-FR')} FCFA)` 
+                            : `(≈ ${(isB2BLot ? b2bUnitPrice : fixedPrice).toLocaleString('fr-FR')} FCFA)`}
                       </span>
                     </div>
                   </div>

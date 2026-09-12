@@ -48,12 +48,12 @@ export const SecurityGuideView: React.FC = () => {
           </h3>
           <p className="text-xs text-slate-300 leading-relaxed">
             {translate(
-              "Chaque vendeur et particulier bénéficie d'une liberté totale de publication sans aucune limite de poste pour ses annonces boutiques et ses enchères en direct à 0 FCFA. Commission compte basique : 10%.",
-              "Every seller and individual benefits from complete posting freedom with zero listing limits for shop items and live auctions at 0 FCFA. Basic account commission: 10%."
+              "Chaque vendeur et particulier bénéficie d'une liberté totale de publication sans aucune limite de poste pour ses annonces boutiques et ses enchères en direct à 0 FCFA. Commission Pass Gratuit : 5.0%.",
+              "Every seller and individual benefits from complete posting freedom with zero listing limits for shop items and live auctions at 0 FCFA. Free Pass commission: 5.0%."
             )}
           </p>
           <div className="text-[11px] text-emerald-300 bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20">
-            {translate("✓ 100% Gratuit & Illimité • Enchères et Boutiques sans abonnement obligatoire.", "✓ 100% Free & Unlimited • Auctions and Shops with no mandatory subscription.")}
+            {translate("✓ 100% Gratuit & Illimité • Commission minimale de 5.0% sur vente finalisée.", "✓ 100% Free & Unlimited • 5.0% commission upon completed sale.")}
           </div>
         </div>
 
@@ -63,16 +63,16 @@ export const SecurityGuideView: React.FC = () => {
             02
           </div>
           <h3 className="text-lg font-bold text-white">
-            {translate("Pass Certifié (5% comm.) & VIP Or (2.5% comm.)", "Certified Pass (5% fee) & VIP Gold (2.5% fee)")}
+            {translate("Pass Pro (2.5% comm.) & Pass Gold (1.5% comm.)", "Pro Pass (2.5% fee) & Gold Pass (1.5% fee)")}
           </h3>
           <p className="text-xs text-slate-300 leading-relaxed">
             {translate(
-              "Passez au sérieux : Badge officiel vérifié, commission boutique ultra-réduite à 5% (Pass Certifié 5 000 F) ou 2.5% (Pass VIP Or 10 000 F), vitrine personnalisée et déblocage express des fonds.",
-              "Level up: Official verified badge, ultra-reduced shop fee to 5% (Certified Pass 5,000 F) or 2.5% (VIP Gold 10,000 F), custom storefront, and express payouts."
+              "Passez au niveau supérieur : Badges officiels vérifiés, commission ultra-réduite à 2.5% (Pass Pro 2 500 F / 30j) ou 1.5% (Pass Gold VIP 5 000 F / 30j), vitrine personnalisée et déblocage express des fonds.",
+              "Level up: Official verified badges, ultra-reduced fee to 2.5% (Pro Pass 2,500 F / 30d) or 1.5% (Gold VIP Pass 5,000 F / 30d), custom storefront, and express payouts."
             )}
           </p>
           <div className="text-[11px] text-blue-300 bg-blue-500/10 p-2.5 rounded-xl border border-blue-500/20">
-            {translate("★ Enchères : 10% fixe quel que soit le pass • Boutiques : 5% (Certifié) et 2.5% (VIP Or).", "★ Auctions: 10% fixed regardless of pass • Shops: 5% (Certified) and 2.5% (VIP Gold).")}
+            {translate("★ Pass Gratuit : 5.0% • Pass Pro : 2.5% • Pass Gold VIP : 1.5% sur toutes vos ventes.", "★ Free Pass: 5.0% • Pro Pass: 2.5% • Gold VIP Pass: 1.5% on all sales.")}
           </div>
         </div>
 
@@ -82,12 +82,12 @@ export const SecurityGuideView: React.FC = () => {
             03
           </div>
           <h3 className="text-lg font-bold text-white">
-            {translate("Pass Livreur & Courses Express (6 000 F)", "Courier Pass & Express Deliveries (6,000 F)")}
+            {translate("Pass Livreurs : Recharge 24h Chrono (2 000 F) & Pass Mensuel (5 000 F)", "Courier Passes: 24h Chrono Recharge (2,000 F) & Monthly Pass (5,000 F)")}
           </h3>
           <p className="text-xs text-slate-300 leading-relaxed">
             {translate(
-              "Tout nouveau livreur débute avec 5 courses d'essai sans frais. Au-delà, l'accès à la Bourse de Fret est conditionné au Pass Livreur (6 000 FCFA / mois) avec 0% de prélèvement sur les courses.",
-              "Every new courier starts with 5 fee-free trial deliveries. Beyond that, freight radar access is unlocked with the Courier Pass (6,000 FCFA/mo) with 0% fee on runs."
+              "Recharge 24h Chrono Livraison Express (2 000 FCFA / 24h) pour les courses directes (Point A ➔ Point B) ou Pass Mensuel Commandes BRAD'CI (5 000 FCFA / 30j) pour les colis marketplace. 0% de commission Brad'CI avec 5 courses offertes au lancement.",
+              "24h Chrono Express Delivery Recharge (2,000 FCFA / 24h) for direct Point A ➔ B runs or Monthly BRAD'CI Orders Pass (5,000 FCFA / 30d) for marketplace packages. 0% Brad'CI commission with 5 free trial runs at rollout."
             )}
           </p>
           <div className="text-[11px] text-amber-300 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">

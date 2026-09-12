@@ -23,6 +23,7 @@ import {
   AppNotification,
   OutbidAlertInfo,
   AppLanguage,
+  AppCurrency,
   AppTheme,
   MapProvider,
   ReviewRecord,
@@ -58,6 +59,7 @@ import {
   INITIAL_REFERRALS
 } from '../data/mockData';
 import { calculateHaversineDistance, findNearestCommune, getCommuneCoords, calculateDeliveryFee, calculateCommuneDistanceKm } from '../data/communes';
+import { calculateSellerCommission, getSellerCommissionPercentage, getSellerCommissionRate, getSellerPlanDetails } from '../utils/commissionEngine';
 import { getTranslation, TranslationKey } from '../utils/translations';
 import { detectFraudulentContact, detectImageFraud, BRAD_CI_TERMS } from '../utils/fraudFilter';
 import { 
@@ -102,9 +104,14 @@ interface AppContextType {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 
-  // Language, Theme, Voice, Map Provider
+  // Language, Currency, Theme, Voice, Map Provider
   language: AppLanguage;
   setLanguage: (lang: AppLanguage) => void;
+  currency: AppCurrency;
+  setCurrency: (curr: AppCurrency) => void;
+  formatCurrency: (amountFCFA: number, options?: { showOriginalFCFA?: boolean; compact?: boolean }) => string;
+  convertPrice: (amountFCFA: number) => number;
+  currencySymbol: string;
   t: (key: TranslationKey) => string;
   translate: (fr: string, en: string) => string;
   theme: AppTheme;
@@ -844,6 +851,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
   const t = (key: TranslationKey) => getTranslation(language, key);
   const translate = (fr: string, en: string) => language === 'en' ? en : fr;
+
+  // Currency State (FCFA / EUR / USD) for international users & auction tracking
+  const [currency, setCurrencyState] = useState<AppCurrency>(() => {
+    const saved = localStorage.getItem('bradci_currency');
+    if (saved === 'EUR' || saved === 'USD' || saved === 'FCFA') return saved;
+    return 'FCFA';
+  });
+
+  const setCurrency = (curr: AppCurrency) => {
+    setCurrencyState(curr);
+    localStorage.setItem('bradci_currency', curr);
+    const toastTitles: Record<AppCurrency, string> = {
+      FCFA: language === 'en' ? 'Currency: CFA Franc (FCFA)' : 'Devise : Franc CFA (FCFA)',
+      EUR: language === 'en' ? 'Currency: Euro (€)' : 'Devise : Euro (€)',
+      USD: language === 'en' ? 'Currency: US Dollar ($)' : 'Devise : Dollar Américain ($)'
+    };
+    const toastDescs: Record<AppCurrency, string> = {
+      FCFA: language === 'en' ? 'Auction bids and listings displayed in CFA Franc (XOF).' : 'Affichage des enchères et prix en Franc CFA (XOF) - Monnaie locale.',
+      EUR: language === 'en' ? 'Official fixed exchange peg: 1 € = 655.957 FCFA.' : 'Conversion officielle à parité fixe : 1 € = 655,957 FCFA.',
+      USD: language === 'en' ? 'Benchmark reference exchange rate: 1 $ ≈ 610 FCFA.' : 'Taux de référence indicatif : 1 $ ≈ 610 FCFA.'
+    };
+    addToast(toastTitles[curr], toastDescs[curr], 'info');
+  };
+
+  const formatCurrency = useCallback((amountFCFA: number, options?: { showOriginalFCFA?: boolean; compact?: boolean }): string => {
+    if (typeof amountFCFA !== 'number' || isNaN(amountFCFA)) return '0 FCFA';
+    if (currency === 'EUR') {
+      const val = amountFCFA / 655.957;
+      const formatted = val.toLocaleString(language === 'en' ? 'en-US' : 'fr-FR', {
+        minimumFractionDigits: val >= 1000 ? 0 : 2,
+        maximumFractionDigits: 2
+      }) + ' €';
+      if (options?.showOriginalFCFA) {
+        return `${formatted} (${amountFCFA.toLocaleString('fr-FR')} FCFA)`;
+      }
+      return formatted;
+    }
+    if (currency === 'USD') {
+      const val = amountFCFA / 610;
+      const formatted = '$' + val.toLocaleString('en-US', {
+        minimumFractionDigits: val >= 1000 ? 0 : 2,
+        maximumFractionDigits: 2
+      });
+      if (options?.showOriginalFCFA) {
+        return `${formatted} (${amountFCFA.toLocaleString('fr-FR')} FCFA)`;
+      }
+      return formatted;
+    }
+    // Default FCFA
+    return `${amountFCFA.toLocaleString('fr-FR')} FCFA`;
+  }, [currency, language]);
+
+  const convertPrice = useCallback((amountFCFA: number): number => {
+    if (typeof amountFCFA !== 'number' || isNaN(amountFCFA)) return 0;
+    if (currency === 'EUR') return Math.round((amountFCFA / 655.957) * 100) / 100;
+    if (currency === 'USD') return Math.round((amountFCFA / 610) * 100) / 100;
+    return amountFCFA;
+  }, [currency]);
+
+  const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : 'FCFA';
 
   const [theme, setThemeState] = useState<AppTheme>(() => {
     const saved = localStorage.getItem('bradci_theme');
@@ -1836,23 +1903,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const plan = currentUser.sellerPlan || 'basic';
     const listingType = productData.listingType || (currentUser.shop ? 'shop' : 'auction');
-    // Commission rules:
-    // - All auctions are strictly 10% commission regardless of pass/plan
-    // - Basic accounts (no subscription) are strictly 10% for both shop and auctions
-    // - Certified Pro ('standard') shop items enjoy 5% commission
-    // - VIP Gold ('pro') shop items enjoy 2.5% commission
-    let commission = 0.10;
-    if (listingType === 'shop') {
-      if (plan === 'pro') {
-        commission = 0.025; // 2.5%
-      } else if (plan === 'standard') {
-        commission = 0.05; // 5%
-      } else {
-        commission = 0.10; // 10% basic
-      }
-    } else {
-      commission = 0.10; // 10% for all auctions
-    }
+    // Commission rules selon statut Pass Vendeur:
+    // - Pass Gratuit: 5.0% (Montant * 0.05)
+    // - Pass Pro: 2.5% (Montant * 0.025) + Badge Pro
+    // - Pass Gold: 1.5% (Montant * 0.015) + Badge VIP Gold
+    const commission = getSellerCommissionRate(plan);
     const sellerCommune = productData.commune || userLocation?.commune || 'Cocody';
     const pickupCoords = productData.pickupCoords || getCommuneCoords(sellerCommune);
     const fixedPrice = productData.buyNowPrice || productData.startingPrice || 10000;
@@ -2881,7 +2936,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (remaining <= 0) {
         return {
           allowed: false,
-          reason: 'Période d\'essai terminée (5/5 courses gratuites utilisées). Vous pouvez souscrire au Pass Livreur VIP (6 000 FCFA / mois) pour continuer à accepter des livraisons.',
+          reason: 'Période d\'essai terminée (5/5 courses gratuites utilisées). Rechargez avec le Pass 24h Chrono (2 000 FCFA) ou le Pass Mensuel BRAD\'CI (5 000 FCFA) pour continuer à accepter des livraisons.',
           remaining: 0,
           isUnlimited: false
         };
@@ -2924,7 +2979,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('bradci_current_user_id', targetDriver.id);
     addToast(
       'Compte Livreur Activé',
-      `Connecté en tant que ${targetDriver.name} (${targetDriver.driverPlan === 'vip_pass' ? 'Pass VIP 6 000 F' : 'Période Essai 5 Courses'})`,
+      `Connecté en tant que ${targetDriver.name} (${targetDriver.driverPlan === 'vip_pass' ? 'Pass Mensuel BRAD\'CI 5 000 F' : (targetDriver.driverPlan === 'daily_pass' ? 'Recharge 24h Chrono 2 000 F' : 'Période Essai 5 Courses')})`,
       'info'
     );
   };
@@ -3125,13 +3180,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const sellerUser = users.find(u => u.name === job.sellerName || (job.sellerName && job.sellerName.includes(u.name)));
     const sellerPlan = sellerUser?.sellerPlan || prod?.sellerPlan || 'basic';
     
-    // Commission structure: Basic: 10%, Intermédiaire / Standard: 5%, Pro: 2.5%
-    let commissionPercent = 10;
-    if (sellerPlan === 'pro') {
-      commissionPercent = 2.5;
-    } else if (sellerPlan === 'standard' || (sellerPlan as string) === 'intermediaire') {
-      commissionPercent = 5.0;
-    }
+    // Commission structure selon statut Pass Vendeur:
+    // Pass Gratuit (0 FCFA): 5.0%, Pass Pro (2 500 FCFA): 2.5%, Pass Gold (5 000 FCFA): 1.5%
+    const commissionPercent = getSellerCommissionPercentage(sellerPlan);
 
     const productPrice = Number(job.itemValue) || 0;
     const deliveryFee = Number(job.deliveryFee) || 0;
@@ -3180,7 +3231,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDirectPaymentRecords(prev => [directRecord, ...prev]);
 
     // 2. ATOMIC SPLIT PAYMENT:
-    // - Seller: Product Price - Commission (10% Basic, 5% Intermédiaire, 2.5% Pro)
+    // - Seller: Product Price - Commission (5.0% Gratuit, 2.5% Pro, 1.5% Gold)
     // - Courier: Delivery Fee
     // - Platform: Commission + Platform fees
     setUsers(prev => prev.map(u => {
@@ -5117,12 +5168,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (plan === 'boost' && targetProductId) {
       setProducts(prev => prev.map(p => p.id === targetProductId ? { ...p, isBoosted: true } : p));
-      addToast('Boost Flash Activé !', 'Votre annonce est maintenant propulsée en tête de liste pendant 48h.', 'success');
-    } else if (plan === 'standard' || plan === 'pro') {
+      addToast('⚡ Booster Flash Activé (1 000 FCFA) !', 'Votre annonce est maintenant propulsée en tête de liste pendant 24h avec mise en vedette.', 'success');
+    } else if (plan === 'gold') {
       const updatedUser: User = {
         ...currentUser,
-        sellerPlan: plan,
-        isVIP: plan === 'pro'
+        sellerPlan: 'gold',
+        isVIP: true
+      };
+      setCurrentUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+      
+      confetti({
+        particleCount: 100,
+        spread: 85,
+        origin: { y: 0.6 }
+      });
+
+      addToast(
+        '👑 Pass Gold VIP Activé (5 000 FCFA / 30j) !',
+        'Commission minimale 1.5% + Badge VIP Gold + Priorité d\'affichage maximale + Alertes acheteurs.',
+        'success'
+      );
+    } else if (plan === 'pro') {
+      const updatedUser: User = {
+        ...currentUser,
+        sellerPlan: 'pro',
+        isVIP: false
       };
       setCurrentUser(updatedUser);
       setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
@@ -5134,31 +5205,94 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       addToast(
-        plan === 'pro' ? '👑 Pass Vendeur Or VIP Activé (10 000 FCFA) !' : '✨ Pass Vendeur Certifié Activé (5 000 FCFA) !',
-        plan === 'pro' 
-          ? 'Commission minimale à 2.5% + Badge Or VIP + Top Algorithme Abidjan + Support Dédié 7j/7.'
-          : 'Commission réduite à 5% + Badge Vendeur Certifié & Vérifié + Vitrine Boutique Pro.',
+        '💼 Pass Pro Activé (2 500 FCFA / 30j) !',
+        'Commission réduite à 2.5% + Badge Vendeur Pro vérifié + Vitrine Boutique.',
         'success'
       );
-    } else if (plan === 'vip_pass') {
+    } else if (plan === 'basic' || plan === 'standard') {
       const updatedUser: User = {
         ...currentUser,
-        driverPlan: 'vip_pass',
+        sellerPlan: plan,
+        isVIP: false
+      };
+      setCurrentUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+      addToast(
+        '✨ Pass Gratuit Activé (0 FCFA) !',
+        'Commission 5.0% par vente. Dépôt d\'annonces illimité sans frais fixes.',
+        'info'
+      );
+    } else if (plan === 'daily_pass') {
+      const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const updatedUser: User = {
+        ...currentUser,
+        driverPlan: 'daily_pass',
+        trialDeliveriesRemaining: 0,
+        isVIP: false
+      };
+      setCurrentUser(updatedUser);
+      setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
+
+      // Save driver pass in localStorage
+      try {
+        localStorage.setItem('bradci_driver_pass', JSON.stringify({
+          planId: 'driver_day',
+          planName: 'Recharge 24h Chrono - Livraison Express',
+          price: 2000,
+          activatedAt: new Date().toISOString(),
+          expiresAt: expiry,
+          paymentMethod
+        }));
+      } catch (e) {
+        // Safe fallback
+      }
+
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+
+      addToast(
+        '⚡ Recharge 24h Chrono - Livraison Express Activée (2 000 FCFA) !',
+        'Accès illimité aux courses de livraison express (Point A ➔ Point B) pendant 24h chrono. 0% de commission !',
+        'success'
+      );
+    } else if (plan === 'monthly_pass' || plan === 'vip_pass') {
+      const expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const updatedUser: User = {
+        ...currentUser,
+        driverPlan: 'monthly_pass',
         trialDeliveriesRemaining: 0,
         isVIP: true
       };
       setCurrentUser(updatedUser);
       setUsers(prev => prev.map(u => u.id === currentUser.id ? updatedUser : u));
 
+      // Save driver pass in localStorage
+      try {
+        localStorage.setItem('bradci_driver_pass', JSON.stringify({
+          planId: 'driver_month',
+          planName: 'Pass Mensuel - Commandes BRAD\'CI',
+          price: 5000,
+          activatedAt: new Date().toISOString(),
+          expiresAt: expiry,
+          paymentMethod
+        }));
+      } catch (e) {
+        // Safe fallback
+      }
+
       confetti({
-        particleCount: 100,
+        particleCount: 110,
         spread: 90,
         origin: { y: 0.6 }
       });
 
       addToast(
-        '🚀 Pass Livreur VIP Activé (6 000 FCFA) !',
-        'Bourse de fret débloquée en illimité. Plus aucune limite de courses !',
+        '🚀 Pass Mensuel - Commandes BRAD\'CI Activé (5 000 FCFA / 30j) !',
+        'Accès illimité pendant 30 jours à toutes les courses et commandes marketplace BRAD\'CI avec 0% de commission !',
         'success'
       );
     }
@@ -5759,9 +5893,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeOutbidAlert,
         dismissOutbidAlert,
 
-        // Language, Theme, Voice, Map Provider
+        // Language, Currency, Theme, Voice, Map Provider
         language,
         setLanguage,
+        currency,
+        setCurrency,
+        formatCurrency,
+        convertPrice,
+        currencySymbol,
         t,
         translate,
         theme,

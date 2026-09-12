@@ -79,6 +79,16 @@ export const AdminActivityAuditView: React.FC = () => {
     return () => clearInterval(timer);
   }, [activeCallId]);
 
+  // Sync real-time VIP call requests dispatched from user chat
+  useEffect(() => {
+    const handleNewVipCall = () => {
+      setVipCalls(auditLogger.getVipCalls());
+      setLogs(auditLogger.getLogs());
+    };
+    window.addEventListener('bradci_new_vip_call', handleNewVipCall);
+    return () => window.removeEventListener('bradci_new_vip_call', handleNewVipCall);
+  }, []);
+
   // Actions
   const handleBanIP = (ip: string, reason: string, commune?: string) => {
     if (!ip) return;
@@ -195,7 +205,7 @@ export const AdminActivityAuditView: React.FC = () => {
         <div className="p-5 rounded-3xl bg-[#0C121E] border border-slate-800 flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-400 font-bold block">
-              {translate("Demandes d'Appels 85 min", "85-min VIP Calls")}
+              {translate("Demandes d'Assistance Dédiée", "Dedicated Priority Support")}
             </span>
             <div className="text-2xl font-black text-amber-400 font-mono mt-1">
               {pendingVipCalls.length}
@@ -276,7 +286,7 @@ export const AdminActivityAuditView: React.FC = () => {
             }`}
           >
             <PhoneCall className="w-3.5 h-3.5" />
-            <span>{translate("Demandes d'Appels VIP (85 min)", "VIP Calls (85 min)")}</span>
+            <span>{translate("Assistance Prioritaire Dédiée", "Dedicated Priority Support")}</span>
             {pendingVipCalls.length > 0 && (
               <span className="text-[10px] bg-emerald-500 text-slate-950 px-1.5 py-0.2 rounded font-black">
                 {pendingVipCalls.length}
@@ -380,7 +390,7 @@ export const AdminActivityAuditView: React.FC = () => {
                 <option value="bid">{translate("Enchères & Offres", "Bidding")}</option>
                 <option value="order">{translate("Commandes", "Orders")}</option>
                 <option value="pod_payment">{translate("Paiements POD", "POD Payments")}</option>
-                <option value="vip_call_request">{translate("Demande d'Appel 85 min", "85-min Call Request")}</option>
+                <option value="vip_call_request">{translate("Assistance Prioritaire", "Priority Support Request")}</option>
                 <option value="kyc_submit">{translate("Dossiers KYC", "KYC Submissions")}</option>
                 <option value="security_alert">{translate("Alertes de Sécurité", "Security Alerts")}</option>
               </select>
@@ -584,21 +594,36 @@ export const AdminActivityAuditView: React.FC = () => {
       {subTab === 'vip_calls' && (
         <div className="space-y-4">
           
-          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <PhoneCall className="w-5 h-5 text-amber-400" />
+              <PhoneCall className="w-5 h-5 text-amber-400 shrink-0" />
               <div>
                 <h3 className="text-sm font-black text-white">
-                  {translate("Console d'Assistance Téléphonique VIP (85 min)", "VIP Phone Assistance Console (85 min)")}
+                  {translate("Console d'Assistance Prioritaire Dédiée", "Dedicated Priority Support Console")}
                 </h3>
                 <p className="text-xs text-slate-400">
                   {translate("Accompagnement continu exclusif réservé aux titulaires de Pass Vendeur et Livreur VIP.", "Continuous assistance strictly reserved for subscriber pass holders.")}
                 </p>
               </div>
             </div>
-            <span className="text-xs bg-amber-500 text-slate-950 px-2.5 py-1 rounded-xl font-black">
-              {vipCalls.length} {translate("Demandes", "Requests")}
-            </span>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+              <button
+                id="btn-admin-establish-live-call"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('bradci_start_voice_call'));
+                }}
+                className="px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center gap-1.5 transition-transform active:scale-95"
+                title={translate("Lancer l'appel vocal direct en ligne réservé aux abonnés", "Launch live in-app voice call reserved for subscribers")}
+              >
+                <Phone className="w-3.5 h-3.5" />
+                <span>{translate("Appel Vocal Direct Abonnés", "Live Subscriber Call")}</span>
+              </button>
+
+              <span className="text-xs bg-amber-500 text-slate-950 px-2.5 py-1 rounded-xl font-black shrink-0">
+                {vipCalls.length} {translate("Demandes", "Requests")}
+              </span>
+            </div>
           </div>
 
           {/* Active Call Stopwatch HUD */}
@@ -610,7 +635,7 @@ export const AdminActivityAuditView: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest block">
-                    {translate("Appel Téléphonique Senior en Cours", "Active Senior Call Session")}
+                    {translate("Session d'Assistance Prioritaire en Cours", "Active Priority Support Session")}
                   </span>
                   <p className="text-sm font-bold text-white">
                     Ticket #{activeCallId}
@@ -621,7 +646,7 @@ export const AdminActivityAuditView: React.FC = () => {
               {/* Stopwatch */}
               <div className="flex items-center gap-4">
                 <div className="text-center">
-                  <span className="text-[10px] text-slate-400 block">{translate("Temps écoulé (max 85 min) :", "Time elapsed (max 85 min):")}</span>
+                  <span className="text-[10px] text-slate-400 block">{translate("Temps écoulé :", "Time elapsed:")}</span>
                   <span className="text-2xl font-black font-mono text-amber-400">
                     {Math.floor(callStopwatchSeconds / 60)}:{String(callStopwatchSeconds % 60).padStart(2, '0')}
                   </span>
@@ -631,7 +656,7 @@ export const AdminActivityAuditView: React.FC = () => {
                   onClick={() => handleFinishVipCall(activeCallId)}
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg"
                 >
-                  {translate("Terminer & Clôturer l'Appel", "Finish & Close Call")}
+                  {translate("Terminer & Clôturer la Session", "Finish & Close Session")}
                 </button>
               </div>
             </div>
@@ -693,8 +718,8 @@ export const AdminActivityAuditView: React.FC = () => {
                     </div>
 
                     <div className="flex justify-between">
-                      <span className="text-slate-400">{translate("Durée maximale :", "Max duration:")}</span>
-                      <span className="text-white font-mono font-bold">85 minutes</span>
+                      <span className="text-slate-400">{translate("Priorité :", "Priority:")}</span>
+                      <span className="text-emerald-400 font-mono font-bold">Haute / Pass</span>
                     </div>
 
                     <div className="p-2.5 bg-slate-900 rounded-xl mt-2 text-slate-300 text-[11px]">
@@ -710,13 +735,44 @@ export const AdminActivityAuditView: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       {call.status === 'pending' && (
-                        <button
-                          onClick={() => handleStartVipCall(call)}
-                          className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl flex items-center gap-1.5 shadow-md"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>{translate("Lancer l'Appel (85 min)", "Start Call (85 min)")}</span>
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              handleStartVipCall(call);
+                              window.dispatchEvent(new CustomEvent('bradci_trigger_incoming_call', {
+                                detail: {
+                                  callId: call.id,
+                                  clientName: call.userName,
+                                  clientPhone: call.userPhone,
+                                  subject: call.subject
+                                }
+                              }));
+                            }}
+                            className="px-2.5 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 text-slate-950 text-xs font-black rounded-xl flex items-center gap-1 shadow-md transition-transform active:scale-95"
+                            title={translate("Lancer l'appel automatique vers le client", "Launch automatic callback to client")}
+                          >
+                            <PhoneCall className="w-3.5 h-3.5" />
+                            <span>{translate("Appel Vocal Direct", "Live Voice Call")}</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              handleStartVipCall(call);
+                              window.dispatchEvent(new CustomEvent('bradci_trigger_incoming_call', {
+                                detail: {
+                                  callId: call.id,
+                                  clientName: call.userName,
+                                  clientPhone: call.userPhone,
+                                  subject: call.subject
+                                }
+                              }));
+                            }}
+                            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl flex items-center gap-1"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            <span>{translate("Prendre en Charge", "Handle Request")}</span>
+                          </button>
+                        </div>
                       )}
 
                       {call.status === 'in_progress' && (
