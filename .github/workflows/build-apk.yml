@@ -13,6 +13,11 @@ jobs:
       - name: Récupération du code source
         uses: actions/checkout@v4
 
+      - name: Configuration de Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Installation de Java JDK 17
         uses: actions/setup-java@v4
         with:
@@ -25,7 +30,7 @@ jobs:
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Copier les assets web dans le projet Android
+      - name: Préparer les répertoires et assets Capacitor
         run: |
           mkdir -p android/app/src/main/assets/public
           if [ -d "assets/public" ]; then
@@ -33,6 +38,9 @@ jobs:
           fi
           if [ -f "assets/capacitor.config.json" ]; then
             cp assets/capacitor.config.json android/app/src/main/assets/
+          fi
+          if [ -f "assets/capacitor.plugins.json" ]; then
+            cp assets/capacitor.plugins.json android/app/src/main/assets/
           fi
 
       - name: Préparer les permissions AndroidManifest
@@ -42,17 +50,11 @@ jobs:
             sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST_FILE
           fi
 
-      - name: Réparer les conflits de dépendances et BouncyCastle
+      - name: Compilation ciblée du module App
         run: |
           cd android
           chmod +x ./gradlew
-          rm -rf ~/.gradle/caches/
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
-
-      - name: Compiler le projet
-        run: |
-          cd android
-          ./gradlew assembleDebug --no-daemon --refresh-dependencies
+          ./gradlew :app:assembleDebug --no-daemon
 
       - name: Téléverser l'APK généré
         uses: actions/upload-artifact@v4
