@@ -8,6 +8,12 @@ export interface AIKnowledgeResponse {
     labelEn: string;
     actionType: 'open_auth' | 'open_pricing' | 'open_kyc' | 'connect_agent' | 'filter_auctions';
   };
+  detectedIssue?: {
+    problemType: 'blocked_sale' | 'typing_error' | 'kyc_pending' | 'escrow_payment' | 'delivery_issue' | 'account_issue' | 'other';
+    problemCategoryLabel: string;
+    reassuranceFr: string;
+    reassuranceEn: string;
+  };
 }
 
 // Strictly prohibited keywords related to admin backoffice, owner data, internal DB or private credentials
@@ -157,6 +163,42 @@ export function queryBradCiKnowledge(rawQuery: string, lang: AppLanguage = 'fr',
         labelFr: "Poser ma Question",
         labelEn: "Ask my Question",
         actionType: "connect_agent"
+      }
+    };
+  }
+
+  // 3.B MANDATORY SUPPORT ESCALATION: BLOCKED SALES / TYPING ERRORS / KYC PENDING (User requested instant ticket + reassurance + admin call escalation)
+  const isBlockedSale = (query.includes('bloqu') || query.includes('bloque') || query.includes('blocage') || query.includes('ferme') || query.includes('impossible de vendre') || query.includes('enchere bloqu')) && (query.includes('vent') || query.includes('annonc') || query.includes('encher') || query.includes('produit') || query.includes('prix') || query.includes('offre'));
+  const isTypingError = query.includes('erreur de frappe') || query.includes('erreur frappe') || query.includes('trompe de numero') || query.includes('trompe de prix') || query.includes('mauvais montant') || query.includes('mauvais numero') || query.includes('faute de frappe') || query.includes('corriger mon annonce') || query.includes('rectifier montant');
+  const isKycPendingIssue = (query.includes('kyc') || query.includes('identite') || query.includes('piece') || query.includes('cni') || query.includes('passeport')) && (query.includes('attente') || query.includes('bloqu') || query.includes('refus') || query.includes('delai') || query.includes('pas valide') || query.includes('rejete') || query.includes('retard'));
+
+  if (isBlockedSale || isTypingError || isKycPendingIssue) {
+    let probType: 'blocked_sale' | 'typing_error' | 'kyc_pending' = 'blocked_sale';
+    let probLabel = 'Blocage de vente / enchère';
+    if (isTypingError) {
+      probType = 'typing_error';
+      probLabel = 'Erreur de frappe / modification requise';
+    } else if (isKycPendingIssue) {
+      probType = 'kyc_pending';
+      probLabel = 'Certification KYC en attente / bloquée';
+    }
+
+    const reassuranceTextFr = `Bonjour, je comprends parfaitement votre situation et je tiens à vous rassurer : **votre demande vient d'être transmise immédiatement et directement à notre page d'administration Back-Office** pour que notre équipe technique et de direction puisse résoudre votre problème en priorité absolue.\n\n🛡️ **Ce qui va se passer maintenant :**\n1. **Prise en charge directe** : Votre dossier (${probLabel}) est désormais ouvert sous suivi prioritaire.\n2. **Contact direct** : Nos administrateurs vont vous recontacter directement **soit par email, soit par appel téléphonique** pour confirmer la régularisation.\n3. **Appel d'assistance** : Dès que l'administration valide la résolution de votre requête, je pourrai déclencher un appel vocal d'assistance direct avec vous au sein de l'application ou sur votre ligne.\n\nSoyez serein(e), votre dossier est entre les mains de notre administration !`;
+    const reassuranceTextEn = `Hello, I understand your situation completely and want to reassure you: **your request has just been transmitted immediately and directly to our Back-Office Administration team** so our team can resolve this issue with top priority.\n\n🛡️ **Next steps:**\n1. **Direct Ticket Created**: Your dossier (${probLabel}) is officially registered under priority review.\n2. **Direct Contact**: Our administrators will reach out to you directly **either by email or via phone call** to confirm resolution.\n3. **Voice Assistance Call**: Once the administration confirms the fix, I will initiate a direct voice support call with you upon approval.\n\nRest assured, your issue is actively being addressed!`;
+
+    return {
+      category: 'troubleshooting',
+      text: isEn ? reassuranceTextEn : reassuranceTextFr,
+      suggestedAction: {
+        labelFr: "Voir l'État de ma Requête",
+        labelEn: "View Ticket Status",
+        actionType: "connect_agent"
+      },
+      detectedIssue: {
+        problemType: probType,
+        problemCategoryLabel: probLabel,
+        reassuranceFr: reassuranceTextFr,
+        reassuranceEn: reassuranceTextEn
       }
     };
   }

@@ -88,6 +88,8 @@ const AppContent: React.FC = () => {
     addToast,
     isMaintenanceMode,
     isAdminAuthenticated,
+    adminImpersonatedUserId,
+    adminStopImpersonating,
     profileAvatarModalOpen,
     setProfileAvatarModalOpen,
     updateUserAvatar,
@@ -182,6 +184,38 @@ const AppContent: React.FC = () => {
       <ErrorBoundary fallbackTitle="Navigation">
         <Navbar />
       </ErrorBoundary>
+
+      {/* 1.5 Admin Impersonation Direct Access Supervisor Banner */}
+      {adminImpersonatedUserId && (
+        <div className="bg-gradient-to-r from-red-600 via-amber-600 to-amber-500 text-white px-4 py-2.5 shadow-lg border-b border-amber-300/30 flex items-center justify-between flex-wrap gap-2 text-xs sm:text-sm font-semibold z-40 sticky top-16">
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded bg-black/50 text-amber-200 font-mono text-xs uppercase font-black tracking-wider">
+              🔑 ACCÈS DIRECT ADMIN ACTIF
+            </span>
+            <span>
+              Contrôle et supervision directe du compte de : <strong className="underline font-bold text-white">{currentUser?.name}</strong> ({currentUser?.phone})
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => adminStopImpersonating()}
+              className="px-3.5 py-1.5 bg-slate-950/80 hover:bg-black text-amber-300 hover:text-white rounded-xl font-black text-xs transition-colors flex items-center gap-1.5 shadow"
+            >
+              <span>🚪 Quitter et revenir au Back-Office Admin</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 1.6 User Theft Emergency Alert Banner if account is frozen */}
+      {currentUser?.theftFreeze && (
+        <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between gap-2 text-xs sm:text-sm font-semibold border-b border-red-700">
+          <div className="flex items-center gap-2">
+            <span className="font-black bg-black/40 px-2 py-0.5 rounded text-xs">🚨 PROCÉDURE VOL / PERTE MOBILE</span>
+            <span>Ce compte est temporairement sécurisé. Les retraits d'argent (Wave, Orange Money) sont bloqués d'urgence pour protéger les avoirs.</span>
+          </div>
+        </div>
+      )}
 
       {/* 2. Persistent Live Delivery Status Bar (Buyer, Seller & Driver Dispatch Notification) */}
       <ErrorBoundary fallbackTitle="Statut de livraison">

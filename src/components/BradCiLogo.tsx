@@ -11,6 +11,7 @@ export interface BradCiLogoProps {
   showSubtitle?: boolean;
   subtitleText?: string;
   showIcon?: boolean;
+  preferImage?: boolean;
   onClick?: () => void;
   id?: string;
 }

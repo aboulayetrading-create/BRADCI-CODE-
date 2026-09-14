@@ -807,9 +807,9 @@ class VoiceNavigatorService {
           window.speechSynthesis.resume();
         }
         // Force voices load if empty
-        if (this.cachedVoices.length === 0) {
-          const v = window.speechSynthesis.getVoices();
-          if (v && v.length > 0) this.cachedVoices = v;
+        const v = window.speechSynthesis.getVoices();
+        if (v && v.length > 0) {
+          this.cachedVoices = v;
         }
       }
     } catch {
@@ -821,27 +821,32 @@ class VoiceNavigatorService {
     try {
       const ctx = getSharedAudioContext();
       if (!ctx) return;
+      const playNotes = () => {
+        const now = ctx.currentTime;
+        const notes = [
+          { freq: 523.25, dur: 0.14 }, // C5
+          { freq: 659.25, dur: 0.14 }, // E5
+          { freq: 783.99, dur: 0.22 }  // G5
+        ];
+        notes.forEach((n, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(n.freq, now + i * 0.14);
+          gain.gain.setValueAtTime(0.24, now + i * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.005, now + i * 0.14 + n.dur);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.14);
+          osc.stop(now + i * 0.14 + n.dur);
+        });
+      };
+
       if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+        ctx.resume().then(() => playNotes()).catch(() => {});
+      } else {
+        playNotes();
       }
-      const now = ctx.currentTime;
-      const notes = [
-        { freq: 523.25, dur: 0.14 }, // C5
-        { freq: 659.25, dur: 0.14 }, // E5
-        { freq: 783.99, dur: 0.22 }  // G5
-      ];
-      notes.forEach((n, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(n.freq, now + i * 0.14);
-        gain.gain.setValueAtTime(0.24, now + i * 0.14);
-        gain.gain.exponentialRampToValueAtTime(0.005, now + i * 0.14 + n.dur);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now + i * 0.14);
-        osc.stop(now + i * 0.14 + n.dur);
-      });
     } catch {}
   }
 

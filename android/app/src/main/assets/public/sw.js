@@ -1,5 +1,5 @@
-// Service Worker officiel BRAD'CI (Web, Mobile PWA & APK) - Cache & Push Notifications v12
-const CACHE_NAME = 'bradci-v12-png-final';
+// Service Worker officiel BRAD'CI (Web, Mobile PWA & APK) - Cache & Push Notifications Adaptive Icon v14
+const CACHE_NAME = 'bradci-adaptive-icon-v14';
 const ASSETS = ['./', './index.html', './icon.png', './manifest.json'];
 
 self.addEventListener('install', (e) => {
@@ -8,7 +8,12 @@ self.addEventListener('install', (e) => {
 });
 
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => k !== CACHE_NAME && caches.delete(k)))));
+  // Purge ALL older caches immediately to force fresh icon and logo update
+  e.waitUntil(
+    caches.keys().then(keys => 
+      Promise.all(keys.map(k => k !== CACHE_NAME && caches.delete(k)))
+    )
+  );
   self.clients.claim();
 });
 
@@ -16,17 +21,30 @@ self.addEventListener('push', (e) => {
   const data = e.data ? e.data.json() : { title: "BRAD'CI", body: "Nouvelle notification !" };
   self.registration.showNotification(data.title, {
     body: data.body,
-    icon: './icon.png',
-    badge: './icon.png',
+    icon: './icon.png?v=14',
+    badge: './icon.png?v=14',
     vibrate: [200, 100, 200],
     renotify: true
   });
 });
 
-// Interception réseau et cache hors-ligne
+// Interception réseau et cache hors-ligne (Network First pour logos et icônes)
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (url.pathname.endsWith('icon.png') || url.pathname.endsWith('manifest.json') || url.pathname.endsWith('index.html') || url.pathname === '/') {
+  if (url.pathname.endsWith('icon.png') || url.pathname.endsWith('logo.png') || url.pathname.endsWith('manifest.json')) {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response && response.status === 200) {
+          const cloned = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
+        }
+        return response;
+      }).catch(() => caches.match(event.request) || caches.match('./icon.png'))
+    );
+    return;
+  }
+
+  if (url.pathname.endsWith('index.html') || url.pathname === '/') {
     event.respondWith(
       caches.match(event.request).then((cachedResponse) => {
         if (cachedResponse) {
@@ -38,7 +56,7 @@ self.addEventListener('fetch', (event) => {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned));
           }
           return response;
-        }).catch(() => caches.match('./icon.png'));
+        });
       })
     );
   }

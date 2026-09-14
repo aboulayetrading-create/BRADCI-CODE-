@@ -144,6 +144,9 @@ export interface User {
     delai_moyen_remise_livreur_minutes?: number;
     descriptions_exactes_pourcentage?: number;
   };
+  theftFreeze?: boolean;
+  theftFreezeDate?: string;
+  ipAddress?: string;
 }
 
 export type ReferralStatus = 'PENDING_KYC' | 'PENDING_TRANSACTION' | 'COMPLETED';
@@ -786,5 +789,26 @@ export interface OutbidAlertInfo {
   previousAmount?: number;
   bidderName?: string;
   timestamp: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  userId?: string;
+  userName: string;
+  userPhone: string;
+  userEmail?: string;
+  userRole?: UserRole;
+  problemType: 'blocked_sale' | 'typing_error' | 'kyc_pending' | 'escrow_payment' | 'delivery_issue' | 'account_issue' | 'other';
+  problemCategoryLabel: string;
+  clientMessage: string;
+  advisorName: string;
+  reassuranceSent: boolean;
+  contactPreference: 'call' | 'email' | 'both';
+  status: 'pending' | 'in_review' | 'resolved' | 'call_scheduled';
+  callAuthorizedByAdmin: boolean;
+  adminResolutionNotes?: string;
+  createdAt: string;
+  resolvedAt?: string;
+  callRequestedAt?: string;
 }
 

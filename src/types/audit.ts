@@ -16,7 +16,9 @@ export type ActivityActionType =
   | 'product_publish'
   | 'page_view'
   | 'security_alert'
-  | 'admin_access';
+  | 'admin_access'
+  | 'account_update'
+  | 'theft_freeze';
 
 export type ActivitySeverity = 'normal' | 'warning' | 'critical';
 

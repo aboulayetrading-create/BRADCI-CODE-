@@ -39,7 +39,8 @@ import {
   CartOrderRecord,
   DriverRechargePass,
   DirectCourierOrderInput,
-  DeliveryJobKind
+  DeliveryJobKind,
+  SupportTicket
 } from '../types';
 import { 
   createCartItemFromProduct,
@@ -56,7 +57,8 @@ import {
   INITIAL_WITHDRAWAL_REQUESTS,
   INITIAL_FINANCIAL_TRANSACTIONS,
   INITIAL_ADMIN_ALERTS,
-  INITIAL_REFERRALS
+  INITIAL_REFERRALS,
+  INITIAL_SUPPORT_TICKETS
 } from '../data/mockData';
 import { calculateHaversineDistance, findNearestCommune, getCommuneCoords, calculateDeliveryFee, calculateCommuneDistanceKm } from '../data/communes';
 import { calculateSellerCommission, getSellerCommissionPercentage, getSellerCommissionRate, getSellerPlanDetails } from '../utils/commissionEngine';
@@ -84,6 +86,7 @@ import {
   BRADCI_NOTIFICATION_CHANNEL_ID 
 } from '../utils/universalNotifications';
 import { sendOtpEmail } from '../services/resendEmailService';
+import { auditLogger } from '../utils/activityAuditLogger';
 
 interface ToastNotification {
   id: string;
@@ -251,6 +254,10 @@ interface AppContextType {
   adminCancelDeliveryJob: (jobId: string, reason: string) => void;
   markAlertAsRead: (alertId: string) => void;
   dismissAlert: (alertId: string) => void;
+  supportTickets: SupportTicket[];
+  createSupportTicket: (ticket: Omit<SupportTicket, 'id' | 'createdAt' | 'status' | 'callAuthorizedByAdmin' | 'reassuranceSent'>) => SupportTicket;
+  adminResolveSupportTicket: (ticketId: string, resolutionNotes: string) => void;
+  adminAuthorizeSupportCall: (ticketId: string) => void;
   adminExportModalOpen: boolean;
   setAdminExportModalOpen: (open: boolean) => void;
   adminSelectedMemberForModal: User | null;
@@ -389,6 +396,14 @@ interface AppContextType {
   cartInvoiceModalOrder: CartOrderRecord | null;
   setCartInvoiceModalOrder: (order: CartOrderRecord | null) => void;
   driverConfirmStopPickup: (jobId: string, stopIndex: number, enteredCode: string) => boolean;
+
+  // Admin Direct Access & Anti-Theft Investigation (Supervision Administrateur Exclusif)
+  adminImpersonatedUserId: string | null;
+  adminOriginalAdminUser: User | null;
+  adminImpersonateUser: (userId: string) => void;
+  adminStopImpersonating: () => void;
+  adminFreezeUserAccountForTheft: (userId: string, reason?: string) => boolean;
+  adminUnfreezeUserAccount: (userId: string) => boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -407,6 +422,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     // Default to Kouassi Jean (Basic Seller with 2/3 products) for immediate rich interaction
     return INITIAL_USERS[0];
+  });
+
+  const [adminImpersonatedUserId, setAdminImpersonatedUserId] = useState<string | null>(() => {
+    return sessionStorage.getItem('bradci_impersonated_user_id');
+  });
+  const [adminOriginalAdminUser, setAdminOriginalAdminUser] = useState<User | null>(() => {
+    const saved = sessionStorage.getItem('bradci_original_admin_user');
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [pendingReferralCode, setPendingReferralCode] = useState<string | null>(() => {
@@ -705,6 +728,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [adminAlerts, setAdminAlerts] = useState<AdminAlert[]>(() => {
     const saved = localStorage.getItem('bradci_admin_alerts');
     return saved ? JSON.parse(saved) : INITIAL_ADMIN_ALERTS;
+  });
+
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
+    const saved = localStorage.getItem('bradci_support_tickets');
+    return saved ? JSON.parse(saved) : INITIAL_SUPPORT_TICKETS;
   });
 
   const [sentAdminMessages, setSentAdminMessages] = useState<SentAdminMessage[]>(() => {
@@ -1609,6 +1637,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('bradci_referrals', JSON.stringify(referrals));
   }, [referrals]);
+
+  useEffect(() => {
+    localStorage.setItem('bradci_support_tickets', JSON.stringify(supportTickets));
+  }, [supportTickets]);
 
   useEffect(() => {
     if (userLocation) {
@@ -5384,11 +5416,191 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAdminAuthenticated(false);
     sessionStorage.removeItem('bradci_admin_auth');
     localStorage.removeItem('bradci_admin_auth');
+    sessionStorage.removeItem('bradci_impersonated_user_id');
+    sessionStorage.removeItem('bradci_original_admin_user');
+    setAdminImpersonatedUserId(null);
+    setAdminOriginalAdminUser(null);
     // Switch to first standard client or visitor
     const fallbackUser = users.find(u => u.role === 'client') || users[0] || null;
     setCurrentUser(fallbackUser);
     setActiveTab('explore');
     addToast('Session Admin Verrouillée', 'Vous êtes retourné à l\'espace public sécurisé.', 'info');
+  };
+
+  const adminImpersonateUser = (userId: string) => {
+    if (!isAdminAuthenticated && currentUser?.role !== 'admin') {
+      addToast('Accès Refusé', 'Seul un administrateur authentifié peut accéder directement au compte.', 'error');
+      return;
+    }
+    const target = users.find(u => u.id === userId);
+    if (!target) {
+      addToast('Utilisateur Introuvable', 'Le compte sélectionné n\'existe pas.', 'error');
+      return;
+    }
+
+    // Save current admin user so we can cleanly revert
+    const originalAdmin = currentUser?.role === 'admin' ? currentUser : users.find(u => u.role === 'admin') || currentUser;
+    setAdminOriginalAdminUser(originalAdmin);
+    if (originalAdmin) {
+      sessionStorage.setItem('bradci_original_admin_user', JSON.stringify(originalAdmin));
+    }
+    setAdminImpersonatedUserId(target.id);
+    sessionStorage.setItem('bradci_impersonated_user_id', target.id);
+
+    // Switch active user
+    setCurrentUser(target);
+    if (target.gpsLocation) {
+      setUserLocation(target.gpsLocation);
+    }
+
+    // Direct redirection to the appropriate user interface
+    if (target.role === 'driver') {
+      setActiveTab('dashboard_driver');
+    } else {
+      setActiveTab('dashboard_client');
+    }
+
+    // Audit log
+    auditLogger.logActivity({
+      userId: target.id,
+      userName: target.name,
+      userPhone: target.phone,
+      userEmail: target.email,
+      userRole: target.role,
+      actionType: 'account_update',
+      actionTitle: 'Accès Direct Administrateur',
+      description: `🔑 ACCÈS DIRECT ADMINISTRATEUR : Prise de contrôle et supervision directe du compte par l'administrateur (${originalAdmin?.name || 'Admin Master'}).`,
+      severity: 'warning'
+    });
+
+    addToast(
+      '🔑 Accès Direct Administrateur Activé',
+      `Vous supervisez actuellement le compte de ${target.name} (${target.phone}). La bannière supérieure vous permet de revenir au Back-Office à tout moment.`,
+      'warning'
+    );
+  };
+
+  const adminStopImpersonating = () => {
+    setAdminImpersonatedUserId(null);
+    sessionStorage.removeItem('bradci_impersonated_user_id');
+
+    const originalAdmin = adminOriginalAdminUser || users.find(u => u.role === 'admin') || {
+      id: 'user-admin',
+      name: 'Direction Sécurité Brad\'CI',
+      email: 'securite.admin@bradci.com',
+      phone: '+225 27 22 44 88 00',
+      role: 'admin',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+      productsPublishedCount: 0,
+      kycStatus: 'verified',
+      walletBalance: 2450000,
+      isVIP: true,
+      rating: 5.0,
+      reviewCount: 999
+    };
+
+    setCurrentUser(originalAdmin);
+    setIsAdminAuthenticated(true);
+    setActiveTab('dashboard_admin');
+
+    addToast(
+      'Session Directe Clôturée',
+      'Vous êtes de retour dans le Back-Office Administrateur sécurisé.',
+      'info'
+    );
+  };
+
+  const adminFreezeUserAccountForTheft = (userId: string, reason?: string): boolean => {
+    const target = users.find(u => u.id === userId);
+    if (!target) return false;
+
+    const freezeReason = reason || 'Compte verrouillé d\'urgence par la Direction Sécurité suite à un signalement de vol de téléphone ou piratage.';
+
+    setUsers(prev => prev.map(u => u.id === userId ? {
+      ...u,
+      isSuspended: true,
+      suspensionReason: freezeReason,
+      theftFreeze: true,
+      theftFreezeDate: new Date().toISOString()
+    } : u));
+
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        isSuspended: true,
+        suspensionReason: freezeReason,
+        theftFreeze: true,
+        theftFreezeDate: new Date().toISOString()
+      } : null);
+    }
+
+    // Create high-severity Admin Alert
+    const newAlert: AdminAlert = {
+      id: 'alert-theft-' + Date.now(),
+      type: 'fraud_incident',
+      title: `🚨 PROCÉDURE VOL ACTIVÉE : Compte ${target.name} Verrouillé`,
+      message: `Le compte de ${target.name} (${target.phone}) a été gelé d'urgence. Tous les retraits Wave/Orange Money sont bloqués et les séquestres d'achats/ventes sont sécurisés. Motif : ${freezeReason}`,
+      channel: 'system',
+      targetAdminPhone: '+225 07 89 96 15 80',
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      metadata: {
+        userId: target.id,
+        phone: target.phone
+      }
+    };
+    setAdminAlerts(prev => [newAlert, ...prev]);
+
+    auditLogger.logActivity({
+      userId: target.id,
+      userName: target.name,
+      userPhone: target.phone,
+      userEmail: target.email,
+      userRole: target.role,
+      actionType: 'account_update',
+      actionTitle: 'Procédure Antivol Déclenchée',
+      description: `🚨 PROCÉDURE ANTIVOL DÉCLENCHÉE : Gel total des fonds, blocage des retraits Wave/Orange Money et suspension des sessions pour le compte ${target.name} (${target.phone}).`,
+      severity: 'critical'
+    });
+
+    addToast(
+      '🚨 Compte Gelé Procédure Antivol',
+      `Le compte de ${target.name} (${target.phone}) a été gelé avec succès. Tous les retraits et accès sont neutralisés pour protéger les fonds.`,
+      'warning'
+    );
+
+    return true;
+  };
+
+  const adminUnfreezeUserAccount = (userId: string): boolean => {
+    const target = users.find(u => u.id === userId);
+    if (!target) return false;
+
+    setUsers(prev => prev.map(u => u.id === userId ? {
+      ...u,
+      isSuspended: false,
+      suspensionReason: undefined,
+      theftFreeze: false,
+      theftFreezeDate: undefined
+    } : u));
+
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => prev ? {
+        ...prev,
+        isSuspended: false,
+        suspensionReason: undefined,
+        theftFreeze: false,
+        theftFreezeDate: undefined
+      } : null);
+    }
+
+    addToast(
+      '✅ Compte Dégelé & Réhabilité',
+      `Le compte de ${target.name} (${target.phone}) a été réactivé. Les opérations normales sont rétablies.`,
+      'success'
+    );
+
+    return true;
   };
 
   const toggleMaintenanceMode = (enabled?: boolean, notice?: string) => {
@@ -5695,6 +5907,118 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAdminAlerts(prev => prev.filter(a => a.id !== alertId));
   };
 
+  const createSupportTicket = (ticketInput: Omit<SupportTicket, 'id' | 'createdAt' | 'status' | 'callAuthorizedByAdmin' | 'reassuranceSent'>): SupportTicket => {
+    const ticketId = 'tkt-' + Date.now();
+    const newTicket: SupportTicket = {
+      ...ticketInput,
+      id: ticketId,
+      status: 'pending',
+      callAuthorizedByAdmin: false,
+      reassuranceSent: true,
+      createdAt: new Date().toISOString()
+    };
+
+    setSupportTickets(prev => [newTicket, ...prev]);
+
+    // Create high-visibility AdminAlert
+    const adminAlert: AdminAlert = {
+      id: 'alert-ticket-' + Date.now(),
+      type: 'fraud_incident',
+      title: `🚨 Requête Client : ${newTicket.problemCategoryLabel}`,
+      message: `${newTicket.userName} (${newTicket.userPhone}) a signalé un problème : "${newTicket.clientMessage.slice(0, 100)}...". Transmis par ${newTicket.advisorName}. Contact prévu par mail ou appel.`,
+      channel: 'system',
+      targetAdminPhone: '+225 07 89 96 15 80',
+      timestamp: new Date().toISOString(),
+      isRead: false,
+      metadata: {
+        userId: newTicket.userId,
+        phone: newTicket.userPhone
+      }
+    };
+    setAdminAlerts(prev => [adminAlert, ...prev]);
+
+    addToast(
+      'Requête transmise à l\'administration',
+      'Votre demande a été transmise immédiatement. Vous serez recontacté par mail ou appel.',
+      'info'
+    );
+
+    return newTicket;
+  };
+
+  const adminResolveSupportTicket = (ticketId: string, resolutionNotes: string) => {
+    const tkt = supportTickets.find(t => t.id === ticketId);
+    if (!tkt) return;
+
+    setSupportTickets(prev => prev.map(t => t.id === ticketId ? {
+      ...t,
+      status: 'resolved',
+      adminResolutionNotes: resolutionNotes,
+      resolvedAt: new Date().toISOString()
+    } : t));
+
+    // Send in-app notification to the client
+    if (tkt.userId) {
+      addNotification({
+        recipientRole: 'all',
+        recipientUserId: tkt.userId,
+        type: 'system',
+        title: '✅ Requête Support Résolue par l\'Administration',
+        message: `Votre demande concernant "${tkt.problemCategoryLabel}" a été traitée avec succès : ${resolutionNotes}. Notre équipe reste à votre écoute.`,
+        urgency: 'high'
+      });
+    }
+
+    addToast(
+      'Requête Résolue',
+      `Le dossier de ${tkt.userName} a été marqué comme résolu.`,
+      'success'
+    );
+  };
+
+  const adminAuthorizeSupportCall = (ticketId: string) => {
+    const tkt = supportTickets.find(t => t.id === ticketId);
+    if (!tkt) return;
+
+    setSupportTickets(prev => prev.map(t => t.id === ticketId ? {
+      ...t,
+      callAuthorizedByAdmin: true,
+      status: 'call_scheduled',
+      callRequestedAt: new Date().toISOString()
+    } : t));
+
+    // Send push notification / in-app notification to user that call is approved & incoming
+    if (tkt.userId) {
+      addNotification({
+        recipientRole: 'all',
+        recipientUserId: tkt.userId,
+        type: 'system',
+        title: '📞 Appel Support Client Autorisé & En Cours',
+        message: `L'administration a validé votre demande d'appel suite à la résolution de votre requête "${tkt.problemCategoryLabel}". ${tkt.advisorName} va vous contacter directement dans l'application ou au ${tkt.userPhone}.`,
+        urgency: 'critical'
+      });
+    }
+
+    // Trigger local storage event so AIChatSupport immediately triggers the incoming call to the client
+    try {
+      localStorage.setItem('bradci_admin_authorized_call', JSON.stringify({
+        ticketId: tkt.id,
+        clientName: tkt.userName,
+        clientPhone: tkt.userPhone,
+        advisorName: tkt.advisorName,
+        subject: tkt.problemCategoryLabel,
+        authorizedAt: Date.now()
+      }));
+      window.dispatchEvent(new Event('storage'));
+    } catch {}
+
+    addToast(
+      'Appel Client Autorisé !',
+      `L'autorisation d'appel pour ${tkt.userName} a été transmise à l'assistante ${tkt.advisorName}. L'appel démarre.`,
+      'success'
+    );
+  };
+
   const exportFinancialsExcel = (timeFilter: TimeFilter) => {
     const now = new Date().toISOString().split('T')[0];
     let csvContent = '\uFEFF'; // UTF-8 BOM for Excel
@@ -5865,6 +6189,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         adminCancelDeliveryJob,
         markAlertAsRead,
         dismissAlert,
+        supportTickets,
+        createSupportTicket,
+        adminResolveSupportTicket,
+        adminAuthorizeSupportCall,
         adminExportModalOpen,
         setAdminExportModalOpen,
         adminSelectedMemberForModal,
@@ -6035,7 +6363,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         driverPass,
         rechargeDriverPass,
         decrementFreeCourierCourse,
-        setDriverPassTestingState
+        setDriverPassTestingState,
+
+        // Admin Direct Access & Anti-Theft Protection
+        adminImpersonatedUserId,
+        adminOriginalAdminUser,
+        adminImpersonateUser,
+        adminStopImpersonating,
+        adminFreezeUserAccountForTheft,
+        adminUnfreezeUserAccount
       }}
     >
       {children}

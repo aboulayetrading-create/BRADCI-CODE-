@@ -778,9 +778,16 @@ export const ProductDetailModal: React.FC = () => {
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono-num font-black text-white">
-                              {b.amount.toLocaleString('fr-FR')} F
-                            </span>
+                            <div className="text-right">
+                              <span className="font-mono-num font-black text-white block">
+                                {currency === 'FCFA' ? `${b.amount.toLocaleString('fr-FR')} F` : formatCurrency(b.amount)}
+                              </span>
+                              {currency !== 'FCFA' && (
+                                <span className="text-[10px] text-slate-400 font-mono block">
+                                  {b.amount.toLocaleString('fr-FR')} FCFA
+                                </span>
+                              )}
+                            </div>
                             {isSeller && prod.status === 'active' && (
                               <button
                                 type="button"

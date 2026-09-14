@@ -117,6 +117,86 @@ export const CNIVectorDrawing: React.FC<{ className?: string; isGood?: boolean }
   );
 };
 
+export const PassportVectorDrawing: React.FC<{ className?: string; isGood?: boolean }> = ({ 
+  className = "w-full h-40",
+  isGood = true 
+}) => {
+  return (
+    <svg 
+      viewBox="0 0 320 200" 
+      className={className}
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <linearGradient id="passCover" x1="0" y1="0" x2="320" y2="200" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#022c22" />
+          <stop offset="1" stopColor="#064e3b" />
+        </linearGradient>
+        <linearGradient id="passPage" x1="20" y1="20" x2="300" y2="180" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FFFDF7" />
+          <stop offset="1" stopColor="#F5EFEB" />
+        </linearGradient>
+      </defs>
+
+      {/* Dark background canvas */}
+      <rect width="320" height="200" rx="16" fill="#0B111E" />
+
+      {/* Passport Book Spread */}
+      <g filter="drop-shadow(0px 8px 16px rgba(0,0,0,0.4))">
+        <rect x="30" y="24" width="260" height="152" rx="8" fill="url(#passPage)" stroke="#CBD5E1" strokeWidth="1.5" />
+        {/* Center fold spine */}
+        <line x1="160" y1="24" x2="160" y2="176" stroke="#D1D5DB" strokeWidth="1.5" strokeDasharray="3 3" />
+      </g>
+
+      {/* Left Page (Official emblem / notes) */}
+      <circle cx="95" cy="70" r="18" fill="#0284C7" fillOpacity="0.1" stroke="#0284C7" strokeWidth="1" />
+      <text x="95" y="73" fill="#0369A1" fontSize="8" fontWeight="bold" textAnchor="middle">CEDEAO</text>
+      <rect x="52" y="100" width="86" height="3" rx="1.5" fill="#64748B" />
+      <rect x="58" y="107" width="74" height="3" rx="1.5" fill="#94A3B8" />
+      <rect x="55" y="114" width="80" height="3" rx="1.5" fill="#94A3B8" />
+
+      {/* Right Page (Photo + Identity Details) */}
+      <rect x="175" y="32" width="105" height="14" rx="3" fill="#065F46" fillOpacity="0.15" />
+      <text x="180" y="42" fill="#047857" fontSize="7" fontWeight="900">PASSEPORT • PASSPORT</text>
+
+      {/* Photo on Right Page */}
+      <rect x="175" y="52" width="42" height="54" rx="4" fill="#1E293B" stroke="#94A3B8" strokeWidth="1" />
+      <circle cx="196" cy="72" r="10" fill="#94A3B8" />
+      <path d="M182 102C182 90 188 87 196 87C204 87 210 90 210 102H182Z" fill="#94A3B8" />
+
+      {/* Identity lines next to photo */}
+      <rect x="224" y="56" width="55" height="4" rx="2" fill="#0F172A" />
+      <rect x="224" y="64" width="48" height="3" rx="1.5" fill="#64748B" />
+      <rect x="224" y="71" width="52" height="3" rx="1.5" fill="#64748B" />
+      <rect x="224" y="78" width="40" height="3" rx="1.5" fill="#64748B" />
+      <rect x="224" y="86" width="35" height="3" rx="1.5" fill="#0284C7" />
+
+      {/* MRZ Lines (Bottom of Right Page) */}
+      <rect x="172" y="114" width="112" height="24" rx="3" fill="#0F172A" fillOpacity="0.08" />
+      <text x="176" y="123" fill="#1E293B" fontSize="5.5" fontFamily="monospace" fontWeight="bold">
+        P&lt;CIVKOUASSI&lt;&lt;JEAN&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;
+      </text>
+      <text x="176" y="132" fill="#1E293B" fontSize="5.5" fontFamily="monospace" fontWeight="bold">
+        2109847123CIV8409121M2809156
+      </text>
+
+      {/* 4 Corner viewfinders */}
+      <g stroke="#10B981" strokeWidth="3" strokeLinecap="round">
+        <path d="M22 36V18H40" />
+        <path d="M298 36V18H280" />
+        <path d="M22 164V182H40" />
+        <path d="M298 164V182H280" />
+
+        <rect x="80" y="6" width="160" height="18" rx="9" fill="#10B981" />
+        <text x="160" y="18" fill="#022C22" fontSize="9" fontWeight="900" textAnchor="middle" letterSpacing="0.5">
+          ✓ PAGE PHOTO ENTIÈRE &amp; LISIBLE
+        </text>
+      </g>
+    </svg>
+  );
+};
+
 export const SelfieVectorDrawing: React.FC<{ className?: string; isGood?: boolean }> = ({ 
   className = "w-full h-40",
   isGood = true 
@@ -496,6 +576,34 @@ export const KYC_DRAWING_DATA_URIS = {
       </g>
       <rect x="110" y="6" width="180" height="22" rx="11" fill="#10B981"/>
       <text x="200" y="21" fill="#022C22" font-size="10" font-weight="900" text-anchor="middle">EXEMPLE CONFORME ✓</text>
+    </svg>
+  `)}`,
+
+  passport: `data:image/svg+xml;utf8,${encodeURIComponent(`
+    <svg viewBox="0 0 400 250" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="250" rx="16" fill="#0F172A"/>
+      <rect x="25" y="25" width="350" height="200" rx="10" fill="#FFFDF7" stroke="#94A3B8" stroke-width="2"/>
+      <line x1="200" y1="25" x2="200" y2="225" stroke="#CBD5E1" stroke-width="2" stroke-dasharray="4 4"/>
+      <circle cx="110" cy="80" r="22" fill="#0284C7" fill-opacity="0.1" stroke="#0284C7" stroke-width="1.5"/>
+      <text x="110" y="85" fill="#0369A1" font-size="10" font-weight="bold" text-anchor="middle">CEDEAO</text>
+      <rect x="50" y="120" width="120" height="4" rx="2" fill="#64748B"/>
+      <rect x="60" y="130" width="100" height="4" rx="2" fill="#94A3B8"/>
+      <rect x="220" y="40" width="140" height="18" rx="4" fill="#065F46" fill-opacity="0.15"/>
+      <text x="226" y="53" fill="#047857" font-size="9" font-weight="900">PASSEPORT • PASSPORT</text>
+      <rect x="220" y="66" width="56" height="70" rx="5" fill="#1E293B"/>
+      <circle cx="248" cy="92" r="13" fill="#94A3B8"/>
+      <path d="M230 130C230 115 238 111 248 111C258 111 266 115 266 130H230Z" fill="#94A3B8"/>
+      <rect x="285" y="70" width="70" height="5" rx="2.5" fill="#0F172A"/>
+      <rect x="285" y="80" width="60" height="4" rx="2" fill="#64748B"/>
+      <rect x="285" y="90" width="65" height="4" rx="2" fill="#64748B"/>
+      <rect x="216" y="148" width="150" height="34" rx="4" fill="#0F172A" fill-opacity="0.08"/>
+      <text x="220" y="162" fill="#1E293B" font-size="7" font-family="monospace" font-weight="bold">P&lt;CIVKOUASSI&lt;&lt;JEAN&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</text>
+      <text x="220" y="174" fill="#1E293B" font-size="7" font-family="monospace" font-weight="bold">2109847123CIV8409121M2809156</text>
+      <g stroke="#10B981" stroke-width="4" stroke-linecap="round">
+        <path d="M20 44V20H44M380 44V20H356M20 206V230H44M380 206V230H356"/>
+      </g>
+      <rect x="100" y="6" width="200" height="22" rx="11" fill="#10B981"/>
+      <text x="200" y="21" fill="#022C22" font-size="10" font-weight="900" text-anchor="middle">PASSEPORT CONFORME ✓</text>
     </svg>
   `)}`,
 

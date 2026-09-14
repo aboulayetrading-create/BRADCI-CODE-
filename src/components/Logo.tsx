@@ -8,6 +8,7 @@ export interface LogoProps {
   showSubtitle?: boolean;
   subtitleText?: string;
   showIcon?: boolean;
+  preferImage?: boolean;
   onClick?: () => void;
   id?: string;
 }
@@ -42,8 +43,6 @@ export const LogoIcon: React.FC<{
   const shieldStrokeGrad = `shield_stroke_grad_${uid}`;
   const orangeSpeedGrad = `orange_speed_grad_${uid}`;
   const blueSpeedGrad = `blue_speed_grad_${uid}`;
-  const dropShadow = `shield_glow_${uid}`;
-  const badgeGlow = `badge_glow_${uid}`;
 
   if (preferImage && !imgFailed) {
     return (
@@ -51,13 +50,17 @@ export const LogoIcon: React.FC<{
         id={id}
         src={BRADCI_OFFICIAL_LOGO_DATA_URI || "/logo.png?v=14"} 
         alt="BRAD'CI Logo" 
-        className={`select-none shrink-0 object-contain rounded-xl ${className}`}
+        className={`select-none shrink-0 object-contain rounded-xl drop-shadow-sm ${className}`}
         style={size ? { width: size, height: size } : undefined}
         onError={(e) => { 
           const target = e.currentTarget as HTMLImageElement;
-          const currentSrc = target.getAttribute('src');
-          if (currentSrc !== BRADCI_OFFICIAL_LOGO_DATA_URI) {
+          const currentSrc: string = target.getAttribute('src') || '';
+          if (currentSrc !== BRADCI_OFFICIAL_LOGO_DATA_URI && BRADCI_OFFICIAL_LOGO_DATA_URI) {
             target.src = BRADCI_OFFICIAL_LOGO_DATA_URI;
+          } else if (!currentSrc.includes('logo.png')) {
+            target.src = "/logo.png?v=14";
+          } else if (!currentSrc.includes('icon.png')) {
+            target.src = "/icon.png?v=14";
           } else {
             setImgFailed(true);
           }
@@ -112,16 +115,6 @@ export const LogoIcon: React.FC<{
           <stop offset="60%" stopColor="#38BDF8" stopOpacity="0.95" />
           <stop offset="100%" stopColor="#60A5FA" />
         </linearGradient>
-
-        {/* Soft Shield Glow Filter */}
-        <filter id={dropShadow} x="0" y="0" width="220" height="220" filterUnits="userSpaceOnUse">
-          <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#1D4ED8" floodOpacity="0.45" />
-        </filter>
-
-        {/* Green Badge Glow */}
-        <filter id={badgeGlow} x="120" y="45" width="45" height="45" filterUnits="userSpaceOnUse">
-          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#10B981" floodOpacity="0.6" />
-        </filter>
       </defs>
 
       {/* ================= 1. SPEED LINES (LEFT OF SHIELD) ================= */}
@@ -138,7 +131,7 @@ export const LogoIcon: React.FC<{
       <rect x="42" y="111" width="22" height="6.5" rx="3.25" fill="#0284C7" />
 
       {/* ================= 2. THE BLUE SECURITY SHIELD ================= */}
-      <g filter={`url(#${dropShadow})`}>
+      <g>
         {/* Left Facet of Shield */}
         <path 
           d="M106 20 L58 39 V98 C58 135 86 160 106 172 V20 Z" 
@@ -234,7 +227,7 @@ export const LogoIcon: React.FC<{
         </g>
 
         {/* ================= 4. GREEN VERIFIED CHECKMARK BADGE ================= */}
-        <g id="verified-badge" filter={`url(#${badgeGlow})`}>
+        <g id="verified-badge">
           <circle cx="139" cy="65" r="9.5" fill="#10B981" stroke="#FFFFFF" strokeWidth="1.6" />
           {/* Thick White Checkmark */}
           <path 
@@ -264,6 +257,7 @@ export const Logo: React.FC<LogoProps> = ({
   variant = 'horizontal',
   showSubtitle = true,
   showIcon = true,
+  preferImage = false,
   subtitleText = "ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS",
   onClick,
   id = "bradci-logo"
@@ -312,7 +306,7 @@ export const Logo: React.FC<LogoProps> = ({
         onClick={onClick}
         className={`inline-flex items-center justify-center shrink-0 ${onClick ? 'cursor-pointer hover:scale-105 transition-transform' : ''} ${className}`}
       >
-        <LogoIcon className={selectedSize.icon} />
+        <LogoIcon className={selectedSize.icon} preferImage={preferImage} />
       </div>
     );
   }
@@ -328,7 +322,7 @@ export const Logo: React.FC<LogoProps> = ({
         {/* Emblem with subtle hover/breath effect */}
         {showIcon && (
           <div className="relative mb-2 transition-transform duration-300 hover:scale-105">
-            <LogoIcon className={selectedSize.icon} />
+            <LogoIcon className={selectedSize.icon} preferImage={preferImage} />
           </div>
         )}
 
@@ -361,7 +355,7 @@ export const Logo: React.FC<LogoProps> = ({
       {/* Shield Emblem */}
       {showIcon && (
         <div className="shrink-0 transition-transform duration-200 group-hover:scale-105">
-          <LogoIcon className={selectedSize.icon} />
+          <LogoIcon className={selectedSize.icon} preferImage={preferImage} />
         </div>
       )}
 
@@ -376,7 +370,7 @@ export const Logo: React.FC<LogoProps> = ({
         </div>
 
         {showSubtitle && (
-          <p className={`hidden lg:block mt-0.5 uppercase font-extrabold text-slate-300 ${selectedSize.subtitle} opacity-90 whitespace-nowrap leading-none`}>
+          <p className={`hidden 2xl:block mt-0.5 uppercase font-extrabold text-slate-300 ${selectedSize.subtitle} opacity-90 whitespace-nowrap leading-none`}>
             {subtitleText}
           </p>
         )}

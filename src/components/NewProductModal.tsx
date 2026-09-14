@@ -1036,7 +1036,7 @@ export const NewProductModal: React.FC = () => {
 
               {/* Active Camera Viewfinder for Product Photos */}
               {isCameraActive && (
-                <div className="rounded-2xl overflow-hidden border-2 border-amber-500 bg-black relative aspect-video flex items-center justify-center animate-in zoom-in-95">
+                <div className="rounded-2xl overflow-hidden border-2 border-amber-500 bg-black relative aspect-[4/3] max-h-[380px] w-full max-w-md mx-auto flex items-center justify-center animate-in zoom-in-95">
                   <video 
                     ref={videoStreamRef} 
                     autoPlay 
@@ -1084,7 +1084,7 @@ export const NewProductModal: React.FC = () => {
                   return (
                     <div 
                       key={slotIdx}
-                      className={`aspect-video rounded-xl border relative overflow-hidden flex items-center justify-center transition-all ${
+                      className={`aspect-[4/3] rounded-xl border relative overflow-hidden flex items-center justify-center transition-all ${
                         img 
                           ? 'border-slate-700 bg-slate-950' 
                           : 'border-dashed border-slate-800 bg-slate-950/40'

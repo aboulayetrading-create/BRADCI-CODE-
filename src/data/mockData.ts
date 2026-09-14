@@ -1943,4 +1943,41 @@ export const INITIAL_ADMIN_ALERTS: AdminAlert[] = [
   }
 ];
 
+export const INITIAL_SUPPORT_TICKETS = [
+  {
+    id: 'tkt-001',
+    userId: 'user-kouassi',
+    userName: 'Kouassi Jean-Marc',
+    userPhone: '+225 07 48 92 11 34',
+    userEmail: 'jm.kouassi@gmail.com',
+    userRole: 'client' as const,
+    problemType: 'blocked_sale' as const,
+    problemCategoryLabel: 'Blocage de vente aux enchères',
+    clientMessage: "Bonjour, mon annonce iPhone 15 semble bloquée lors de la validation des 5 offres. L'enchère ne se clôture pas et l'acheteur attend.",
+    advisorName: 'Awa',
+    reassuranceSent: true,
+    contactPreference: 'both' as const,
+    status: 'pending' as const,
+    callAuthorizedByAdmin: false,
+    createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString()
+  },
+  {
+    id: 'tkt-002',
+    userId: 'user-awa',
+    userName: 'Awa Diabaté',
+    userPhone: '+225 05 99 82 44 10',
+    userEmail: 'contact.diabate@prestige.ci',
+    userRole: 'client' as const,
+    problemType: 'kyc_pending' as const,
+    problemCategoryLabel: 'Certification KYC en attente',
+    clientMessage: "Mes pièces CNI ont été envoyées hier soir mais mon statut reste 'en attente de certification'. Mes retraits sont différés.",
+    advisorName: 'Sarah',
+    reassuranceSent: true,
+    contactPreference: 'call' as const,
+    status: 'pending' as const,
+    callAuthorizedByAdmin: false,
+    createdAt: new Date(Date.now() - 120 * 60 * 1000).toISOString()
+  }
+];
+
 

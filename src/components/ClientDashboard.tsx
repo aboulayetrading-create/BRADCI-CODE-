@@ -45,6 +45,7 @@ import {
   Moon,
   Laptop,
   Globe,
+  Coins,
   Volume2,
   VolumeX,
   Mic,
@@ -104,6 +105,8 @@ export const ClientDashboard: React.FC = () => {
     toggleTheme,
     language,
     setLanguage,
+    currency,
+    setCurrency,
     voiceEnabled,
     toggleVoice,
     readCurrentScreenAloud,
@@ -2286,7 +2289,7 @@ export const ClientDashboard: React.FC = () => {
                     <img
                       src={currentUser.kycPhotoUrl}
                       alt="KYC Document"
-                      className="w-full h-24 object-cover rounded-xl border border-slate-800 bg-slate-950"
+                      className="w-full h-28 object-contain rounded-xl border border-slate-800 bg-slate-950 p-1"
                     />
                   </div>
                 )}
@@ -2296,7 +2299,7 @@ export const ClientDashboard: React.FC = () => {
                     <img
                       src={currentUser.kycSelfieUrl}
                       alt="KYC Selfie"
-                      className="w-full h-24 object-cover rounded-xl border border-slate-800 bg-slate-950"
+                      className="w-full h-28 object-contain rounded-xl border border-slate-800 bg-slate-950 p-1"
                     />
                   </div>
                 )}
@@ -2306,7 +2309,7 @@ export const ClientDashboard: React.FC = () => {
                     <img
                       src={currentUser.kycDriverLicenseUrl}
                       alt="Driver License"
-                      className="w-full h-24 object-cover rounded-xl border border-slate-800 bg-slate-950"
+                      className="w-full h-28 object-contain rounded-xl border border-slate-800 bg-slate-950 p-1"
                     />
                   </div>
                 )}
@@ -2615,6 +2618,52 @@ export const ClientDashboard: React.FC = () => {
               <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
                 <span>{translate("Zone Horaire :", "Timezone:")}</span>
                 <span className="font-mono text-slate-300 font-semibold">GMT (Heure d'Abidjan)</span>
+              </div>
+
+              {/* Devise d'affichage (FCFA, EUR, USD) */}
+              <div className="pt-3 border-t border-slate-800/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Coins className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold text-white">
+                      {translate("Devise d'affichage", "Display Currency")}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-amber-400">
+                    {currency}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {translate(
+                    "Choisissez la devise pour l'estimation des montants. Les soldes de retrait et le panier restent en FCFA.",
+                    "Select currency for estimation. Wallet balances and cart remain anchored in FCFA."
+                  )}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['FCFA', 'EUR', 'USD'] as const).map((curr) => (
+                    <button
+                      key={curr}
+                      id={`btn-settings-currency-${curr.toLowerCase()}`}
+                      type="button"
+                      onClick={() => {
+                        setCurrency(curr);
+                        addToast(
+                          translate("Devise modifiée", "Currency updated"),
+                          translate(`Devise active : ${curr}`, `Active currency: ${curr}`),
+                          "success"
+                        );
+                      }}
+                      className={`p-2.5 rounded-xl border text-center transition-all flex items-center justify-center gap-1.5 font-mono text-xs font-bold cursor-pointer ${
+                        currency === curr
+                          ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-md ring-1 ring-amber-500/40'
+                          : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                      }`}
+                    >
+                      <span>{curr === 'FCFA' ? '🇨🇮' : curr === 'EUR' ? '🇪🇺' : '🇺🇸'}</span>
+                      <span>{curr}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

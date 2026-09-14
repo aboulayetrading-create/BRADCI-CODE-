@@ -37,21 +37,25 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Configure Capacitor & Add Native Plugins
+      - name: Configure Capacitor & Generate BRAD'CI Official App Icons
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/assets @capacitor/geolocation @capacitor/camera --legacy-peer-deps
           npx cap init "BRAD'CI" "com.bradci.app" --web-dir dist || true
-          rm -rf android
-          npx cap add android
           
-          # Vérification de l'emplacement de l'icône (assets/icon.png ou icon.png à la racine)
-          if [ -f "assets/icon.png" ]; then
-            npx capassets generate --android || true
-          elif [ -f "icon.png" ]; then
-            mkdir -p assets
-            cp icon.png assets/icon.png
-            npx capassets generate --android || true
+          # Initialize android platform if missing
+          if [ ! -d "android" ]; then
+            npx cap add android
           fi
+          
+          # Prepare official icon in assets directory
+          mkdir -p assets
+          if [ -f "icon.png" ]; then
+            cp icon.png assets/icon.png
+            cp icon.png assets/icon-only.png
+          fi
+          
+          # Generate all Android launcher icons & splash screens from BRAD'CI icon
+          npx @capacitor/assets generate --android || npx capacitor-assets generate --android || true
 
           npx cap sync android
 

@@ -36,6 +36,7 @@ import { queryBradCiKnowledge, AIKnowledgeResponse } from '../utils/aiKnowledgeE
 import { voiceNavigator, playSuccessChime, createPhoneRingtoneController } from '../utils/voiceNavigator';
 import { AFRICAN_SUPPORT_ADVISORS, SupportAdvisor } from '../data/africanAdvisors';
 import { auditLogger } from '../utils/activityAuditLogger';
+import { assistantArchive } from '../utils/assistantRecordingArchive';
 
 export const SUPPORT_ADVISORS: SupportAdvisor[] = AFRICAN_SUPPORT_ADVISORS;
 export type { SupportAdvisor };
@@ -97,7 +98,9 @@ export const AIChatSupport: React.FC = () => {
     setKycModalOpen, 
     language, 
     translate,
-    currentUser
+    currentUser,
+    createSupportTicket,
+    supportTickets
   } = useApp();
 
   // Primary UI state
@@ -215,6 +218,7 @@ export const AIChatSupport: React.FC = () => {
   // Timestamps for tracking inactivity
   const lastUserActivityRef = useRef<number>(Date.now());
   const lastAdvisorMsgTimeRef = useRef<number>(Date.now());
+  const typingTimeoutRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const callRecognitionRef = useRef<any>(null);
@@ -243,6 +247,14 @@ export const AIChatSupport: React.FC = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isOpen, isTyping, isVoiceCallActive]);
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ==========================================
   // COUNTDOWN INTERVAL FOR 10-MINUTE CALL REQUEST
@@ -336,7 +348,7 @@ export const AIChatSupport: React.FC = () => {
     }
   };
 
-  // Listen to incoming call events dispatched by admin console
+  // Listen to incoming call events dispatched by admin console or authorized tickets
   useEffect(() => {
     const handleAdminTriggerCall = (e: any) => {
       const detail = e.detail || {};
@@ -345,15 +357,48 @@ export const AIChatSupport: React.FC = () => {
       triggerIncomingCall({
         advisor: picked,
         callId: detail.callId || `VIP-CALL-${Date.now()}`,
-        clientName: detail.clientName || currentUser?.name || 'Abonné VIP',
+        clientName: detail.clientName || currentUser?.name || 'Client',
         clientPhone: detail.clientPhone || currentUser?.phone || '',
-        subject: detail.subject || 'Assistance prioritaire sous 10 minutes'
+        subject: detail.subject || 'Assistance prioritaire suite à résolution administrateur'
       });
     };
 
+    const checkAdminAuthorizedCall = () => {
+      try {
+        const raw = localStorage.getItem('bradci_admin_authorized_call');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && (!currentUser?.phone || parsed.clientPhone === currentUser?.phone || parsed.clientName === currentUser?.name)) {
+            // Find advisor or current
+            const advisor = SUPPORT_ADVISORS.find(a => a.name === parsed.advisorName) || currentAdvisor;
+            // Clear storage so it doesn't re-trigger
+            localStorage.removeItem('bradci_admin_authorized_call');
+            setIsOpen(true); // Open support assistant automatically
+            triggerIncomingCall({
+              advisor,
+              callId: parsed.ticketId || `TKT-CALL-${Date.now()}`,
+              clientName: parsed.clientName || currentUser?.name || 'Client',
+              clientPhone: parsed.clientPhone || currentUser?.phone || '',
+              subject: parsed.subject || 'Requête résolue par l\'Administration'
+            });
+          }
+        }
+      } catch {}
+    };
+
+    // Check immediately and on storage change
+    checkAdminAuthorizedCall();
+
     window.addEventListener('bradci_trigger_incoming_call', handleAdminTriggerCall);
-    return () => window.removeEventListener('bradci_trigger_incoming_call', handleAdminTriggerCall);
-  }, [currentUser]);
+    window.addEventListener('storage', checkAdminAuthorizedCall);
+    const interval = setInterval(checkAdminAuthorizedCall, 3000);
+
+    return () => {
+      window.removeEventListener('bradci_trigger_incoming_call', handleAdminTriggerCall);
+      window.removeEventListener('storage', checkAdminAuthorizedCall);
+      clearInterval(interval);
+    };
+  }, [currentUser, currentAdvisor]);
 
   // Cleanup ringtone if component unmounts
   useEffect(() => {
@@ -585,6 +630,9 @@ export const AIChatSupport: React.FC = () => {
 
   // Read message out loud with advisor's voice
   const handleSpeakText = (messageId: string, text: string) => {
+    // Proactively unlock audio context for Android WebViews & mobile browsers
+    voiceNavigator.unlockAudio();
+
     if (isSpeaking && speakingMessageId === messageId) {
       voiceNavigator.stop();
       setIsSpeaking(false);
@@ -792,6 +840,25 @@ export const AIChatSupport: React.FC = () => {
     setInputText('');
     setIsTyping(true);
 
+    // Automatic Archive Recording for Admin Security & Fraud Audit
+    try {
+      assistantArchive.logChatMessage({
+        userId: currentUser?.id || `anon-${Date.now().toString().slice(-4)}`,
+        userName: currentUser?.name || 'Visiteur En Ligne',
+        userPhone: currentUser?.phone || 'Non renseigné',
+        userEmail: currentUser?.email,
+        userRole: currentUser?.role || 'client',
+        advisorName: currentAdvisor.name,
+        advisorRole: language === 'en' ? currentAdvisor.roleEn : currentAdvisor.roleFr,
+        sender: 'user',
+        text: userMsg.text,
+        commune: currentUser?.city || 'Cocody',
+        attachmentName: attachedFile?.name
+      });
+    } catch (e) {
+      console.warn('[AssistantArchive] User message log error', e);
+    }
+
     let finalReplyText = '';
     let category: AIKnowledgeResponse['category'] = 'general';
     let suggestedAction: AIKnowledgeResponse['suggestedAction'] | undefined = undefined;
@@ -799,6 +866,8 @@ export const AIChatSupport: React.FC = () => {
     const promptToSend = attachedFile 
       ? `${query ? query + '\n\n' : ''}[Le client a transmis une pièce jointe : "${attachedFile.name}" (${attachedFile.type}, ${formatFileSize(attachedFile.size)})]`
       : query;
+
+    let detectedIssueData: any = null;
 
     try {
       const res = await fetch('/api/chat/assistant', {
@@ -823,6 +892,7 @@ export const AIChatSupport: React.FC = () => {
           finalReplyText = data.reply;
           category = data.source === 'security_filter' ? 'security_blocked' : (data.category || 'general');
           suggestedAction = data.suggestedAction;
+          detectedIssueData = data.detectedIssue;
         }
       }
     } catch {
@@ -834,6 +904,44 @@ export const AIChatSupport: React.FC = () => {
       finalReplyText = localResponse.text;
       category = localResponse.category;
       suggestedAction = localResponse.suggestedAction;
+      detectedIssueData = localResponse.detectedIssue;
+    }
+
+    // Check if query itself has problem characteristics even if AI replied via Gemini
+    const queryNorm = (query || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const isBlocked = (queryNorm.includes('bloqu') || queryNorm.includes('blocage') || queryNorm.includes('ferme') || queryNorm.includes('impossible de')) && (queryNorm.includes('vent') || queryNorm.includes('annonc') || queryNorm.includes('encher') || queryNorm.includes('produit') || queryNorm.includes('prix') || queryNorm.includes('offre'));
+    const isTypoError = queryNorm.includes('erreur de frappe') || queryNorm.includes('erreur frappe') || queryNorm.includes('trompe de numero') || queryNorm.includes('trompe de prix') || queryNorm.includes('mauvais montant') || queryNorm.includes('rectifier') || queryNorm.includes('corriger');
+    const isKyc = (queryNorm.includes('kyc') || queryNorm.includes('identite') || queryNorm.includes('piece') || queryNorm.includes('cni')) && (queryNorm.includes('attente') || queryNorm.includes('bloqu') || queryNorm.includes('refus') || queryNorm.includes('delai') || queryNorm.includes('retard'));
+    const isProblem = isBlocked || isTypoError || isKyc || Boolean(detectedIssueData);
+
+    if (isProblem && createSupportTicket) {
+      let problemType: 'blocked_sale' | 'typing_error' | 'kyc_pending' | 'other' = 'other';
+      let problemCategoryLabel = 'Problème technique / administratif';
+
+      if (isBlocked || detectedIssueData?.problemType === 'blocked_sale') {
+        problemType = 'blocked_sale';
+        problemCategoryLabel = 'Blocage de vente aux enchères';
+      } else if (isTypoError || detectedIssueData?.problemType === 'typing_error') {
+        problemType = 'typing_error';
+        problemCategoryLabel = 'Erreur de frappe / modification requise';
+      } else if (isKyc || detectedIssueData?.problemType === 'kyc_pending') {
+        problemType = 'kyc_pending';
+        problemCategoryLabel = 'Certification KYC en attente';
+      }
+
+      // Automatically dispatch ticket to Admin Back-Office
+      createSupportTicket({
+        userId: currentUser?.id || `user-anon-${Date.now().toString().slice(-4)}`,
+        userName: currentUser?.name || 'Client',
+        userPhone: currentUser?.phone || '+225 07 00 00 00 00',
+        userEmail: currentUser?.email || 'client@plateforme.ci',
+        userRole: currentUser?.role || 'client',
+        problemType,
+        problemCategoryLabel,
+        clientMessage: query || 'Signalement transmis via chat d\'assistance',
+        advisorName: currentAdvisor.name,
+        contactPreference: 'both'
+      });
     }
 
     // Acknowledge attachment if present and not already acknowledged
@@ -844,28 +952,64 @@ export const AIChatSupport: React.FC = () => {
       finalReplyText = fileAck + finalReplyText;
     }
 
-    setIsTyping(false);
-    lastAdvisorMsgTimeRef.current = Date.now();
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
 
-    const botMsgId = `b-${Date.now()}`;
-    const botReply: ChatMessage = {
-      id: botMsgId,
-      sender: 'bot',
-      advisorName: currentAdvisor.name,
-      text: finalReplyText,
-      timestamp: new Date().toLocaleTimeString(isEn ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      category,
-      suggestedAction
+    const sendStartTime = Date.now();
+    // User requested realistic 30 seconds to 1 minute response delay (30000ms - 45000ms)
+    const targetDelayMs = 30000 + Math.floor(Math.random() * 15000);
+
+    const deliverBotResponse = () => {
+      setIsTyping(false);
+      lastAdvisorMsgTimeRef.current = Date.now();
+
+      const botMsgId = `b-${Date.now()}`;
+      const botReply: ChatMessage = {
+        id: botMsgId,
+        sender: 'bot',
+        advisorName: currentAdvisor.name,
+        text: finalReplyText,
+        timestamp: new Date().toLocaleTimeString(isEn ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        category,
+        suggestedAction
+      };
+
+      setMessages(prev => [...prev, botReply]);
+
+      // Automatic Assistant Reply Archiving for Admin Supervision
+      try {
+        assistantArchive.logChatMessage({
+          userId: currentUser?.id || `anon-${Date.now().toString().slice(-4)}`,
+          userName: currentUser?.name || 'Visiteur En Ligne',
+          userPhone: currentUser?.phone || 'Non renseigné',
+          userEmail: currentUser?.email,
+          userRole: currentUser?.role || 'client',
+          advisorName: currentAdvisor.name,
+          advisorRole: language === 'en' ? currentAdvisor.roleEn : currentAdvisor.roleFr,
+          sender: 'assistant',
+          text: botReply.text,
+          commune: currentUser?.city || 'Cocody',
+          detectedIssue: category !== 'general' ? category : undefined
+        });
+      } catch (e) {
+        console.warn('[AssistantArchive] Bot reply log error', e);
+      }
+
+      // Auto-Voice readout if enabled
+      if (autoVoice) {
+        setTimeout(() => {
+          handleSpeakText(botMsgId, finalReplyText);
+        }, 150);
+      }
     };
 
-    setMessages(prev => [...prev, botReply]);
+    const elapsedMs = Date.now() - sendStartTime;
+    const remainingDelay = Math.max(0, targetDelayMs - elapsedMs);
 
-    // Auto-Voice readout if enabled
-    if (autoVoice) {
-      setTimeout(() => {
-        handleSpeakText(botMsgId, finalReplyText);
-      }, 150);
-    }
+    typingTimeoutRef.current = setTimeout(() => {
+      deliverBotResponse();
+    }, remainingDelay);
   };
 
   // ==========================================
@@ -971,6 +1115,31 @@ export const AIChatSupport: React.FC = () => {
 
     setIsVoiceCallActive(false);
     setCallPhase('idle');
+
+    // Automatic Call Recording & Network Audit Archiving for Admin
+    try {
+      assistantArchive.recordCompletedCall({
+        userId: currentUser?.id || `anon-${Date.now().toString().slice(-4)}`,
+        userName: currentUser?.name || incomingCall?.clientName || callFormName || 'Client Appel Vocal',
+        userPhone: currentUser?.phone || incomingCall?.clientPhone || callFormPhone || '+225 07 00 00 00 00',
+        userEmail: currentUser?.email,
+        userRole: currentUser?.role || 'client',
+        advisorName: callActiveAdvisor.fullName,
+        advisorRole: language === 'en' ? callActiveAdvisor.roleEn : callActiveAdvisor.roleFr,
+        callType: pendingCallRequest ? 'vip_call' : 'direct_voice_assistant',
+        durationSeconds: Math.max(1, callStopwatchSeconds),
+        subject: incomingCall?.subject || (callMessagesLog.length > 0 ? callMessagesLog[0].text.slice(0, 50) : 'Assistance Vocale Personnalisée'),
+        transcript: callMessagesLog.map(m => ({
+          speaker: m.sender === 'user' ? 'client' : 'advisor',
+          speakerName: m.sender === 'user' ? (currentUser?.name || 'Client') : callActiveAdvisor.fullName,
+          text: m.text,
+          timestamp: m.time
+        })),
+        commune: currentUser?.city || 'Cocody'
+      });
+    } catch (e) {
+      console.warn('[AssistantArchive] Call record error', e);
+    }
 
     const recapMsg: ChatMessage = {
       id: `call-recap-${Date.now()}`,

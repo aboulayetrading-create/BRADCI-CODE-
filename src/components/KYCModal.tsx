@@ -33,6 +33,7 @@ import { KYCDemoGuideModal } from './KYCDemoGuideModal';
 import { verifyFacialBiometrics, BiometricCheckResult } from '../utils/biometricVerification';
 import { 
   CNIVectorDrawing, 
+  PassportVectorDrawing,
   SelfieVectorDrawing, 
   SelfieWithCardVectorDrawing, 
   DriverLicenseVectorDrawing, 
@@ -175,6 +176,102 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
 
   if (!isOpen) return null;
 
+  // Check if current step requires live camera biometric capture (no gallery upload)
+  const isSelfieStep = (!isDriver && (currentStep === 2 || currentStep === 3)) || (isDriver && currentStep === 2);
+
+  // Dynamic format configuration tailored to each step's physical framing
+  const getStepFormatConfig = () => {
+    // 1. Direct Biometric Selfie (Step 2)
+    if (currentStep === 2) {
+      return {
+        type: 'selfie_simple' as const,
+        containerAspectClass: 'aspect-[3/4] min-h-[380px] max-h-[460px] max-w-sm',
+        previewAspectClass: 'aspect-[3/4] max-h-[420px] max-w-sm',
+        formatBadge: 'Format Portrait (3:4)',
+        facingMode: 'user' as const,
+        guideTitle: translate("Centrez votre visage dans l'ovale", "Center your face in the oval"),
+        guideSubtitle: translate("Regardez droit devant vous • Sans lunettes de soleil ni casquette", "Look straight ahead • No sunglasses or hat")
+      };
+    }
+
+    // 2. Selfie holding ID Card (Step 3 for Non-Driver)
+    if (!isDriver && currentStep === 3) {
+      return {
+        type: 'selfie_with_id' as const,
+        containerAspectClass: 'aspect-[3/4] min-h-[400px] max-h-[480px] max-w-md',
+        previewAspectClass: 'aspect-[3/4] max-h-[440px] max-w-md',
+        formatBadge: 'Format Pose Visage + Carte (3:4)',
+        facingMode: 'user' as const,
+        guideTitle: translate("Visage + Pièce d'identité visibles", "Face + ID card visible"),
+        guideSubtitle: translate("Tenez la pièce sous le menton sans masquer vos yeux ni votre bouche", "Hold card under chin without covering eyes or mouth")
+      };
+    }
+
+    // 3. Driver's License (Step 3 for Driver)
+    if (isDriver && currentStep === 3) {
+      return {
+        type: 'driver_license' as const,
+        containerAspectClass: 'aspect-[16/10] sm:aspect-[1.58/1] min-h-[250px] max-h-[340px] max-w-lg',
+        previewAspectClass: 'aspect-[16/10] sm:aspect-[1.58/1] max-h-[300px] max-w-lg',
+        formatBadge: 'Format Permis Recto (16:10)',
+        facingMode: 'environment' as const,
+        guideTitle: translate("Cadrez le permis de conduire", "Frame driver's license"),
+        guideSubtitle: translate("4 coins visibles, mentions des catégories A/B/C bien nettes", "4 corners visible, categories A/B/C sharp")
+      };
+    }
+
+    // 4. Vehicle Registration / Carte Grise & Plate (Step 4 for Driver)
+    if (isDriver && currentStep === 4) {
+      return {
+        type: 'vehicle_reg' as const,
+        containerAspectClass: 'aspect-[4/3] min-h-[260px] max-h-[340px] max-w-lg',
+        previewAspectClass: 'aspect-[4/3] max-h-[300px] max-w-lg',
+        formatBadge: 'Format Carte Grise & Engin (4:3)',
+        facingMode: 'environment' as const,
+        guideTitle: translate("Cadrez la carte grise ou la plaque", "Frame registration or plate"),
+        guideSubtitle: translate("Matricule et mentions d'identification lisibles", "Plate number and details readable")
+      };
+    }
+
+    // 5. Official ID: Passport (Step 1)
+    if (docType === 'passeport') {
+      return {
+        type: 'passport' as const,
+        containerAspectClass: 'aspect-[4/3] min-h-[260px] max-h-[340px] max-w-lg',
+        previewAspectClass: 'aspect-[4/3] max-h-[300px] max-w-lg',
+        formatBadge: 'Format Passeport (4:3)',
+        facingMode: 'environment' as const,
+        guideTitle: translate("Cadrez la double page photo du passeport", "Frame passport photo page"),
+        guideSubtitle: translate("Lignes MRZ du bas et photo bien nettes, sans reflets", "Bottom MRZ lines and photo sharp, no glare")
+      };
+    }
+
+    // Default: CNI / Attestation ONECI / Carte Consulaire (Step 1)
+    return {
+      type: 'id_card' as const,
+      containerAspectClass: 'aspect-[16/10] sm:aspect-[1.58/1] min-h-[250px] max-h-[340px] max-w-lg',
+      previewAspectClass: 'aspect-[16/10] sm:aspect-[1.58/1] max-h-[300px] max-w-lg',
+      formatBadge: 'Format Carte CNI (16:10)',
+      facingMode: 'environment' as const,
+      guideTitle: translate("Cadrez les 4 coins de la pièce d'identité", "Frame all 4 corners of ID card"),
+      guideSubtitle: translate("Posez la pièce à plat sur une surface unie, sans reflets", "Lay card flat on solid surface without glare")
+    };
+  };
+
+  // Stop camera and set appropriate facing mode when step changes
+  useEffect(() => {
+    stopCamera();
+    const config = getStepFormatConfig();
+    setFacingMode(config.facingMode);
+  }, [currentStep, isDriver, docType]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
   // Stop Camera Stream
   const stopCamera = () => {
     if (streamRef.current) {
@@ -191,20 +288,24 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     startCamera(nextMode);
   };
 
-  // Start Camera Stream
+  // Start Camera Stream with optimized aspect ratio constraints
   const startCamera = async (overrideFacingMode?: 'user' | 'environment') => {
     setCameraError(null);
     stopCamera();
 
-    const targetMode = overrideFacingMode || facingMode;
+    const config = getStepFormatConfig();
+    const targetMode = overrideFacingMode || facingMode || config.facingMode;
+    setFacingMode(targetMode);
+
+    const isSelfie = isSelfieStep;
 
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             facingMode: targetMode, 
-            width: { ideal: 1280 }, 
-            height: { ideal: 720 } 
+            width: isSelfie ? { ideal: 720, max: 1080 } : { ideal: 1280, max: 1920 }, 
+            height: isSelfie ? { ideal: 960, max: 1440 } : { ideal: 720, max: 1080 } 
           },
           audio: false
         });
@@ -227,23 +328,29 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     } catch (err) {
       console.warn("getUserMedia error:", err);
       setCameraError(translate(
-        "Accès caméra refusé. Utilisez l'importation de fichier ou le guide démo.",
-        "Camera access denied. Please use file upload or demo guide."
+        "Accès caméra refusé. Vérifiez les autorisations de caméra dans votre navigateur.",
+        "Camera access denied. Please check camera permissions in your browser."
       ));
     }
   };
 
-  // Capture frame from video to canvas
+  // Capture frame from video to canvas with mirror and proper dimensions
   const capturePhoto = () => {
     if (!videoRef.current) return;
     try {
+      const video = videoRef.current;
       const canvas = document.createElement('canvas');
-      canvas.width = videoRef.current.videoWidth || 640;
-      canvas.height = videoRef.current.videoHeight || 480;
+      canvas.width = video.videoWidth || 720;
+      canvas.height = video.videoHeight || 960;
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        // If front camera, mirror image on canvas so captured photo matches the live viewfinder preview
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
         assignPhotoForCurrentStep(dataUrl);
         stopCamera();
         addToast(
@@ -258,8 +365,21 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     }
   };
 
-  // Check if current step requires live camera biometric capture (no gallery upload)
-  const isSelfieStep = (!isDriver && (currentStep === 2 || currentStep === 3)) || (isDriver && currentStep === 2);
+  const clearCurrentStepPhoto = () => {
+    if (!isDriver) {
+      if (currentStep === 1) setDocPhoto('');
+      else if (currentStep === 2) setSelfiePhoto('');
+      else if (currentStep === 3) setSelfieWithIdPhoto('');
+    } else {
+      if (currentStep === 1) setDocPhoto('');
+      else if (currentStep === 2) setSelfiePhoto('');
+      else if (currentStep === 3) {
+        setDriverLicensePhoto('');
+        setDriverLicenseVersoPhoto('');
+      }
+      else if (currentStep === 4) setVehicleRegPhoto('');
+    }
+  };
 
   // Handle manual file selection (only permitted for official documents, not for live selfies)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -419,6 +539,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
   ];
 
   const currentPhoto = getCurrentStepPhoto();
+  const formatConfig = getStepFormatConfig();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
@@ -515,7 +636,11 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
           </div>
 
           <div className="rounded-xl overflow-hidden bg-slate-900 border border-slate-800 p-1 flex items-center justify-center">
-            {currentStep === 1 && <CNIVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
+            {currentStep === 1 && (
+              docType === 'passeport'
+                ? <PassportVectorDrawing className="w-full max-w-sm h-32" isGood={true} />
+                : <CNIVectorDrawing className="w-full max-w-sm h-32" isGood={true} />
+            )}
             {!isDriver && currentStep === 2 && <SelfieVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
             {!isDriver && currentStep === 3 && <SelfieWithCardVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
             {isDriver && currentStep === 2 && <SelfieVectorDrawing className="w-full max-w-sm h-32" isGood={true} />}
@@ -845,48 +970,166 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
           />
 
           {isCameraActive ? (
-            <div className="relative rounded-2xl overflow-hidden bg-black aspect-video flex items-center justify-center border-2 border-emerald-500 shadow-xl">
+            <div className={`relative rounded-2xl overflow-hidden bg-black ${formatConfig.containerAspectClass} mx-auto flex items-center justify-center border-2 border-emerald-500 shadow-2xl transition-all duration-300`}>
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
                 className="w-full h-full object-cover"
+                style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
               />
 
-              {/* Viewfinder Target Framing */}
-              <div className="absolute inset-0 m-4 rounded-xl border-2 border-dashed border-emerald-400/80 pointer-events-none flex items-center justify-center bg-emerald-500/5">
-                <span className="text-[10px] text-white font-bold bg-black/70 px-2.5 py-0.5 rounded-full">
-                  {(!isDriver && (currentStep === 2 || currentStep === 3)) || (isDriver && currentStep === 2)
-                    ? translate("Cadrez votre visage", "Center your face") 
-                    : translate("Cadrez le document", "Center the document")}
-                </span>
-              </div>
+              {/* Viewfinder Target Framing Guides tailored to each step's format */}
+              {formatConfig.type === 'selfie_simple' && (
+                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-3">
+                  {/* Oval Biometric Target for Human Face */}
+                  <div className="relative w-48 h-64 sm:w-56 sm:h-72 rounded-[50%] border-2 border-dashed border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.35)] flex flex-col items-center justify-center">
+                    {/* Head watermark */}
+                    <div className="w-16 h-24 rounded-[50%] border border-emerald-400/20 opacity-30 mb-2" />
+                    <div className="w-28 h-10 rounded-t-full border-t border-emerald-400/20 opacity-30" />
+
+                    {/* Eye Level Guide Line */}
+                    <div className="absolute top-[40%] inset-x-4 flex items-center justify-between pointer-events-none">
+                      <div className="w-5 h-0.5 bg-emerald-400/80 rounded" />
+                      <span className="text-[8px] sm:text-[9px] font-mono text-emerald-300 font-bold bg-slate-950/85 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        {translate("Niveau des yeux", "Eye level")}
+                      </span>
+                      <div className="w-5 h-0.5 bg-emerald-400/80 rounded" />
+                    </div>
+
+                    {/* Crosshair marks */}
+                    <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-1.5 h-3.5 bg-emerald-400 rounded-full" />
+                    <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-3.5 bg-emerald-400 rounded-full" />
+                    <div className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3.5 h-1.5 bg-emerald-400 rounded-full" />
+                    <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3.5 h-1.5 bg-emerald-400 rounded-full" />
+                  </div>
+
+                  {/* Top Guide Pill */}
+                  <div className="absolute top-2.5 inset-x-3 flex justify-center">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white bg-slate-950/90 backdrop-blur border border-emerald-500/40 px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{formatConfig.guideTitle}</span>
+                    </span>
+                  </div>
+
+                  {/* Bottom Subtitle */}
+                  <div className="absolute bottom-16 inset-x-3 flex justify-center">
+                    <span className="text-[9px] sm:text-[10px] text-slate-200 bg-black/85 px-3 py-1 rounded-lg backdrop-blur text-center border border-white/10 max-w-xs">
+                      {formatConfig.guideSubtitle}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {formatConfig.type === 'selfie_with_id' && (
+                <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3">
+                  {/* Top Guide Pill */}
+                  <div className="flex justify-center mt-1">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white bg-slate-950/90 backdrop-blur border border-emerald-500/40 px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{formatConfig.guideTitle}</span>
+                    </span>
+                  </div>
+
+                  {/* Dual Framing Targets: Face Oval on left + ID Card on right */}
+                  <div className="relative flex-1 flex items-center justify-around px-2 my-1">
+                    {/* Face Target */}
+                    <div className="w-32 h-44 sm:w-36 sm:h-48 rounded-[50%] border-2 border-dashed border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.3)] bg-emerald-500/5 flex flex-col items-center justify-center relative">
+                      <User className="w-7 h-7 text-emerald-400/40 mb-1" />
+                      <span className="text-[9px] font-extrabold text-emerald-300 bg-slate-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                        {translate("Visage", "Face")}
+                      </span>
+                    </div>
+
+                    {/* Card Target */}
+                    <div className="w-36 h-24 sm:w-44 sm:h-28 rounded-xl border-2 border-dashed border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)] bg-amber-500/10 flex flex-col items-center justify-center relative p-1.5">
+                      <FileText className="w-4 h-4 text-amber-400/60 mb-0.5" />
+                      <span className="text-[8px] font-extrabold text-amber-300 bg-slate-950/90 px-2 py-0.5 rounded-full border border-amber-500/40 text-center">
+                        {translate("Pièce d'Identité", "ID Card")}
+                      </span>
+                      <span className="text-[7px] text-amber-200/80 mt-0.5 font-medium">
+                        {translate("Au niveau du menton", "Under chin level")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Subtitle */}
+                  <div className="flex justify-center mb-16">
+                    <span className="text-[9px] sm:text-[10px] text-slate-200 bg-slate-950/90 px-3 py-1 rounded-full border border-slate-700 text-center shadow-md max-w-xs">
+                      {formatConfig.guideSubtitle}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {(formatConfig.type === 'id_card' || formatConfig.type === 'passport' || formatConfig.type === 'driver_license' || formatConfig.type === 'vehicle_reg') && (
+                <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-4">
+                  {/* Top Guide Pill */}
+                  <div className="flex justify-center">
+                    <span className="text-[10px] sm:text-[11px] font-bold text-white bg-slate-950/90 backdrop-blur border border-emerald-500/40 px-3.5 py-1 rounded-full shadow-lg flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{formatConfig.guideTitle}</span>
+                    </span>
+                  </div>
+
+                  {/* Document Card Outline with 4 Corner L-Brackets */}
+                  <div className="relative mx-auto w-[92%] h-[74%] rounded-2xl border-2 border-dashed border-emerald-400/80 bg-emerald-500/5 flex items-center justify-between p-3">
+                    {/* 4 Corner L brackets */}
+                    <div className="absolute -top-1.5 -left-1.5 w-5 h-5 sm:w-6 sm:h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-xl shadow-sm" />
+                    <div className="absolute -top-1.5 -right-1.5 w-5 h-5 sm:w-6 sm:h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-xl shadow-sm" />
+                    <div className="absolute -bottom-1.5 -left-1.5 w-5 h-5 sm:w-6 sm:h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-xl shadow-sm" />
+                    <div className="absolute -bottom-1.5 -right-1.5 w-5 h-5 sm:w-6 sm:h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-xl shadow-sm" />
+
+                    {/* Photo area guide */}
+                    <div className="w-16 h-20 sm:w-20 sm:h-24 rounded-lg border border-emerald-400/30 bg-emerald-400/10 flex flex-col items-center justify-center shrink-0">
+                      <User className="w-5 h-5 text-emerald-400/40" />
+                      <span className="text-[7px] text-emerald-300 font-bold uppercase mt-1">Photo</span>
+                    </div>
+
+                    <div className="flex-1 ml-3 space-y-2">
+                      <div className="w-3/4 h-2 bg-emerald-400/30 rounded" />
+                      <div className="w-1/2 h-2 bg-emerald-400/20 rounded" />
+                      <div className="w-2/3 h-2 bg-emerald-400/20 rounded" />
+                    </div>
+                  </div>
+
+                  {/* Bottom Subtitle */}
+                  <div className="flex justify-center mb-14">
+                    <span className="text-[9px] sm:text-[10px] text-slate-200 bg-black/85 px-3 py-1 rounded-lg backdrop-blur text-center border border-white/10 max-w-xs">
+                      {formatConfig.guideSubtitle}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Controls bar inside camera view */}
-              <div className="absolute bottom-3 inset-x-3 flex items-center justify-between">
+              <div className="absolute bottom-3 inset-x-3 flex items-center justify-between z-10">
                 <button
                   type="button"
                   onClick={toggleFacingMode}
-                  className="p-2 rounded-xl bg-black/60 text-slate-200 border border-white/20 hover:bg-black/80 transition-colors"
+                  className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-950/85 text-slate-200 border border-white/20 hover:bg-black transition-all flex items-center gap-1.5 shadow-lg active:scale-95"
                   title="Changer de caméra"
                 >
-                  <RotateCw className="w-4 h-4" />
+                  <RotateCw className="w-4 h-4 text-emerald-400" />
+                  <span className="text-[10px] font-bold hidden sm:inline">
+                    {facingMode === 'user' ? translate("Caméra Arrière", "Rear Camera") : translate("Mode Selfie", "Selfie Mode")}
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={capturePhoto}
-                  className="px-5 py-2 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg transition-transform hover:scale-105 flex items-center gap-1.5"
+                  className="px-5 py-2 sm:px-6 sm:py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-xl transition-transform hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer"
                 >
                   <Camera className="w-4 h-4" />
-                  <span>{translate("Capturer", "Capture")}</span>
+                  <span>{translate("Prendre la Photo", "Capture Photo")}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={stopCamera}
-                  className="p-2 rounded-xl bg-black/60 text-rose-400 border border-white/20 hover:bg-black/80 transition-colors"
+                  className="p-2 rounded-xl bg-slate-950/85 text-rose-400 border border-white/20 hover:bg-black transition-all shadow-lg active:scale-95"
                   title="Fermer la caméra"
                 >
                   <X className="w-4 h-4" />
@@ -896,31 +1139,60 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
           ) : (
             <div>
               {currentPhoto ? (
-                <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-emerald-500/50 p-2 text-center space-y-2">
+                <div className={`relative rounded-2xl overflow-hidden bg-slate-950 border-2 border-emerald-500/60 shadow-xl ${formatConfig.previewAspectClass} mx-auto flex flex-col items-center justify-center p-2 text-center group`}>
                   <img
                     src={currentPhoto}
                     alt={`Étape ${currentStep}`}
                     referrerPolicy="no-referrer"
-                    className="w-full h-44 object-cover rounded-xl"
+                    className="w-full h-full object-contain rounded-xl bg-slate-950"
                   />
-                  <div className="flex items-center justify-center gap-1 text-xs text-emerald-400 font-bold">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>{translate("Photo Prête & Conforme", "Photo Ready & Compliant")}</span>
+
+                  {/* Top Badge Overlay */}
+                  <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/90 text-slate-950 text-[11px] font-black shadow-lg">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{translate("Photo Conforme & Nette", "Photo Ready & Sharp")}</span>
+                    </span>
+                    <span className="text-[9px] font-mono text-emerald-300 bg-slate-950/90 px-2 py-0.5 rounded-md border border-emerald-500/40">
+                      {formatConfig.formatBadge}
+                    </span>
+                  </div>
+
+                  {/* Quick Retake Button */}
+                  <div className="absolute bottom-2.5 inset-x-3 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearCurrentStepPhoto();
+                        startCamera(formatConfig.facingMode);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-white border border-slate-700 shadow-xl text-xs font-bold flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{translate("Reprendre la photo", "Retake photo")}</span>
+                    </button>
                   </div>
                 </div>
               ) : (
-                <div className="p-6 rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/40 text-center space-y-2">
-                  <Camera className="w-8 h-8 text-slate-600 mx-auto" />
-                  <p className="text-xs text-slate-400 font-medium">
-                    {translate("Aucune photo prise pour cette étape", "No photo captured for this step yet")}
-                  </p>
+                <div className={`rounded-2xl border-2 border-dashed border-slate-800 bg-slate-950/40 text-center flex flex-col items-center justify-center p-6 ${formatConfig.previewAspectClass} mx-auto space-y-3`}>
+                  <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center border border-slate-800 text-emerald-400">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs sm:text-sm text-white font-bold">
+                      {translate("Prise de photo requise", "Photo required")}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-1 max-w-xs leading-relaxed">
+                      {formatConfig.guideTitle} ({formatConfig.formatBadge})
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
           {cameraError && (
-            <p className="text-[11px] text-amber-400 text-center mt-2">{cameraError}</p>
+            <p className="text-[11px] text-amber-400 text-center mt-2 font-medium">{cameraError}</p>
           )}
 
           {/* Action triggers */}
@@ -928,18 +1200,18 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
             <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
               <button
                 type="button"
-                onClick={() => startCamera(isSelfieStep ? 'user' : 'environment')}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-900/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                onClick={() => startCamera(formatConfig.facingMode)}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-900/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
               >
                 <Camera className="w-4 h-4 text-white" />
-                <span>{translate("Prendre Photo (Caméra)", "Take Photo (Camera)")}</span>
+                <span>{currentPhoto ? translate("Reprendre la Photo", "Retake Photo") : translate("Ouvrir la Caméra", "Open Camera")}</span>
               </button>
 
               {!isSelfieStep && (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5 text-blue-400" />
                   <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>

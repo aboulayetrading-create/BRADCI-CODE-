@@ -44,7 +44,10 @@ import {
   Video,
   Play,
   Film,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Key,
+  PhoneCall,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   TimeFilter, 
@@ -55,6 +58,8 @@ import {
 } from '../types';
 import { ALL_COMMUNES } from '../data/communes';
 import { AdminActivityAuditView } from './AdminActivityAuditView';
+import { AdminCallChatArchiveView } from './AdminCallChatArchiveView';
+import { AdminUserInvestigationView } from './AdminUserInvestigationView';
 
 export const AdminBackOffice: React.FC = () => {
   const { 
@@ -76,6 +81,9 @@ export const AdminBackOffice: React.FC = () => {
     toggleMaintenanceMode,
     withdrawalRequests,
     financialTransactions,
+    supportTickets,
+    adminResolveSupportTicket,
+    adminAuthorizeSupportCall,
     adminAlerts,
     markAlertAsRead,
     dismissAlert,
@@ -96,11 +104,17 @@ export const AdminBackOffice: React.FC = () => {
   } = useApp();
 
   // Navigation within Admin Suite
-  const [adminTab, setAdminTab] = useState<'financials' | 'withdrawals' | 'members' | 'kyc' | 'product_approvals' | 'operations_gps' | 'audit_activity_ip' | 'settings'>('financials');
+  const [adminTab, setAdminTab] = useState<'financials' | 'withdrawals' | 'members' | 'kyc' | 'product_approvals' | 'support_tickets' | 'recordings_archive' | 'theft_investigations' | 'operations_gps' | 'audit_activity_ip' | 'settings'>('financials');
 
   // Master Login state
   const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+
+  // Support Tickets states
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<'all' | 'pending' | 'resolved' | 'call_scheduled'>('all');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [selectedTicketForResolve, setSelectedTicketForResolve] = useState<string | null>(null);
+  const [resolutionNotesInput, setResolutionNotesInput] = useState('');
 
   // Product Approvals states
   const [productApprovalFilter, setProductApprovalFilter] = useState<'all' | 'auction' | 'shop'>('all');
@@ -243,7 +257,19 @@ export const AdminBackOffice: React.FC = () => {
   const pendingWithdrawalsCount = withdrawalRequests.filter(w => w.status === 'pending').length;
   const pendingKycCount = kycRecords.filter(k => k.status === 'pending').length;
   const pendingProductsCount = products.filter(p => p.status === 'pending_approval').length;
+  const pendingTicketsCount = supportTickets.filter(t => t.status === 'pending' || t.status === 'in_review').length;
   const unreadAlertsCount = adminAlerts.filter(a => !a.isRead).length;
+
+  // Filter support tickets
+  const filteredTickets = supportTickets.filter(t => {
+    const matchesStatus = ticketStatusFilter === 'all' || t.status === ticketStatusFilter;
+    const matchesSearch = t.userName.toLowerCase().includes(ticketSearch.toLowerCase()) ||
+      t.userPhone.includes(ticketSearch) ||
+      t.clientMessage.toLowerCase().includes(ticketSearch.toLowerCase()) ||
+      t.problemCategoryLabel.toLowerCase().includes(ticketSearch.toLowerCase()) ||
+      t.advisorName.toLowerCase().includes(ticketSearch.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
 
   // Filter pending products for moderation
   const filteredPendingProducts = products.filter(p => {
@@ -435,6 +461,59 @@ export const AdminBackOffice: React.FC = () => {
                 {pendingProductsCount}
               </span>
             )}
+          </button>
+
+          {/* New Tab: Support Client & Requêtes */}
+          <button
+            id="admin-tab-support-tickets"
+            onClick={() => setAdminTab('support_tickets')}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shrink-0 border transition-all ${
+              adminTab === 'support_tickets'
+                ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-lg shadow-amber-500/10'
+                : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800'
+            }`}
+          >
+            <Phone className="w-4 h-4 text-rose-400" />
+            <span>{translate("Requêtes Clients & Appels", "Support Tickets & Calls")}</span>
+            {pendingTicketsCount > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black animate-pulse ${
+                adminTab === 'support_tickets' ? 'bg-slate-950 text-amber-400' : 'bg-rose-500 text-white'
+              }`}>
+                {pendingTicketsCount}
+              </span>
+            )}
+          </button>
+
+          {/* New Tab 1: Enregistrements Conversations & Appels */}
+          <button
+            id="admin-tab-recordings-archive"
+            onClick={() => setAdminTab('recordings_archive')}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shrink-0 border transition-all ${
+              adminTab === 'recordings_archive'
+                ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-lg shadow-amber-500/10'
+                : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:bg-slate-800'
+            }`}
+          >
+            <PhoneCall className="w-4 h-4 text-amber-400" />
+            <span>{translate("Enregistrements Conversations & Appels", "Conversations & Calls Recordings")}</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          </button>
+
+          {/* New Tab 2: Enquêtes Vol, Antivol & Accès Direct aux Comptes */}
+          <button
+            id="admin-tab-theft-investigations"
+            onClick={() => setAdminTab('theft_investigations')}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shrink-0 border transition-all ${
+              adminTab === 'theft_investigations'
+                ? 'bg-red-500 text-white border-red-500 shadow-lg shadow-red-500/20'
+                : 'bg-slate-900/80 text-red-300 border-red-500/30 hover:bg-slate-800'
+            }`}
+          >
+            <Key className="w-4 h-4 text-amber-400" />
+            <span>{translate("Enquêtes Vol, Antivol & Accès Direct Comptes", "Theft & Direct Account Access")}</span>
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-red-600 text-white">
+              ADMIN SEUL
+            </span>
           </button>
 
           <button
@@ -1216,7 +1295,7 @@ export const AdminBackOffice: React.FC = () => {
                           <img 
                             src={k.documentPhoto} 
                             alt="Pièce CNI" 
-                            className="w-full h-28 object-cover rounded-xl border border-slate-700 cursor-pointer hover:opacity-90"
+                            className="w-full h-32 object-contain bg-slate-950 rounded-xl border border-slate-700 cursor-pointer hover:border-emerald-500/50 transition-all p-1"
                             onClick={() => setSelectedKycDoc(k.documentPhoto)}
                           />
                         </div>
@@ -1225,7 +1304,7 @@ export const AdminBackOffice: React.FC = () => {
                           <img 
                             src={k.selfiePhoto} 
                             alt="Selfie" 
-                            className="w-full h-28 object-cover rounded-xl border border-slate-700 cursor-pointer hover:opacity-90"
+                            className="w-full h-32 object-contain bg-slate-950 rounded-xl border border-slate-700 cursor-pointer hover:border-emerald-500/50 transition-all p-1"
                             onClick={() => setSelectedKycDoc(k.selfiePhoto)}
                           />
                         </div>
@@ -2021,6 +2100,279 @@ export const AdminBackOffice: React.FC = () => {
             </div>
 
           </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB: SUPPORT CLIENT & REQUÊTES / APPELS             */}
+        {/* ---------------------------------------------------- */}
+        {adminTab === 'support_tickets' && (
+          <div className="space-y-6">
+            
+            {/* Header info & filters */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#0C121E] p-6 rounded-3xl border border-slate-800">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400">
+                    <Phone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>{translate("Gestion des Requêtes & Appels Clients", "Customer Tickets & Support Calls")}</span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        {supportTickets.length} au total
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      {translate("Résolution des problèmes signalés par les clients (blocages vente, erreurs de frappe, KYC en attente) et déclenchement d'appels après accord administrateur.", "Resolution of issues reported by customers (blocked sales, typing errors, pending KYC) and authorization of support calls.")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status filter pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input
+                    type="text"
+                    value={ticketSearch}
+                    onChange={(e) => setTicketSearch(e.target.value)}
+                    placeholder={translate("Rechercher client, tél, motif...", "Search user, phone, issue...")}
+                    className="bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 w-48 sm:w-60"
+                  />
+                </div>
+
+                <div className="flex bg-slate-900 border border-slate-800 rounded-xl p-1 gap-1">
+                  <button
+                    onClick={() => setTicketStatusFilter('all')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      ticketStatusFilter === 'all' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Tous ({supportTickets.length})
+                  </button>
+                  <button
+                    onClick={() => setTicketStatusFilter('pending')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      ticketStatusFilter === 'pending' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    En Attente ({supportTickets.filter(t => t.status === 'pending').length})
+                  </button>
+                  <button
+                    onClick={() => setTicketStatusFilter('resolved')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      ticketStatusFilter === 'resolved' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Résolus ({supportTickets.filter(t => t.status === 'resolved').length})
+                  </button>
+                  <button
+                    onClick={() => setTicketStatusFilter('call_scheduled')}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      ticketStatusFilter === 'call_scheduled' ? 'bg-sky-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Appels Autorisés ({supportTickets.filter(t => t.status === 'call_scheduled').length})
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Tickets List */}
+            <div className="space-y-4">
+              {filteredTickets.length === 0 ? (
+                <div className="p-12 text-center bg-[#0C121E] border border-slate-800 rounded-3xl">
+                  <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+                  <h3 className="text-white font-bold text-sm">Aucune requête client trouvée</h3>
+                  <p className="text-slate-400 text-xs mt-1">Toutes les demandes de support sont actuellement traitées ou correspondent à aucun filtre.</p>
+                </div>
+              ) : (
+                filteredTickets.map(tkt => {
+                  const isPending = tkt.status === 'pending' || tkt.status === 'in_review';
+                  const isResolved = tkt.status === 'resolved';
+                  const isCallAuthorized = tkt.callAuthorizedByAdmin || tkt.status === 'call_scheduled';
+
+                  return (
+                    <div 
+                      key={tkt.id}
+                      className={`p-6 rounded-3xl border transition-all ${
+                        isPending 
+                          ? 'bg-[#0C121E] border-amber-500/40 shadow-lg shadow-amber-500/5' 
+                          : isResolved 
+                            ? 'bg-slate-900/60 border-slate-800' 
+                            : 'bg-[#0C121E] border-sky-500/40'
+                      }`}
+                    >
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        {/* Ticket Main Info */}
+                        <div className="space-y-2 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs text-slate-400 font-bold">
+                              #{tkt.id}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
+                              isPending
+                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                : isResolved
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                            }`}>
+                              {isPending ? 'En attente administrateur' : isResolved ? 'Résolu par Admin' : 'Appel Autorisé & En Cours'}
+                            </span>
+
+                            <span className="px-2 py-0.5 rounded-lg text-xs bg-slate-800 text-slate-300 border border-slate-700 font-medium">
+                              Type : {tkt.problemCategoryLabel}
+                            </span>
+
+                            <span className="text-[11px] text-slate-400">
+                              Conseillère assignée : <strong className="text-slate-200">{tkt.advisorName}</strong>
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-baseline gap-2">
+                            <h3 className="text-base font-bold text-white">{tkt.userName}</h3>
+                            <a href={`tel:${tkt.userPhone}`} className="text-xs text-amber-400 hover:underline font-mono">
+                              {tkt.userPhone}
+                            </a>
+                            {tkt.userEmail && (
+                              <span className="text-xs text-slate-400 font-mono">
+                                ({tkt.userEmail})
+                              </span>
+                            )}
+                            <span className="text-[11px] text-slate-500 ml-auto">
+                              Créé le {new Date(tkt.createdAt).toLocaleString(language === 'en' ? 'en-US' : 'fr-FR')}
+                            </span>
+                          </div>
+
+                          {/* Message Content */}
+                          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800/80 text-xs text-slate-200 leading-relaxed font-sans">
+                            <strong className="text-slate-400 block text-[10px] uppercase tracking-wider mb-1">Message du Client / Signalement :</strong>
+                            "{tkt.clientMessage}"
+                          </div>
+
+                          {/* Reassurance badge */}
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 pt-1">
+                            <span className="inline-flex items-center gap-1.5 text-emerald-400">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Client rassuré automatiquement (recontacte prévu par mail ou appel)</span>
+                            </span>
+                            {tkt.adminResolutionNotes && (
+                              <span className="text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">
+                                <strong>Note Résolution Admin :</strong> {tkt.adminResolutionNotes}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Admin Action Buttons */}
+                        <div className="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0 lg:w-56">
+                          {/* 1. Resolve Ticket Button */}
+                          <button
+                            onClick={() => {
+                              setSelectedTicketForResolve(tkt.id);
+                              setResolutionNotesInput(tkt.adminResolutionNotes || 'Problème résolu après vérification technique. Paramètres corrigés avec succès.');
+                            }}
+                            className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                              isResolved 
+                                ? 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30' 
+                                : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-md shadow-emerald-500/10'
+                            }`}
+                          >
+                            <Check className="w-4 h-4" />
+                            <span>{isResolved ? "Modifier Résolution" : "Résoudre le Problème"}</span>
+                          </button>
+
+                          {/* 2. Authorize Call with Client */}
+                          <button
+                            onClick={() => {
+                              adminAuthorizeSupportCall(tkt.id);
+                            }}
+                            className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                              isCallAuthorized
+                                ? 'bg-sky-500/20 border border-sky-500/40 text-sky-300'
+                                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md shadow-amber-500/10'
+                            }`}
+                          >
+                            <Phone className="w-4 h-4" />
+                            <span>{isCallAuthorized ? "Appel Déjà Déclenché" : "Autoriser & Lancer Appel"}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal for Resolution Notes */}
+            {selectedTicketForResolve && (
+              <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-[#0C121E] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-white flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                      <span>Résolution du Dossier Client</span>
+                    </h3>
+                    <button 
+                      onClick={() => setSelectedTicketForResolve(null)}
+                      className="text-slate-400 hover:text-white p-1 rounded-lg"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-400">
+                    Indiquez la solution appliquée (ex: déblocage d'enchère validé, correction de numéro de téléphone effectuée, pièce KYC acceptée manuellement). Le client recevra une notification confirmant la régularisation.
+                  </p>
+
+                  <textarea
+                    value={resolutionNotesInput}
+                    onChange={(e) => setResolutionNotesInput(e.target.value)}
+                    rows={4}
+                    placeholder="Ex: Erreur de frappe rectifiée dans la base de données. Montant ajusté à 15 000 FCFA. Validation du dossier effectuée avec succès."
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setSelectedTicketForResolve(null)}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (selectedTicketForResolve) {
+                          adminResolveSupportTicket(selectedTicketForResolve, resolutionNotesInput);
+                          setSelectedTicketForResolve(null);
+                        }
+                      }}
+                      className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>Confirmer la Résolution</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB: ENREGISTREMENTS CONVERSATIONS & APPELS (AUDIO)  */}
+        {/* ---------------------------------------------------- */}
+        {adminTab === 'recordings_archive' && (
+          <AdminCallChatArchiveView />
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* TAB: ENQUÊTES VOL, ANTIVOL & ACCÈS DIRECT COMPTES    */}
+        {/* ---------------------------------------------------- */}
+        {adminTab === 'theft_investigations' && (
+          <AdminUserInvestigationView />
         )}
 
         {/* ---------------------------------------------------- */}
