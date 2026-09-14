@@ -42,17 +42,17 @@ jobs:
             sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST_FILE
           fi
 
-      - name: Forcer Gradle 8.2 stable et options JVM
+      - name: Réparer les conflits de dépendances et BouncyCastle
         run: |
           cd android
           chmod +x ./gradlew
-          sed -i 's/gradle-8.14.3-all.zip/gradle-8.2.1-all.zip/g' gradle/wrapper/gradle-wrapper.properties || true
-          echo "org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m" >> gradle.properties
+          rm -rf ~/.gradle/caches/
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
 
-      - name: Compiler l'APK Android
+      - name: Compiler le projet
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --no-build-cache
+          ./gradlew assembleDebug --no-daemon --refresh-dependencies
 
       - name: Téléverser l'APK généré
         uses: actions/upload-artifact@v4
