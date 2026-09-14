@@ -24,37 +24,35 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configurer l'environnement Android SDK
+      - name: Configurer le SDK Android
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Préparer les répertoires et assets Capacitor
+      - name: Installer Capacitor CLI et Plugins requis
         run: |
-          mkdir -p android/app/src/main/assets/public
-          if [ -d "assets/public" ]; then
-            cp -r assets/public/* android/app/src/main/assets/public/
-          fi
-          if [ -f "assets/capacitor.config.json" ]; then
-            cp assets/capacitor.config.json android/app/src/main/assets/
-          fi
-          if [ -f "assets/capacitor.plugins.json" ]; then
-            cp assets/capacitor.plugins.json android/app/src/main/assets/
-          fi
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/geolocation @capacitor/camera
+          npx cap init "BRADCI" "com.bradci.app" --web-dir assets/public
 
-      - name: Préparer les permissions AndroidManifest
+      - name: Reconstruire le projet Android natif propre
+        run: |
+          rm -rf android
+          npx cap add android
+          npx cap sync android
+
+      - name: Ajouter les permissions au Manifeste
         run: |
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
             sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST_FILE
           fi
 
-      - name: Compilation ciblée du module App
+      - name: Compiler l'APK Android
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew :app:assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon
 
       - name: Téléverser l'APK généré
         uses: actions/upload-artifact@v4
