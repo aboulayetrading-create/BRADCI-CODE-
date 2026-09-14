@@ -13,20 +13,16 @@ jobs:
       - name: Récupération du code source
         uses: actions/checkout@v4
 
-      - name: Configuration de Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Installation de Java JDK 21
+      - name: Installation de Java JDK 17 (Requis Capacitor)
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '21'
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Configurer les licences Android SDK
+      - name: Configurer l'environnement Android SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Préparer les permissions AndroidManifest
@@ -36,15 +32,11 @@ jobs:
             sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST_FILE
           fi
 
-      - name: Rendre gradlew exécutable
+      - name: Nettoyer et compiler le package Android (APK Debug)
         run: |
           cd android
           chmod +x ./gradlew
-
-      - name: Compiler le package Android (APK Debug)
-        run: |
-          cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew clean assembleDebug --no-daemon
 
       - name: Téléverser l'APK généré
         uses: actions/upload-artifact@v4
