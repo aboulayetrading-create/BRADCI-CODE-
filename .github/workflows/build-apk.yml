@@ -38,14 +38,15 @@ jobs:
 
       - name: Compiler l'application Vite avec Bun
         run: |
-          # Retirer les modules natifs conflictuels avant l'installation
+          # Éliminer tous les plugins natifs obsolètes du package.json
+          sed -i '/@capacitor\/local-notifications/d' package.json || true
+          sed -i '/@capacitor\/push-notifications/d' package.json || true
           sed -i '/@capacitor\/camera/d' package.json || true
           sed -i '/@capacitor\/geolocation/d' package.json || true
           
           bun install || npm install --legacy-peer-deps --force
           bun run build || npm run build || true
 
-          # Si le dossier dist n'est pas créé ou incomplet, utiliser les assets publics du projet
           mkdir -p dist
           if [ -d "assets/public" ]; then
             cp -rn assets/public/* dist/ || true
@@ -54,7 +55,6 @@ jobs:
             cp index.html dist/
           fi
 
-          # Fix écran blanc : forcer les chemins relatifs pour le WebView Android
           if [ -f "dist/index.html" ]; then
             sed -i 's|src="/|src="./|g' dist/index.html
             sed -i 's|href="/|href="./|g' dist/index.html
@@ -62,7 +62,13 @@ jobs:
 
       - name: Initialiser le conteneur Android Capacitor
         run: |
+          # Supprimer les dossiers résiduels de plugins natifs
+          rm -rf node_modules/@capacitor/local-notifications
+          rm -rf node_modules/@capacitor/push-notifications
+          rm -rf node_modules/@capacitor/camera
+          rm -rf node_modules/@capacitor/geolocation
           rm -rf android capacitor.config.ts
+
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.bradci.app",
@@ -91,13 +97,26 @@ jobs:
             done
           fi
 
-      - name: Nettoyer les dépendances et autorisations Android
+      - name: Neutraliser les plugins natifs résiduels dans Gradle
         run: |
           cd android
-          # Empêcher toute tentative d'injection de sous-projets corrompus
+          # Vider les déclarations de plugins dans capacitor.settings.gradle s'il existe
+          if [ -f "capacitor.settings.gradle" ]; then
+            > capacitor.settings.gradle
+          fi
+
+          # Nettoyer settings.gradle
+          sed -i '/notifications/d' settings.gradle || true
           sed -i '/capacitor-camera/d' settings.gradle || true
           sed -i '/capacitor-geolocation/d' settings.gradle || true
+
+          # Nettoyer app/build.gradle de toute dépendance vers un sous-projet
+          sed -i '/project('\'':capacitor-/d' app/build.gradle || true
+
+          # Activer MultiDex
+          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/g' app/build.gradle
           echo "android.suppressUnsupportedCompileSdk=34,35,36" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
 
           MANIFEST_FILE="app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
