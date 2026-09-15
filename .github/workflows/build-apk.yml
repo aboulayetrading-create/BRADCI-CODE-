@@ -26,11 +26,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configurer le SDK Android (API 35)
+      - name: Configurer le SDK Android
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
 
       - name: Installer les dépendances et compiler Vite
         run: |
@@ -55,20 +54,7 @@ jobs:
           EOF
           npx cap add android
 
-      - name: Mettre à jour les versions Android SDK (compileSdk 35)
-        run: |
-          # Aligner variables.gradle sur l'API 35
-          if [ -f "android/variables.gradle" ]; then
-            sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 35/g' android/variables.gradle
-            sed -i 's/targetSdkVersion = [0-9]*/targetSdkVersion = 35/g' android/variables.gradle
-          fi
-          # Aligner app/build.gradle
-          if [ -f "android/app/build.gradle" ]; then
-            sed -i 's/compileSdkVersion rootProject.ext.compileSdkVersion/compileSdkVersion 35/g' android/app/build.gradle
-            sed -i 's/targetSdkVersion rootProject.ext.targetSdkVersion/targetSdkVersion 35/g' android/app/build.gradle
-          fi
-
-      - name: Génération des icônes Android avec Capacitor Assets
+      - name: Génération des icônes avec icon.png
         run: |
           if [ -f "icon.png" ]; then
             mkdir -p assets
@@ -78,6 +64,12 @@ jobs:
             npx @capacitor/assets generate --android || true
           fi
           npx cap sync android
+
+      - name: Débloquer la vérification de version du SDK Gradle
+        run: |
+          # Désactive l'erreur de version bloquante "uses Android Gradle Plugin..."
+          echo "android.suppressUnsupportedCompileSdk=34,35,36" >> android/gradle.properties
+          echo "android.dependency.useConstraints=false" >> android/gradle.properties
 
       - name: Configurer les autorisations Android
         run: |
