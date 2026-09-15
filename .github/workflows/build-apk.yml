@@ -31,16 +31,29 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Préparer le dossier dist et index.html
+      - name: Déployer et vérifier les fichiers web BRADCI
         run: |
           mkdir -p dist
+          # Copier les fichiers web réels
           if [ -d "assets/public" ]; then
             cp -r assets/public/* dist/
           elif [ -f "index.html" ]; then
             cp -r * dist/ || true
           fi
 
-      - name: Initialiser Capacitor avec BRADCI
+          # Vérification de l'index.html
+          if [ ! -f "dist/index.html" ]; then
+            SRC_INDEX=$(find . -name "index.html" -not -path "*/.*" -not -path "./dist/*" | head -n 1)
+            if [ -n "$SRC_INDEX" ]; then
+              cp "$SRC_INDEX" dist/index.html
+            fi
+          fi
+
+          # Rendre les chemins relatifs pour WebView
+          sed -i 's|src="/|src="./|g' dist/index.html
+          sed -i 's|href="/|href="./|g' dist/index.html
+
+      - name: Initialiser Capacitor propre (Pas de crash XML)
         run: |
           rm -rf android package.json node_modules package-lock.json capacitor.config.ts
           npm init -y
@@ -50,34 +63,29 @@ jobs:
             "appId": "com.bradci.app",
             "appName": "BRADCI",
             "webDir": "dist",
-            "bundledWebRuntime": false
+            "bundledWebRuntime": false,
+            "server": {
+              "androidScheme": "https",
+              "cleartext": true
+            }
           }
           EOF
           npx cap add android
           npx cap copy android
 
-      - name: Remplacer les icônes sans conflit de ressources
+      - name: Remplacer le logo proprement sans toucher aux XML Android
         run: |
           LOGO_SRC=$(find assets/ . -maxdepth 3 -type f \( -iname "*logo*.png" -o -iname "*icon*.png" -o -iname "favicon*.png" \) ! -path "*/node_modules/*" ! -path "*/android/*" | head -n 1)
 
           if [ -n "$LOGO_SRC" ]; then
-            echo "Logo détecté : $LOGO_SRC"
+            echo "Logo appliqué : $LOGO_SRC"
             RES_DIR="android/app/src/main/res"
 
-            # Supprimer les XML adaptatifs qui provoquent l'erreur 'Duplicate resources'
-            rm -rf $RES_DIR/mipmap-anydpi-v26
-
-            # Écraser les icônes PNG dans tous les sous-dossiers mipmap restants
-            for dir in $RES_DIR/mipmap-*; do
-              if [ -d "$dir" ]; then
-                cp "$LOGO_SRC" "$dir/ic_launcher.png"
-                cp "$LOGO_SRC" "$dir/ic_launcher_round.png"
-                cp "$LOGO_SRC" "$dir/ic_launcher_foreground.png" || true
-              fi
-            done
+            # Remplacement des fichiers PNG uniquement pour éviter le crash de ressource
+            find $RES_DIR -type f -name "ic_launcher*.png" -exec cp "$LOGO_SRC" {} \;
           fi
 
-      - name: Configurer les permissions et WebView Android
+      - name: Configurer les autorisations Android
         run: |
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
@@ -85,7 +93,7 @@ jobs:
             sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' $MANIFEST_FILE
           fi
 
-      - name: Compiler l'APK Android
+      - name: Compiler l'APK Android (Gradle)
         run: |
           cd android
           chmod +x ./gradlew
