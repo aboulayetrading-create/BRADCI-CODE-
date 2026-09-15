@@ -56,16 +56,18 @@ jobs:
           npx cap add android
           npx cap copy android
 
-      - name: Remplacer le logo Capacitor par le logo BRADCI
+      - name: Remplacer les icônes sans conflit de ressources
         run: |
-          # Recherche automatique d'une image de logo dans le projet
           LOGO_SRC=$(find assets/ . -maxdepth 3 -type f \( -iname "*logo*.png" -o -iname "*icon*.png" -o -iname "favicon*.png" \) ! -path "*/node_modules/*" ! -path "*/android/*" | head -n 1)
 
           if [ -n "$LOGO_SRC" ]; then
-            echo "Logo trouve : $LOGO_SRC"
+            echo "Logo détecté : $LOGO_SRC"
             RES_DIR="android/app/src/main/res"
 
-            # Remplacement de l'icone standard et ronde dans toutes les résolutions
+            # Supprimer les XML adaptatifs qui provoquent l'erreur 'Duplicate resources'
+            rm -rf $RES_DIR/mipmap-anydpi-v26
+
+            # Écraser les icônes PNG dans tous les sous-dossiers mipmap restants
             for dir in $RES_DIR/mipmap-*; do
               if [ -d "$dir" ]; then
                 cp "$LOGO_SRC" "$dir/ic_launcher.png"
@@ -73,8 +75,6 @@ jobs:
                 cp "$LOGO_SRC" "$dir/ic_launcher_foreground.png" || true
               fi
             done
-          else
-            echo "Aucun fichier logo.png ou icon.png trouve dans assets/"
           fi
 
       - name: Configurer les permissions et WebView Android
