@@ -36,35 +36,42 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Compiler le code React/Vite
+      - name: Compiler le code source récent (Vite/React)
         run: |
-          bun install || npm install --legacy-peer-deps --force
-          bun run build || npm run build || true
+          # Installation propre des dépendances avec Bun
+          bun install --no-save || npm install --legacy-peer-deps --force
+          
+          # Nettoyage strict de l'ancien dossier de build
+          rm -rf dist
+          
+          # Compilation du code le plus récent
+          bun run build || npx vite build
 
-          mkdir -p dist
-          if [ -d "assets/public" ]; then
-            cp -rn assets/public/* dist/ || true
-          fi
-          if [ -f "index.html" ] && [ ! -f "dist/index.html" ]; then
-            cp index.html dist/
+          # Vérification de la présence de l'application compilée
+          if [ ! -f "dist/index.html" ]; then
+            echo "Alerte: dist/index.html non généré par Vite, copie de secours..."
+            mkdir -p dist
+            if [ -d "assets/public" ]; then
+              cp -r assets/public/* dist/
+            fi
+            if [ -f "index.html" ]; then
+              cp index.html dist/
+            fi
           fi
 
-          if [ -f "dist/index.html" ]; then
-            sed -i 's|src="/|src="./|g' dist/index.html
-            sed -i 's|href="/|href="./|g' dist/index.html
-          fi
+          # Fix écran blanc : forcer les chemins relatifs pour WebView
+          sed -i 's|src="/|src="./|g' dist/index.html
+          sed -i 's|href="/|href="./|g' dist/index.html
 
       - name: Créer le conteneur Android Capacitor propre
         run: |
-          # Sauvegarde du build web et de l'icône
           mkdir -p /tmp/bradci_build
           cp -r dist /tmp/bradci_build/
           cp icon.png /tmp/bradci_build/ || true
 
-          # Nettoyage complet pour supprimer toute trace de plugin natif brisé
+          # Nettoyage des modules natifs obsolètes
           rm -rf android capacitor.config.* package.json bun.lock node_modules
 
-          # Initialisation d'un environnement Capacitor autonome
           cat << 'EOF' > package.json
           {
             "name": "bradci",
@@ -88,7 +95,6 @@ jobs:
           }
           EOF
 
-          # Restauration de l'application compilée
           cp -r /tmp/bradci_build/dist ./
           if [ -f "/tmp/bradci_build/icon.png" ]; then
             cp /tmp/bradci_build/icon.png ./
