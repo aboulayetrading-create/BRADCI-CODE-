@@ -38,7 +38,7 @@ jobs:
 
       - name: Initialiser et synchroniser Capacitor
         run: |
-          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact --legacy-peer-deps --force
+          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 @capacitor/assets --save-exact --legacy-peer-deps --force
           rm -rf android capacitor.config.ts
           cat << 'EOF' > capacitor.config.json
           {
@@ -53,19 +53,17 @@ jobs:
           }
           EOF
           npx cap add android
-          npx cap copy android
 
-      - name: Configurer les icônes sans altérer les ressources vectorielles
+      - name: Génération propre des icônes Android (Capacitor Assets)
         run: |
           if [ -f "icon.png" ]; then
-            RES_DIR="android/app/src/main/res"
-            for d in $RES_DIR/mipmap-*; do
-              if [ -d "$d" ] && [ "$(basename $d)" != "mipmap-anydpi-v26" ]; then
-                cp icon.png "$d/ic_launcher.png"
-                cp icon.png "$d/ic_launcher_round.png"
-              fi
-            done
+            mkdir -p assets
+            cp icon.png assets/icon-only.png
+            cp icon.png assets/icon-foreground.png
+            cp icon.png assets/icon-background.png
+            npx @capacitor/assets generate --android || true
           fi
+          npx cap sync android
 
       - name: Configurer les autorisations Android
         run: |
@@ -79,7 +77,7 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon
 
       - name: Téléverser l'APK généré
         uses: actions/upload-artifact@v4
