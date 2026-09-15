@@ -31,33 +31,17 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Déployer et vérifier les fichiers web BRADCI
+      - name: Installer les dépendances du projet et compiler avec Vite
         run: |
-          mkdir -p dist
-          # Copier les fichiers web réels
-          if [ -d "assets/public" ]; then
-            cp -r assets/public/* dist/
-          elif [ -f "index.html" ]; then
-            cp -r * dist/ || true
-          fi
+          npm install --legacy-peer-deps
+          # Compilation du code source React/Vite vers le dossier dist
+          npm run build || npx vite build
 
-          # Vérification de l'index.html
-          if [ ! -f "dist/index.html" ]; then
-            SRC_INDEX=$(find . -name "index.html" -not -path "*/.*" -not -path "./dist/*" | head -n 1)
-            if [ -n "$SRC_INDEX" ]; then
-              cp "$SRC_INDEX" dist/index.html
-            fi
-          fi
-
-          # Rendre les chemins relatifs pour WebView
-          sed -i 's|src="/|src="./|g' dist/index.html
-          sed -i 's|href="/|href="./|g' dist/index.html
-
-      - name: Initialiser Capacitor propre (Pas de crash XML)
+      - name: Initialiser et synchroniser Capacitor
         run: |
-          rm -rf android package.json node_modules package-lock.json capacitor.config.ts
-          npm init -y
-          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 typescript @types/node --save-exact
+          # Installation des outils Capacitor nécessaires à l'assemblage Android
+          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact
+          rm -rf android capacitor.config.ts
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.bradci.app",
@@ -73,16 +57,12 @@ jobs:
           npx cap add android
           npx cap copy android
 
-      - name: Remplacer le logo proprement sans toucher aux XML Android
+      - name: Remplacer le logo par icon.png
         run: |
-          LOGO_SRC=$(find assets/ . -maxdepth 3 -type f \( -iname "*logo*.png" -o -iname "*icon*.png" -o -iname "favicon*.png" \) ! -path "*/node_modules/*" ! -path "*/android/*" | head -n 1)
-
-          if [ -n "$LOGO_SRC" ]; then
-            echo "Logo appliqué : $LOGO_SRC"
+          if [ -f "icon.png" ]; then
             RES_DIR="android/app/src/main/res"
-
-            # Remplacement des fichiers PNG uniquement pour éviter le crash de ressource
-            find $RES_DIR -type f -name "ic_launcher*.png" -exec cp "$LOGO_SRC" {} \;
+            # Remplacement direct de toutes les icônes de lancement par votre fichier icon.png
+            find $RES_DIR -type f -name "ic_launcher*.png" -exec cp icon.png {} \;
           fi
 
       - name: Configurer les autorisations Android
