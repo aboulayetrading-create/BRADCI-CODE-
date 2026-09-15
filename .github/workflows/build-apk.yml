@@ -31,16 +31,14 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Installer les dépendances du projet et compiler avec Vite
+      - name: Installer les dépendances et compiler Vite
         run: |
-          npm install --legacy-peer-deps
-          # Compilation du code source React/Vite vers le dossier dist
+          npm install --legacy-peer-deps --force
           npm run build || npx vite build
 
       - name: Initialiser et synchroniser Capacitor
         run: |
-          # Installation des outils Capacitor nécessaires à l'assemblage Android
-          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact
+          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact --legacy-peer-deps --force
           rm -rf android capacitor.config.ts
           cat << 'EOF' > capacitor.config.json
           {
@@ -61,7 +59,6 @@ jobs:
         run: |
           if [ -f "icon.png" ]; then
             RES_DIR="android/app/src/main/res"
-            # Remplacement direct de toutes les icônes de lancement par votre fichier icon.png
             find $RES_DIR -type f -name "ic_launcher*.png" -exec cp icon.png {} \;
           fi
 
