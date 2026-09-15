@@ -55,11 +55,16 @@ jobs:
           npx cap add android
           npx cap copy android
 
-      - name: Remplacer le logo par icon.png
+      - name: Configurer les icônes sans altérer les ressources vectorielles
         run: |
           if [ -f "icon.png" ]; then
             RES_DIR="android/app/src/main/res"
-            find $RES_DIR -type f -name "ic_launcher*.png" -exec cp icon.png {} \;
+            for d in $RES_DIR/mipmap-*; do
+              if [ -d "$d" ] && [ "$(basename $d)" != "mipmap-anydpi-v26" ]; then
+                cp icon.png "$d/ic_launcher.png"
+                cp icon.png "$d/ic_launcher_round.png"
+              fi
+            done
           fi
 
       - name: Configurer les autorisations Android
@@ -74,7 +79,7 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Téléverser l'APK généré
         uses: actions/upload-artifact@v4
