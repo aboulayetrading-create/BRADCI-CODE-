@@ -12,7 +12,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
-      - name: Récupération du code source le plus récent
+      - name: Récupération du code source
         uses: actions/checkout@v4
 
       - name: Configuration de Node.js 20
@@ -31,17 +31,16 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Injecter les derniers assets compilés BRADCI
+      - name: Préparer le dossier dist et index.html
         run: |
           mkdir -p dist
-          # Copie des derniers fichiers compilés réels de l'application
           if [ -d "assets/public" ]; then
             cp -r assets/public/* dist/
           elif [ -f "index.html" ]; then
             cp -r * dist/ || true
           fi
 
-      - name: Initialiser Capacitor avec la dernière version de BRADCI
+      - name: Initialiser Capacitor avec BRADCI
         run: |
           rm -rf android package.json node_modules package-lock.json capacitor.config.ts
           npm init -y
@@ -57,7 +56,28 @@ jobs:
           npx cap add android
           npx cap copy android
 
-      - name: Configurer les autorisations Android (Permissions, Réseau, Médias)
+      - name: Remplacer le logo Capacitor par le logo BRADCI
+        run: |
+          # Recherche automatique d'une image de logo dans le projet
+          LOGO_SRC=$(find assets/ . -maxdepth 3 -type f \( -iname "*logo*.png" -o -iname "*icon*.png" -o -iname "favicon*.png" \) ! -path "*/node_modules/*" ! -path "*/android/*" | head -n 1)
+
+          if [ -n "$LOGO_SRC" ]; then
+            echo "Logo trouve : $LOGO_SRC"
+            RES_DIR="android/app/src/main/res"
+
+            # Remplacement de l'icone standard et ronde dans toutes les résolutions
+            for dir in $RES_DIR/mipmap-*; do
+              if [ -d "$dir" ]; then
+                cp "$LOGO_SRC" "$dir/ic_launcher.png"
+                cp "$LOGO_SRC" "$dir/ic_launcher_round.png"
+                cp "$LOGO_SRC" "$dir/ic_launcher_foreground.png" || true
+              fi
+            done
+          else
+            echo "Aucun fichier logo.png ou icon.png trouve dans assets/"
+          fi
+
+      - name: Configurer les permissions et WebView Android
         run: |
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
@@ -65,7 +85,7 @@ jobs:
             sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' $MANIFEST_FILE
           fi
 
-      - name: Compiler l'APK Android final
+      - name: Compiler l'APK Android
         run: |
           cd android
           chmod +x ./gradlew
