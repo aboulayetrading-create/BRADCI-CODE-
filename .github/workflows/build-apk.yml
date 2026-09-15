@@ -15,10 +15,10 @@ jobs:
       - name: Récupération du code source
         uses: actions/checkout@v4
 
-      - name: Configuration de Node.js 22
+      - name: Configuration de Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
+          node-version: 20
 
       - name: Configuration de Java JDK 17
         uses: actions/setup-java@v4
@@ -31,7 +31,7 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Préparer le dossier dist
+      - name: Préparer le dossier dist et index.html
         run: |
           mkdir -p dist
           if [ -d "assets/public" ]; then
@@ -44,31 +44,28 @@ jobs:
             FOUND_INDEX=$(find . -name "index.html" -not -path "*/.*" -not -path "./dist/*" | head -n 1)
             if [ -n "$FOUND_INDEX" ]; then
               cp "$FOUND_INDEX" dist/index.html
+            else
+              echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>BRADCI</title></head><body><div id="root"></div></body></html>' > dist/index.html
             fi
           fi
 
-      - name: Installer Capacitor 6 et synchroniser Android
+      - name: Initialiser Capacitor Android officiel propre
         run: |
-          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/camera@6 @capacitor/geolocation@6 --legacy-peer-deps
-          rm -rf android
+          rm -rf android package.json node_modules package-lock.json
+          npm init -y
+          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact
+          npx cap init "BRADCI" "com.bradci.app" --web-dir dist
           npx cap add android
-          npx cap sync android
 
-      - name: Configurer Gradle pour désactiver l'agent ASM
-        run: |
-          cd android
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8 -Dorg.gradle.internal.instrumentation.agent=false" >> gradle.properties
-          echo "android.useAndroidX=true" >> gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
-
-      - name: Ajouter les autorisations au Manifeste
+      - name: Configurer les permissions et le WebView Android
         run: |
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
-            sed -i '/<application/i \    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />' $MANIFEST_FILE
+            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' $MANIFEST_FILE
+            sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' $MANIFEST_FILE
           fi
 
-      - name: Compiler l'APK Android
+      - name: Compiler l'APK Android (Gradle)
         run: |
           cd android
           chmod +x ./gradlew
