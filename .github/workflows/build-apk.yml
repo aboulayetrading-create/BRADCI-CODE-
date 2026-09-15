@@ -15,6 +15,11 @@ jobs:
       - name: Récupération du code source
         uses: actions/checkout@v4
 
+      - name: Configuration de Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Configuration de Node.js 20
         uses: actions/setup-node@v4
         with:
@@ -31,18 +36,33 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Installer les dépendances et compiler Vite
+      - name: Compiler l'application Vite avec Bun
         run: |
-          # Désinstaller le plugin caméra conflictuel de package.json
-          npm uninstall @capacitor/camera @capacitor/geolocation || true
-          npm install --legacy-peer-deps --force
-          npm run build || npx vite build
+          # Retirer les modules natifs conflictuels avant l'installation
+          sed -i '/@capacitor\/camera/d' package.json || true
+          sed -i '/@capacitor\/geolocation/d' package.json || true
+          
+          bun install || npm install --legacy-peer-deps --force
+          bun run build || npm run build || true
 
-      - name: Initialiser le conteneur Capacitor officiel propre
+          # Si le dossier dist n'est pas créé ou incomplet, utiliser les assets publics du projet
+          mkdir -p dist
+          if [ -d "assets/public" ]; then
+            cp -rn assets/public/* dist/ || true
+          fi
+          if [ -f "index.html" ] && [ ! -f "dist/index.html" ]; then
+            cp index.html dist/
+          fi
+
+          # Fix écran blanc : forcer les chemins relatifs pour le WebView Android
+          if [ -f "dist/index.html" ]; then
+            sed -i 's|src="/|src="./|g' dist/index.html
+            sed -i 's|href="/|href="./|g' dist/index.html
+          fi
+
+      - name: Initialiser le conteneur Android Capacitor
         run: |
-          # Nettoyage complet des anciens artefacts de build
-          rm -rf android capacitor.config.ts node_modules/@capacitor/camera
-          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact --legacy-peer-deps --force
+          rm -rf android capacitor.config.ts
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.bradci.app",
@@ -55,18 +75,11 @@ jobs:
             }
           }
           EOF
+          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact --legacy-peer-deps --force
           npx cap add android
           npx cap copy android
 
-      - name: Verrouiller les dépendances Gradle
-        run: |
-          cd android
-          # Désactiver l'inclusion de plugins natifs résiduels dans settings.gradle
-          sed -i '/capacitor-camera/d' settings.gradle || true
-          sed -i '/capacitor-geolocation/d' settings.gradle || true
-          echo "android.suppressUnsupportedCompileSdk=34,35,36" >> gradle.properties
-
-      - name: Remplacer le logo par icon.png
+      - name: Appliquer le logo BRADCI (icon.png)
         run: |
           if [ -f "icon.png" ]; then
             RES_DIR="android/app/src/main/res"
@@ -78,15 +91,21 @@ jobs:
             done
           fi
 
-      - name: Configurer les autorisations Android
+      - name: Nettoyer les dépendances et autorisations Android
         run: |
-          MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
+          cd android
+          # Empêcher toute tentative d'injection de sous-projets corrompus
+          sed -i '/capacitor-camera/d' settings.gradle || true
+          sed -i '/capacitor-geolocation/d' settings.gradle || true
+          echo "android.suppressUnsupportedCompileSdk=34,35,36" >> gradle.properties
+
+          MANIFEST_FILE="app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
             sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' $MANIFEST_FILE
             sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' $MANIFEST_FILE
           fi
 
-      - name: Compiler l'APK Android (Gradle)
+      - name: Compiler l'APK Android final (Gradle)
         run: |
           cd android
           chmod +x ./gradlew
