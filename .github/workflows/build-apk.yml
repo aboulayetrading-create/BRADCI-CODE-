@@ -26,19 +26,20 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configurer le SDK Android
+      - name: Accepter les licences et installer le SDK Android
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
-      - name: Installer les dépendances et compiler Vite
+      - name: Installer et compiler l'application Vite (BRADCI)
         run: |
           npm install --legacy-peer-deps --force
           npm run build || npx vite build
 
-      - name: Initialiser et synchroniser Capacitor
+      - name: Générer le conteneur natif Android propre
         run: |
-          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 @capacitor/assets --save-exact --legacy-peer-deps --force
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 --save-exact --legacy-peer-deps --force
           rm -rf android capacitor.config.ts
           cat << 'EOF' > capacitor.config.json
           {
@@ -53,23 +54,40 @@ jobs:
           }
           EOF
           npx cap add android
+          npx cap copy android
 
-      - name: Génération des icônes avec icon.png
+      - name: Fixer les dépendances Gradle et verrouiller les versions AndroidX
+        run: |
+          cd android
+          # Empêcher le téléchargement de versions instables d'AndroidX
+          cat << 'EOF' > fix_deps.gradle
+          allprojects {
+              configurations.all {
+                  resolutionStrategy {
+                      force 'androidx.core:core:1.13.1'
+                      force 'androidx.core:core-ktx:1.13.1'
+                      force 'androidx.activity:activity:1.9.0'
+                      force 'androidx.activity:activity-ktx:1.9.0'
+                      force 'androidx.appcompat:appcompat:1.6.1'
+                  }
+              }
+          }
+          EOF
+          echo "apply from: 'fix_deps.gradle'" >> build.gradle
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
+
+      - name: Remplacer le logo par icon.png
         run: |
           if [ -f "icon.png" ]; then
-            mkdir -p assets
-            cp icon.png assets/icon-only.png
-            cp icon.png assets/icon-foreground.png
-            cp icon.png assets/icon-background.png
-            npx @capacitor/assets generate --android || true
+            RES_DIR="android/app/src/main/res"
+            for d in $RES_DIR/mipmap-*; do
+              if [ -d "$d" ] && [ "$(basename $d)" != "mipmap-anydpi-v26" ]; then
+                cp icon.png "$d/ic_launcher.png"
+                cp icon.png "$d/ic_launcher_round.png"
+              fi
+            done
           fi
-          npx cap sync android
-
-      - name: Débloquer la vérification de version du SDK Gradle
-        run: |
-          # Désactive l'erreur de version bloquante "uses Android Gradle Plugin..."
-          echo "android.suppressUnsupportedCompileSdk=34,35,36" >> android/gradle.properties
-          echo "android.dependency.useConstraints=false" >> android/gradle.properties
 
       - name: Configurer les autorisations Android
         run: |
