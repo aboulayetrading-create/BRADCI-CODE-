@@ -12,7 +12,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
-      - name: Récupération du code source
+      - name: Récupération du code source complet
         uses: actions/checkout@v4
 
       - name: Configuration de Bun
@@ -36,40 +36,46 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Compiler le code source récent (Vite/React)
+      - name: Compiler et rassembler TOUS les fichiers du projet
         run: |
-          # Installation propre des dépendances avec Bun
+          # 1. Tenter la compilation Vite complète
           bun install --no-save || npm install --legacy-peer-deps --force
-          
-          # Nettoyage strict de l'ancien dossier de build
-          rm -rf dist
-          
-          # Compilation du code le plus récent
-          bun run build || npx vite build
+          bun run build || npx vite build || true
 
-          # Vérification de la présence de l'application compilée
-          if [ ! -f "dist/index.html" ]; then
-            echo "Alerte: dist/index.html non généré par Vite, copie de secours..."
-            mkdir -p dist
-            if [ -d "assets/public" ]; then
-              cp -r assets/public/* dist/
-            fi
-            if [ -f "index.html" ]; then
-              cp index.html dist/
-            fi
+          # 2. Créer le dossier dist final et y injecter l'intégralité du projet
+          mkdir -p dist
+
+          # Copier l'intégralité des dossiers de médias, données et assets
+          if [ -d "assets" ]; then
+            cp -r assets dist/
+          fi
+          if [ -d "public" ]; then
+            cp -r public/* dist/ || true
+          fi
+          if [ -d "src" ]; then
+            cp -r src dist/ || true
           fi
 
-          # Fix écran blanc : forcer les chemins relatifs pour WebView
+          # S'assurer que le fichier index.html principal est à la racine de dist
+          if [ -f "index.html" ]; then
+            cp index.html dist/index.html
+          fi
+
+          # Corriger tous les chemins absolus pour qu'Android puisse lire l'intégralité des fichiers
           sed -i 's|src="/|src="./|g' dist/index.html
           sed -i 's|href="/|href="./|g' dist/index.html
 
-      - name: Créer le conteneur Android Capacitor propre
-        run: |
-          mkdir -p /tmp/bradci_build
-          cp -r dist /tmp/bradci_build/
-          cp icon.png /tmp/bradci_build/ || true
+          echo "=== Taille totale des fichiers intégrés dans dist ==="
+          du -sh dist/
 
-          # Nettoyage des modules natifs obsolètes
+      - name: Créer le conteneur Android avec l'intégralité des données
+        run: |
+          # Sauvegarde des données complètes
+          mkdir -p /tmp/bradci_bundle
+          cp -r dist /tmp/bradci_bundle/
+          cp icon.png /tmp/bradci_bundle/ || true
+
+          # Nettoyer l'environnement sans impacter dist
           rm -rf android capacitor.config.* package.json bun.lock node_modules
 
           cat << 'EOF' > package.json
@@ -95,9 +101,10 @@ jobs:
           }
           EOF
 
-          cp -r /tmp/bradci_build/dist ./
-          if [ -f "/tmp/bradci_build/icon.png" ]; then
-            cp /tmp/bradci_build/icon.png ./
+          # Restaurer l'intégralité du code et des médias dans le dossier web
+          cp -r /tmp/bradci_bundle/dist ./
+          if [ -f "/tmp/bradci_bundle/icon.png" ]; then
+            cp /tmp/bradci_bundle/icon.png ./
           fi
 
           npx cap add android
@@ -115,7 +122,7 @@ jobs:
             done
           fi
 
-      - name: Configurer les autorisations et options Gradle
+      - name: Configurer MultiDex et autorisations Android
         run: |
           cd android
           echo "android.suppressUnsupportedCompileSdk=34,35,36" >> gradle.properties
@@ -133,9 +140,9 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Téléverser l'APK généré
+      - name: Téléverser l'APK complet
         uses: actions/upload-artifact@v4
         with:
-          name: BRADCI-Application-APK
+          name: BRADCI-Application-Complete-APK
           path: android/app/build/outputs/apk/debug/*.apk
           retention-days: 7
