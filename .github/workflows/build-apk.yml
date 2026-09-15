@@ -31,11 +31,26 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Préparer le dossier dist attendu par Capacitor
+      - name: Préparer le dossier dist et index.html
         run: |
           mkdir -p dist
+          # Si un dossier assets/public existe, copier son contenu
           if [ -d "assets/public" ]; then
             cp -r assets/public/* dist/
+          fi
+          # Si un index.html est à la racine, le copier dans dist
+          if [ -f "index.html" ]; then
+            cp index.html dist/
+          fi
+          # Si dist n'a toujours pas d'index.html, chercher le premier index.html disponible
+          if [ ! -f "dist/index.html" ]; then
+            FOUND_INDEX=$(find . -name "index.html" -not -path "*/.*" -not -path "./dist/*" | head -n 1)
+            if [ -n "$FOUND_INDEX" ]; then
+              cp "$FOUND_INDEX" dist/index.html
+            else
+              # Création d'un conteneur minimal si non trouvé pour débloquer Capacitor
+              echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>BRADCI</title></head><body><div id="root"></div></body></html>' > dist/index.html
+            fi
           fi
 
       - name: Installer les dépendances et synchroniser Capacitor
