@@ -20,11 +20,11 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: Configuration de Java JDK 21
+      - name: Configuration de Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - name: Configurer le SDK Android
         run: |
@@ -47,28 +47,19 @@ jobs:
             fi
           fi
 
-      - name: Réinstaller Capacitor et générer le projet Android
+      - name: Installer Capacitor 6 et synchroniser Android
         run: |
           npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/camera@6 @capacitor/geolocation@6 --legacy-peer-deps
           rm -rf android
           npx cap add android
           npx cap sync android
 
-      - name: Résoudre le bug BouncyCastle et configurer Gradle
+      - name: Configurer Gradle pour désactiver l'agent ASM
         run: |
           cd android
-          # Corriger la dépendance BouncyCastle corrompue dans le buildscript racine
-          cat << 'EOF' > fix_bc.gradle
-          allprojects {
-              configurations.all {
-                  resolutionStrategy {
-                      force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
-                  }
-              }
-          }
-          EOF
-          echo "apply from: 'fix_bc.gradle'" >> build.gradle
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8 -Dorg.gradle.internal.instrumentation.agent=false" >> gradle.properties
+          echo "android.useAndroidX=true" >> gradle.properties
+          echo "android.enableJetifier=true" >> gradle.properties
 
       - name: Ajouter les autorisations au Manifeste
         run: |
@@ -81,7 +72,7 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon
 
       - name: Téléverser l'APK généré
         uses: actions/upload-artifact@v4
