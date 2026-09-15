@@ -26,29 +26,26 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configurer le SDK Android
+      - name: Configurer le SDK Android (API 36)
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
 
       - name: Préparer le dossier dist et index.html
         run: |
           mkdir -p dist
-          # Si un dossier assets/public existe, copier son contenu
           if [ -d "assets/public" ]; then
             cp -r assets/public/* dist/
           fi
-          # Si un index.html est à la racine, le copier dans dist
           if [ -f "index.html" ]; then
             cp index.html dist/
           fi
-          # Si dist n'a toujours pas d'index.html, chercher le premier index.html disponible
           if [ ! -f "dist/index.html" ]; then
             FOUND_INDEX=$(find . -name "index.html" -not -path "*/.*" -not -path "./dist/*" | head -n 1)
             if [ -n "$FOUND_INDEX" ]; then
               cp "$FOUND_INDEX" dist/index.html
             else
-              # Création d'un conteneur minimal si non trouvé pour débloquer Capacitor
               echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>BRADCI</title></head><body><div id="root"></div></body></html>' > dist/index.html
             fi
           fi
@@ -57,6 +54,21 @@ jobs:
         run: |
           npm install --legacy-peer-deps
           npx cap sync android
+
+      - name: Aligner les versions Android SDK (compileSdk 36)
+        run: |
+          # Met à jour les variables variables.gradle si présent
+          if [ -f "android/variables.gradle" ]; then
+            sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 36/g' android/variables.gradle
+            sed -i 's/targetSdkVersion = [0-9]*/targetSdkVersion = 36/g' android/variables.gradle
+          fi
+          # Met à jour directement app/build.gradle
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 36/g' android/app/build.gradle
+            sed -i 's/compileSdk = [0-9]*/compileSdk = 36/g' android/app/build.gradle
+            sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 36/g' android/app/build.gradle
+            sed -i 's/targetSdk = [0-9]*/targetSdk = 36/g' android/app/build.gradle
+          fi
 
       - name: Ajouter les autorisations au Manifeste
         run: |
