@@ -26,21 +26,23 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Accepter les licences et installer le SDK Android
+      - name: Accepter les licences Android SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
-      - name: Installer et compiler l'application Vite (BRADCI)
+      - name: Installer les dépendances et compiler Vite
         run: |
+          # Désinstaller le plugin caméra conflictuel de package.json
+          npm uninstall @capacitor/camera @capacitor/geolocation || true
           npm install --legacy-peer-deps --force
           npm run build || npx vite build
 
-      - name: Générer le conteneur natif Android propre
+      - name: Initialiser le conteneur Capacitor officiel propre
         run: |
-          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 --save-exact --legacy-peer-deps --force
-          rm -rf android capacitor.config.ts
+          # Nettoyage complet des anciens artefacts de build
+          rm -rf android capacitor.config.ts node_modules/@capacitor/camera
+          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact --legacy-peer-deps --force
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.bradci.app",
@@ -56,26 +58,13 @@ jobs:
           npx cap add android
           npx cap copy android
 
-      - name: Fixer les dépendances Gradle et verrouiller les versions AndroidX
+      - name: Verrouiller les dépendances Gradle
         run: |
           cd android
-          # Empêcher le téléchargement de versions instables d'AndroidX
-          cat << 'EOF' > fix_deps.gradle
-          allprojects {
-              configurations.all {
-                  resolutionStrategy {
-                      force 'androidx.core:core:1.13.1'
-                      force 'androidx.core:core-ktx:1.13.1'
-                      force 'androidx.activity:activity:1.9.0'
-                      force 'androidx.activity:activity-ktx:1.9.0'
-                      force 'androidx.appcompat:appcompat:1.6.1'
-                  }
-              }
-          }
-          EOF
-          echo "apply from: 'fix_deps.gradle'" >> build.gradle
-          echo "android.useAndroidX=true" >> gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
+          # Désactiver l'inclusion de plugins natifs résiduels dans settings.gradle
+          sed -i '/capacitor-camera/d' settings.gradle || true
+          sed -i '/capacitor-geolocation/d' settings.gradle || true
+          echo "android.suppressUnsupportedCompileSdk=34,35,36" >> gradle.properties
 
       - name: Remplacer le logo par icon.png
         run: |
