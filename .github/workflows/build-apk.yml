@@ -20,13 +20,13 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: Configuration de Java JDK 17
+      - name: Configuration de Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
-      - name: Accepter les licences Android SDK
+      - name: Configurer le SDK Android
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -47,12 +47,28 @@ jobs:
             fi
           fi
 
-      - name: Réinstaller Capacitor et regénérer Android propre
+      - name: Réinstaller Capacitor et générer le projet Android
         run: |
-          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 --legacy-peer-deps
+          npm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/camera@6 @capacitor/geolocation@6 --legacy-peer-deps
           rm -rf android
           npx cap add android
           npx cap sync android
+
+      - name: Résoudre le bug BouncyCastle et configurer Gradle
+        run: |
+          cd android
+          # Corriger la dépendance BouncyCastle corrompue dans le buildscript racine
+          cat << 'EOF' > fix_bc.gradle
+          allprojects {
+              configurations.all {
+                  resolutionStrategy {
+                      force 'org.bouncycastle:bcprov-jdk18on:1.78.1'
+                  }
+              }
+          }
+          EOF
+          echo "apply from: 'fix_bc.gradle'" >> build.gradle
+          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
 
       - name: Ajouter les autorisations au Manifeste
         run: |
@@ -65,7 +81,7 @@ jobs:
         run: |
           cd android
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Téléverser l'APK généré
         uses: actions/upload-artifact@v4
