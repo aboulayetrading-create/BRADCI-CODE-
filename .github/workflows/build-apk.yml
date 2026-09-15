@@ -8,15 +8,17 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
       - name: Récupération du code source
         uses: actions/checkout@v4
 
-      - name: Configuration de Node.js
+      - name: Configuration de Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22.x'
 
       - name: Installation de Java JDK 17
         uses: actions/setup-java@v4
