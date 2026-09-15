@@ -31,15 +31,19 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Installer les dépendances et Capacitor
+      - name: Préparer le dossier dist attendu par Capacitor
+        run: |
+          mkdir -p dist
+          if [ -d "assets/public" ]; then
+            cp -r assets/public/* dist/
+          fi
+
+      - name: Installer les dépendances et synchroniser Capacitor
         run: |
           npm install --legacy-peer-deps
-
-      - name: Synchroniser Capacitor Android
-        run: |
           npx cap sync android
 
-      - name: Ajouter les permissions au Manifeste
+      - name: Ajouter les autorisations au Manifeste
         run: |
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
