@@ -36,14 +36,8 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Compiler l'application Vite avec Bun
+      - name: Compiler le code React/Vite
         run: |
-          # Éliminer tous les plugins natifs obsolètes du package.json
-          sed -i '/@capacitor\/local-notifications/d' package.json || true
-          sed -i '/@capacitor\/push-notifications/d' package.json || true
-          sed -i '/@capacitor\/camera/d' package.json || true
-          sed -i '/@capacitor\/geolocation/d' package.json || true
-          
           bun install || npm install --legacy-peer-deps --force
           bun run build || npm run build || true
 
@@ -60,15 +54,27 @@ jobs:
             sed -i 's|href="/|href="./|g' dist/index.html
           fi
 
-      - name: Initialiser le conteneur Android Capacitor
+      - name: Créer le conteneur Android Capacitor propre
         run: |
-          # Supprimer les dossiers résiduels de plugins natifs
-          rm -rf node_modules/@capacitor/local-notifications
-          rm -rf node_modules/@capacitor/push-notifications
-          rm -rf node_modules/@capacitor/camera
-          rm -rf node_modules/@capacitor/geolocation
-          rm -rf android capacitor.config.ts
+          # Sauvegarde du build web et de l'icône
+          mkdir -p /tmp/bradci_build
+          cp -r dist /tmp/bradci_build/
+          cp icon.png /tmp/bradci_build/ || true
 
+          # Nettoyage complet pour supprimer toute trace de plugin natif brisé
+          rm -rf android capacitor.config.* package.json bun.lock node_modules
+
+          # Initialisation d'un environnement Capacitor autonome
+          cat << 'EOF' > package.json
+          {
+            "name": "bradci",
+            "version": "1.0.0",
+            "private": true
+          }
+          EOF
+
+          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact
+          
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.bradci.app",
@@ -81,7 +87,13 @@ jobs:
             }
           }
           EOF
-          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact --legacy-peer-deps --force
+
+          # Restauration de l'application compilée
+          cp -r /tmp/bradci_build/dist ./
+          if [ -f "/tmp/bradci_build/icon.png" ]; then
+            cp /tmp/bradci_build/icon.png ./
+          fi
+
           npx cap add android
           npx cap copy android
 
@@ -97,26 +109,11 @@ jobs:
             done
           fi
 
-      - name: Neutraliser les plugins natifs résiduels dans Gradle
+      - name: Configurer les autorisations et options Gradle
         run: |
           cd android
-          # Vider les déclarations de plugins dans capacitor.settings.gradle s'il existe
-          if [ -f "capacitor.settings.gradle" ]; then
-            > capacitor.settings.gradle
-          fi
-
-          # Nettoyer settings.gradle
-          sed -i '/notifications/d' settings.gradle || true
-          sed -i '/capacitor-camera/d' settings.gradle || true
-          sed -i '/capacitor-geolocation/d' settings.gradle || true
-
-          # Nettoyer app/build.gradle de toute dépendance vers un sous-projet
-          sed -i '/project('\'':capacitor-/d' app/build.gradle || true
-
-          # Activer MultiDex
-          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/g' app/build.gradle
           echo "android.suppressUnsupportedCompileSdk=34,35,36" >> gradle.properties
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
+          sed -i 's/defaultConfig {/defaultConfig {\n        multiDexEnabled true/g' app/build.gradle
 
           MANIFEST_FILE="app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
