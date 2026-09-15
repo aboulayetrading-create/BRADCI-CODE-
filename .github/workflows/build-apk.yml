@@ -36,41 +36,46 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Forcer la compilation et inclure 100% des fichiers médias
+      - name: Compiler et packager l'intégralité absolue des données (18 Mo)
         run: |
           # 1. Neutraliser les contrôles bloquants
           sed -i 's/"build": "tsc -b && vite build"/"build": "vite build"/g' package.json || true
           sed -i 's/"build": "tsc && vite build"/"build": "vite build"/g' package.json || true
 
-          # 2. Installer toutes les dépendances
+          # 2. Installation complète
           bun install || npm install --legacy-peer-deps --force
           npm install @capacitor/camera @capacitor/geolocation @capacitor/push-notifications @capacitor/local-notifications --legacy-peer-deps --force || true
 
-          # 3. Compilation Vite
+          # 3. Compiler avec Vite
           npx vite build || true
 
-          # 4. Fusionner l'intégralité brute des assets, médias et dossiers publics
+          # 4. Injecter TOUS les dossiers et fichiers médias sans exception dans dist
           mkdir -p dist
+
+          # Injection directe du contenu de assets
           if [ -d "assets" ]; then
-            cp -r assets dist/
+            cp -rn assets/* dist/ || true
+            cp -rn assets dist/ || true
           fi
+
+          # Injection du contenu de public
           if [ -d "public" ]; then
-            cp -r public/* dist/ || true
+            cp -rn public/* dist/ || true
           fi
-          if [ -f "index.html" ] && [ ! -f "dist/index.html" ]; then
+
+          # S'assurer que le HTML principal est présent
+          if [ -f "index.html" ]; then
             cp index.html dist/index.html
           fi
 
-          # 5. Corriger les chemins pour le WebView Android
-          if [ -f "dist/index.html" ]; then
-            sed -i 's|src="/|src="./|g' dist/index.html
-            sed -i 's|href="/|href="./|g' dist/index.html
-          fi
+          # Chemins relatifs pour WebView Android
+          sed -i 's|src="/|src="./|g' dist/index.html
+          sed -i 's|href="/|href="./|g' dist/index.html
 
-          echo "=== Poids total injecté dans dist ==="
+          echo "=== Vérification de la taille totale brute injectée ==="
           du -sh dist/
 
-      - name: Créer le conteneur Android avec l'intégralité des données
+      - name: Initialiser Capacitor avec l'ensemble complet
         run: |
           mkdir -p /tmp/bradci_full
           cp -r dist /tmp/bradci_full/
