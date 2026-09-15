@@ -12,7 +12,7 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
-      - name: Récupération du code source
+      - name: Récupération du code source le plus récent
         uses: actions/checkout@v4
 
       - name: Configuration de Node.js 20
@@ -31,31 +31,21 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Préparer le dossier dist et index.html
+      - name: Injecter les derniers assets compilés BRADCI
         run: |
           mkdir -p dist
+          # Copie des derniers fichiers compilés réels de l'application
           if [ -d "assets/public" ]; then
             cp -r assets/public/* dist/
-          fi
-          if [ -f "index.html" ]; then
-            cp index.html dist/
-          fi
-          if [ ! -f "dist/index.html" ]; then
-            FOUND_INDEX=$(find . -name "index.html" -not -path "*/.*" -not -path "./dist/*" | head -n 1)
-            if [ -n "$FOUND_INDEX" ]; then
-              cp "$FOUND_INDEX" dist/index.html
-            else
-              echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>BRADCI</title></head><body><div id="root"></div></body></html>' > dist/index.html
-            fi
+          elif [ -f "index.html" ]; then
+            cp -r * dist/ || true
           fi
 
-      - name: Initialiser Capacitor Android officiel propre
+      - name: Initialiser Capacitor avec la dernière version de BRADCI
         run: |
-          # Supprimer les anciens fichiers sources de conflits
           rm -rf android package.json node_modules package-lock.json capacitor.config.ts
           npm init -y
           npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 typescript @types/node --save-exact
-          # Créer directement la configuration JSON native
           cat << 'EOF' > capacitor.config.json
           {
             "appId": "com.bradci.app",
@@ -65,8 +55,9 @@ jobs:
           }
           EOF
           npx cap add android
+          npx cap copy android
 
-      - name: Configurer les permissions et le WebView Android
+      - name: Configurer les autorisations Android (Permissions, Réseau, Médias)
         run: |
           MANIFEST_FILE="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST_FILE" ]; then
@@ -74,7 +65,7 @@ jobs:
             sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' $MANIFEST_FILE
           fi
 
-      - name: Compiler l'APK Android (Gradle)
+      - name: Compiler l'APK Android final
         run: |
           cd android
           chmod +x ./gradlew
