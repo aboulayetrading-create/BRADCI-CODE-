@@ -26,10 +26,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configurer le SDK Android
+      - name: Configurer le SDK Android (API 35)
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-35" "build-tools;35.0.0" || true
 
       - name: Installer les dépendances et compiler Vite
         run: |
@@ -54,7 +55,20 @@ jobs:
           EOF
           npx cap add android
 
-      - name: Génération propre des icônes Android (Capacitor Assets)
+      - name: Mettre à jour les versions Android SDK (compileSdk 35)
+        run: |
+          # Aligner variables.gradle sur l'API 35
+          if [ -f "android/variables.gradle" ]; then
+            sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 35/g' android/variables.gradle
+            sed -i 's/targetSdkVersion = [0-9]*/targetSdkVersion = 35/g' android/variables.gradle
+          fi
+          # Aligner app/build.gradle
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i 's/compileSdkVersion rootProject.ext.compileSdkVersion/compileSdkVersion 35/g' android/app/build.gradle
+            sed -i 's/targetSdkVersion rootProject.ext.targetSdkVersion/targetSdkVersion 35/g' android/app/build.gradle
+          fi
+
+      - name: Génération des icônes Android avec Capacitor Assets
         run: |
           if [ -f "icon.png" ]; then
             mkdir -p assets
