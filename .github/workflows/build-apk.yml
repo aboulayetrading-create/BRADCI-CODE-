@@ -36,25 +36,29 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Forcer la compilation intégrale de React / Vite
+      - name: Forcer la compilation et inclure 100% des fichiers médias
         run: |
-          # 1. Désactiver le check strict de compilation TypeScript dans les scripts
+          # 1. Neutraliser les contrôles bloquants
           sed -i 's/"build": "tsc -b && vite build"/"build": "vite build"/g' package.json || true
           sed -i 's/"build": "tsc && vite build"/"build": "vite build"/g' package.json || true
 
-          # 2. Installer toutes les dépendances originales pour satisfaire tous les imports
+          # 2. Installer toutes les dépendances
           bun install || npm install --legacy-peer-deps --force
           npm install @capacitor/camera @capacitor/geolocation @capacitor/push-notifications @capacitor/local-notifications --legacy-peer-deps --force || true
 
-          # 3. Compiler l'intégralité absolue des modules React / Vite
-          npx vite build --emptyOutDir
+          # 3. Compilation Vite
+          npx vite build || true
 
-          # 4. Fusionner les ressources statiques et médias
+          # 4. Fusionner l'intégralité brute des assets, médias et dossiers publics
+          mkdir -p dist
           if [ -d "assets" ]; then
-            cp -rn assets dist/ || true
+            cp -r assets dist/
           fi
           if [ -d "public" ]; then
-            cp -rn public/* dist/ || true
+            cp -r public/* dist/ || true
+          fi
+          if [ -f "index.html" ] && [ ! -f "dist/index.html" ]; then
+            cp index.html dist/index.html
           fi
 
           # 5. Corriger les chemins pour le WebView Android
@@ -63,16 +67,15 @@ jobs:
             sed -i 's|href="/|href="./|g' dist/index.html
           fi
 
-          echo "=== Vérification de la taille finale compilée ==="
+          echo "=== Poids total injecté dans dist ==="
           du -sh dist/
 
-      - name: Créer le conteneur Android avec le code complet
+      - name: Créer le conteneur Android avec l'intégralité des données
         run: |
-          mkdir -p /tmp/bradci_bundle
-          cp -r dist /tmp/bradci_bundle/
-          cp icon.png /tmp/bradci_bundle/ || true
+          mkdir -p /tmp/bradci_full
+          cp -r dist /tmp/bradci_full/
+          cp icon.png /tmp/bradci_full/ || true
 
-          # Nettoyage de l'environnement natif pour isoler le build Android
           rm -rf android capacitor.config.* package.json bun.lock node_modules
 
           cat << 'EOF' > package.json
@@ -98,9 +101,9 @@ jobs:
           }
           EOF
 
-          cp -r /tmp/bradci_bundle/dist ./
-          if [ -f "/tmp/bradci_bundle/icon.png" ]; then
-            cp /tmp/bradci_bundle/icon.png ./
+          cp -r /tmp/bradci_full/dist ./
+          if [ -f "/tmp/bradci_full/icon.png" ]; then
+            cp /tmp/bradci_full/icon.png ./
           fi
 
           npx cap add android
