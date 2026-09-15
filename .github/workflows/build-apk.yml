@@ -31,16 +31,12 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Installer Capacitor CLI et Plugins requis
+      - name: Installer les dépendances et Capacitor
         run: |
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/geolocation @capacitor/camera
-          npx cap init "BRADCI" "com.bradci.app" --web-dir assets/public
+          npm install --legacy-peer-deps
 
-      - name: Reconstruire le projet Android natif propre
+      - name: Synchroniser Capacitor Android
         run: |
-          rm -rf android
-          npx cap add android
           npx cap sync android
 
       - name: Ajouter les permissions au Manifeste
