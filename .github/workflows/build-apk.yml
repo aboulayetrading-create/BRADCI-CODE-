@@ -51,10 +51,19 @@ jobs:
 
       - name: Initialiser Capacitor Android officiel propre
         run: |
-          rm -rf android package.json node_modules package-lock.json
+          # Supprimer les anciens fichiers sources de conflits
+          rm -rf android package.json node_modules package-lock.json capacitor.config.ts
           npm init -y
-          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 --save-exact
-          npx cap init "BRADCI" "com.bradci.app" --web-dir dist
+          npm install @capacitor/core@5.7.4 @capacitor/cli@5.7.4 @capacitor/android@5.7.4 typescript @types/node --save-exact
+          # Créer directement la configuration JSON native
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "com.bradci.app",
+            "appName": "BRADCI",
+            "webDir": "dist",
+            "bundledWebRuntime": false
+          }
+          EOF
           npx cap add android
 
       - name: Configurer les permissions et le WebView Android
