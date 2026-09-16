@@ -11,7 +11,8 @@ import {
   Bike,
   Car,
   Truck,
-  Zap
+  Zap,
+  Bell
 } from 'lucide-react';
 import { DriverTab } from '../types';
 import { DriverRadarView } from './DriverRadarView';
@@ -27,7 +28,9 @@ export const DriverDashboard: React.FC = () => {
     freightJobs, 
     activeDriverTab, 
     setActiveDriverTab,
-    toggleDriverAvailability 
+    toggleDriverAvailability,
+    unreadNotificationsCount,
+    setNotificationsModalOpen
   } = useApp();
 
   // Listen to global custom events (e.g. from MobileBottomNav or quick actions)
@@ -98,8 +101,23 @@ export const DriverDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Online / Offline Toggle */}
+          {/* Quick Actions: Notifications Bell & Online / Offline Toggle */}
           <div className="flex items-center gap-2">
+            <button
+              id="driver-header-notifications-btn"
+              type="button"
+              onClick={() => setNotificationsModalOpen(true)}
+              className="relative p-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-700 shadow-md flex items-center justify-center transition-all cursor-pointer active:scale-95"
+              title="Centre des Notifications & Alertes Courses"
+            >
+              <Bell className="w-4 h-4 text-amber-400" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white font-mono font-bold text-[10px] flex items-center justify-center border border-slate-900 shadow animate-pulse">
+                  {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+
             <button
               id="driver-header-toggle-status"
               onClick={toggleDriverAvailability}

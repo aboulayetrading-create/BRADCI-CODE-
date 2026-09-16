@@ -175,7 +175,7 @@ export const ClientDashboard: React.FC = () => {
 
   // KYC Form state
   const [docType, setDocType] = useState<'cni' | 'passeport' | 'attestation'>('cni');
-  const [docNumber, setDocNumber] = useState(currentUser?.kycDocumentNumber || 'CI0029481920');
+  const [docNumber, setDocNumber] = useState(currentUser?.kycDocumentNumber || '');
   const [docPhoto, setDocPhoto] = useState(KYC_DRAWING_DATA_URIS.cni);
   const [selfiePhoto, setSelfiePhoto] = useState(currentUser?.avatar || KYC_DRAWING_DATA_URIS.selfie);
   const [kycFeedback, setKycFeedback] = useState<{ isDuplicate?: boolean; message?: string } | null>(null);
@@ -313,19 +313,39 @@ export const ClientDashboard: React.FC = () => {
                 </span>
 
                 {currentUser.kycStatus === 'verified' ? (
-                  <span id="profile-header-kyc-verified-badge" className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setActiveSubTab('kyc');
+                      setKycModalOpen(true);
+                    }}
+                    id="profile-header-kyc-verified-badge" 
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 cursor-pointer transition-colors"
+                  >
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                     <span>{translate("Vérifié KYC", "KYC Verified")}</span>
-                  </span>
+                  </button>
                 ) : currentUser.kycStatus === 'pending' ? (
-                  <span id="profile-header-kyc-pending-badge" className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-xs">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setActiveSubTab('kyc');
+                      setKycModalOpen(true);
+                    }}
+                    id="profile-header-kyc-pending-badge" 
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-xs hover:bg-amber-500/25 cursor-pointer transition-colors"
+                  >
                     <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
                     <span>{translate("KYC en cours de vérification", "KYC under verification")}</span>
-                  </span>
+                  </button>
                 ) : (
                   <button
-                    onClick={() => setKycModalOpen(true)}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 hover:text-amber-400 transition-colors"
+                    type="button"
+                    onClick={() => {
+                      setActiveSubTab('kyc');
+                      setKycModalOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 hover:text-amber-400 hover:border-amber-500/50 cursor-pointer transition-colors"
                   >
                     <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
                     <span>{translate("Vérifier KYC", "Verify KYC")}</span>
@@ -674,20 +694,20 @@ export const ClientDashboard: React.FC = () => {
       {/* Withdrawal Modal */}
       {withdrawalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-md bg-[#0C121E] border border-slate-800 rounded-3xl p-6 shadow-2xl relative text-slate-100 space-y-4">
+          <div className="w-full max-w-md bg-white dark:bg-[#0C121E] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl relative text-slate-900 dark:text-slate-100 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/30">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">Demande de Retrait Mobile Money</h3>
-                  <p className="text-xs text-slate-400">Solde disponible : <strong className="text-emerald-400 font-mono">{currentUser.walletBalance.toLocaleString('fr-FR')} FCFA</strong></p>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Demande de Retrait Mobile Money</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Solde disponible : <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{currentUser.walletBalance.toLocaleString('fr-FR')} FCFA</strong></p>
                 </div>
               </div>
               <button
                 onClick={() => setWithdrawalModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-900 border border-slate-800"
+                className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -705,62 +725,69 @@ export const ClientDashboard: React.FC = () => {
               className="space-y-4 pt-1"
             >
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1.5">Opérateur de Réception :</label>
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1.5">Opérateur de Réception :</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['Wave', 'Orange Money', 'MTN MoMo'] as PaymentMethod[]).map(m => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setWithdrawMethod(m)}
-                      className={`p-2 rounded-xl text-xs font-bold border transition-all ${
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         withdrawMethod === m
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500 shadow-xs'
+                          : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 border-slate-300 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800'
                       }`}
                     >
                       {m}
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {withdrawMethod === 'Wave' ? '✓ Frais de retrait Wave : 0%' : 'Frais de transaction réseau : 1%'}
-                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-1.5">
+                  <span>⚡ Frais de retrait : 1% sur tous les opérateurs (Wave, Orange Money, MTN MoMo)</span>
+                </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Montant à Retirer (FCFA) :</label>
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1">Montant à Retirer (FCFA) :</label>
                 <input
                   type="number"
                   min={1000}
                   max={currentUser.walletBalance}
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Numéro Mobile Money Récepteur :</label>
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1">Numéro Mobile Money Récepteur :</label>
                 <input
                   type="tel"
                   value={withdrawPhone}
                   onChange={(e) => setWithdrawPhone(e.target.value)}
                   placeholder="+225 07 XX XX XX XX"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
 
-              <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Montant Brut :</span>
-                  <span className="font-mono text-white">{Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA</span>
+              {/* Financial Calculation Breakdown with 1% fee */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                <div className="flex justify-between text-slate-700 dark:text-slate-300">
+                  <span>Montant Brut demandé :</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-white">{Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Net à recevoir :</span>
-                  <span className="font-mono text-emerald-400 font-bold">
-                    {(Number(withdrawAmount || 0) - (withdrawMethod === 'Wave' ? 0 : Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA
+                <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
+                  <span>Frais de retrait (1%) :</span>
+                  <span className="font-mono font-bold">
+                    - {Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01)).toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+                <div className="flex justify-between pt-1.5 border-t border-slate-200 dark:border-slate-800 font-bold">
+                  <span className="text-slate-800 dark:text-slate-200">Net à recevoir sur votre mobile :</span>
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                    {(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA
                   </span>
                 </div>
               </div>
@@ -769,15 +796,18 @@ export const ClientDashboard: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setWithdrawalModalOpen(false)}
-                  className="px-4 py-2 bg-slate-900 text-slate-400 text-xs font-bold rounded-xl border border-slate-800"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   {translate("Annuler", "Cancel")}
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer"
                 >
-                  {translate(`Confirmer le Retrait (${Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA)`, `Confirm Withdrawal (${Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA)`)}
+                  {translate(
+                    `Confirmer le Retrait (${(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA Net)`,
+                    `Confirm Withdrawal (${(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA Net)`
+                  )}
                 </button>
               </div>
             </form>

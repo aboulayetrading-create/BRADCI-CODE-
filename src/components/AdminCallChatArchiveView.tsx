@@ -24,29 +24,71 @@ import {
   ExternalLink,
   Smartphone,
   Eye,
-  X
+  X,
+  Send,
+  Check,
+  Crown,
+  Trash2,
+  HelpCircle,
+  Zap,
+  PhoneForwarded,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   assistantArchive, 
   AssistantConversationArchive, 
-  AssistantCallArchive 
+  AssistantCallArchive,
+  RecordedChatMessage
 } from '../utils/assistantRecordingArchive';
 import { useApp } from '../context/AppContext';
 
 export const AdminCallChatArchiveView: React.FC = () => {
-  const { translate, adminImpersonateUser } = useApp();
+  const { translate, adminImpersonateUser, addToast, adminAuthorizeSupportCall } = useApp();
   const [conversations, setConversations] = useState<AssistantConversationArchive[]>(() => assistantArchive.getConversations());
   const [calls, setCalls] = useState<AssistantCallArchive[]>(() => assistantArchive.getCalls());
   
-  const [activeSubtab, setActiveSubtab] = useState<'all' | 'calls' | 'conversations'>('all');
+  const [activeSubtab, setActiveSubtab] = useState<'all' | 'calls' | 'conversations' | 'unresolved' | 'resolved'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedConversation, setSelectedConversation] = useState<AssistantConversationArchive | null>(null);
   const [selectedCall, setSelectedCall] = useState<AssistantCallArchive | null>(null);
+
+  // Admin Live Chat Response state
+  const [adminReplyText, setAdminReplyText] = useState('');
+  const [markResolvedOnSend, setMarkResolvedOnSend] = useState(false);
+  const [isSendingReply, setIsSendingReply] = useState(false);
 
   // Audio player simulation state
   const [playingCallId, setPlayingCallId] = useState<string | null>(null);
   const [playbackProgress, setPlaybackProgress] = useState<number>(0);
   const [audioVolume, setAudioVolume] = useState<number>(85);
+
+  const QUICK_ADMIN_TEMPLATES = [
+    {
+      label: "✅ Compte & KYC Validés",
+      text: "Bonjour. Votre profil et vos pièces justificatives KYC viennent d'être vérifiés et approuvés manuellement par la direction BRAD'CI. Vous bénéficiez désormais de l'accès illimité aux enchères et retraits.",
+      resolve: true
+    },
+    {
+      label: "💳 Retrait Wave / OM Approuvé",
+      text: "Bonjour. Votre demande de virement / retrait vers votre compte Mobile Money a été traitée et validée par le service financier. Les fonds sont immédiatement disponibles sur votre numéro.",
+      resolve: true
+    },
+    {
+      label: "🛵 Course Réassignée Priorité",
+      text: "Bonjour. Nous avons constaté le délai de prise en charge de votre colis. Votre course vient d'être réassignée en priorité absolue à un coursier express certifié. Vous pouvez suivre sa position sur le radar GPS.",
+      resolve: false
+    },
+    {
+      label: "🔒 Séquestre Garanti 100%",
+      text: "Bonjour. Nous vous confirmons que votre paiement est intégralement consigné sur le compte séquestre sécurisé officiel de BRAD'CI. Aucun versement n'est transmis au vendeur tant que vous n'avez pas confirmé la réception conforme du produit.",
+      resolve: false
+    },
+    {
+      label: "📞 Rappel Téléphonique en cours",
+      text: "Bonjour. Un membre de notre équipe support de niveau 2 prend en charge votre dossier et va vous appeler sur votre numéro dans les prochaines minutes.",
+      resolve: false
+    }
+  ];
 
   // Listen to automatic updates from assistantArchive
   useEffect(() => {
@@ -91,8 +133,79 @@ export const AdminCallChatArchiveView: React.FC = () => {
     }
   };
 
+  const unresolvedConversations = conversations.filter(c => !c.resolvedByAdmin && c.status !== 'closed');
+  const resolvedConversations = conversations.filter(c => c.resolvedByAdmin || c.status === 'closed');
+
+  const handleSendAdminReply = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!selectedConversation || !adminReplyText.trim()) return;
+
+    setIsSendingReply(true);
+    const sentMsg = assistantArchive.adminReplyToConversation({
+      conversationId: selectedConversation.id,
+      replyText: adminReplyText.trim(),
+      adminName: "Direction BRAD'CI (Super Admin)",
+      markAsResolved: markResolvedOnSend
+    });
+
+    if (sentMsg) {
+      setSelectedConversation(prev => prev ? {
+        ...prev,
+        messages: [...prev.messages, sentMsg],
+        messagesCount: prev.messages.length + 1,
+        resolvedByAdmin: markResolvedOnSend ? true : prev.resolvedByAdmin,
+        status: markResolvedOnSend ? 'closed' : prev.status
+      } : null);
+
+      setAdminReplyText('');
+      addToast(
+        "Réponse Officielle Transmise",
+        `Message délivré en direct à ${selectedConversation.userName}`,
+        "success"
+      );
+    }
+    setIsSendingReply(false);
+  };
+
+  const handleToggleResolution = (convId: string, currentResolved: boolean) => {
+    const nextState = !currentResolved;
+    assistantArchive.updateConversationStatus(convId, nextState);
+    if (selectedConversation && selectedConversation.id === convId) {
+      setSelectedConversation(prev => prev ? {
+        ...prev,
+        resolvedByAdmin: nextState,
+        status: nextState ? 'closed' : 'active'
+      } : null);
+    }
+    addToast(
+      nextState ? "Discussion Clôturée / Résolue" : "Discussion Réouverte",
+      "Le statut d'assistance a été mis à jour.",
+      "info"
+    );
+  };
+
+  const handleDeleteConversation = (convId: string) => {
+    if (window.confirm("Supprimer définitivement cette archive de discussion ?")) {
+      assistantArchive.deleteConversation(convId);
+      if (selectedConversation?.id === convId) {
+        setSelectedConversation(null);
+      }
+      addToast("Archive Supprimée", "L'enregistrement a été retiré.", "info");
+    }
+  };
+
+  const handleApplyTemplate = (template: { label: string; text: string; resolve: boolean }) => {
+    setAdminReplyText(template.text);
+    if (template.resolve) {
+      setMarkResolvedOnSend(true);
+    }
+  };
+
   // Filter conversations
   const filteredConversations = conversations.filter(conv => {
+    if (activeSubtab === 'unresolved' && (conv.resolvedByAdmin || conv.status === 'closed')) return false;
+    if (activeSubtab === 'resolved' && (!conv.resolvedByAdmin && conv.status !== 'closed')) return false;
+
     const q = searchTerm.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -101,12 +214,14 @@ export const AdminCallChatArchiveView: React.FC = () => {
       conv.userEmail?.toLowerCase().includes(q) ||
       conv.advisorName.toLowerCase().includes(q) ||
       conv.ipAddress.includes(q) ||
-      conv.commune.toLowerCase().includes(q)
+      conv.commune.toLowerCase().includes(q) ||
+      (conv.detectedIssue && conv.detectedIssue.toLowerCase().includes(q))
     );
   });
 
   // Filter calls
   const filteredCalls = calls.filter(call => {
+    if (activeSubtab === 'unresolved' || activeSubtab === 'resolved') return false;
     const q = searchTerm.toLowerCase().trim();
     if (!q) return true;
     return (
@@ -182,10 +297,10 @@ export const AdminCallChatArchiveView: React.FC = () => {
           )}
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1">
           <button
             onClick={() => setActiveSubtab('all')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
               activeSubtab === 'all'
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
@@ -194,26 +309,48 @@ export const AdminCallChatArchiveView: React.FC = () => {
             Tous ({totalInteractionsCount})
           </button>
           <button
+            onClick={() => setActiveSubtab('unresolved')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              activeSubtab === 'unresolved'
+                ? 'bg-rose-500 text-white shadow-md font-black'
+                : 'bg-slate-900 text-rose-400 hover:bg-rose-500/10 border border-rose-500/30'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <span>En Attente d'Intervention ({unresolvedConversations.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveSubtab('resolved')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              activeSubtab === 'resolved'
+                ? 'bg-emerald-500 text-slate-950 shadow-md font-black'
+                : 'bg-slate-900 text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/30'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Résolues ({resolvedConversations.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveSubtab('conversations')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              activeSubtab === 'conversations'
+                ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>Tous les Chats ({conversations.length})</span>
+          </button>
+          <button
             onClick={() => setActiveSubtab('calls')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
               activeSubtab === 'calls'
                 ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                 : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
             <Phone className="w-3.5 h-3.5" />
-            <span>Appels Téléphoniques ({calls.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveSubtab('conversations')}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-              activeSubtab === 'conversations'
-                ? 'bg-amber-500 text-slate-950 shadow-md font-black'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Conversations Chat ({conversations.length})</span>
+            <span>Appels ({calls.length})</span>
           </button>
         </div>
       </div>
@@ -360,32 +497,48 @@ export const AdminCallChatArchiveView: React.FC = () => {
       )}
 
       {/* SECTION 2: CHAT CONVERSATIONS LIST */}
-      {(activeSubtab === 'all' || activeSubtab === 'conversations') && (
+      {(activeSubtab === 'all' || activeSubtab === 'conversations' || activeSubtab === 'unresolved' || activeSubtab === 'resolved') && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-cyan-400" />
-              <span>Historique Intégral des Conversations Écrites ({filteredConversations.length})</span>
+              <span>
+                {activeSubtab === 'unresolved'
+                  ? `Conversations En Attente d'Intervention (${filteredConversations.length})`
+                  : activeSubtab === 'resolved'
+                  ? `Conversations Résolues (${filteredConversations.length})`
+                  : `Historique Intégral des Conversations Écrites (${filteredConversations.length})`}
+              </span>
             </h3>
-            <span className="text-xs text-slate-400">Archivage automatique horodaté</span>
+            <span className="text-xs text-slate-400">Intervention en direct & archivage certifié</span>
           </div>
 
           {filteredConversations.length === 0 ? (
             <div className="p-8 text-center bg-[#0C121E] border border-slate-800 rounded-2xl text-slate-400 text-sm">
-              Aucune conversation ne correspond à votre recherche.
+              Aucune conversation ne correspond à ce filtre ou critère de recherche.
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
               {filteredConversations.map(conv => {
                 const lastMsg = conv.messages[conv.messages.length - 1];
+                const isResolved = conv.resolvedByAdmin || conv.status === 'closed';
+
                 return (
                   <div 
                     key={conv.id}
-                    className="bg-[#0C121E] border border-slate-800 hover:border-slate-700 rounded-2xl p-4 transition-all space-y-3"
+                    className={`bg-[#0C121E] border rounded-2xl p-4 transition-all space-y-3 ${
+                      !isResolved
+                        ? 'border-rose-500/40 hover:border-rose-400/70 shadow-lg shadow-rose-950/20'
+                        : 'border-slate-800 hover:border-slate-700'
+                    }`}
                   >
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                       <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
+                          !isResolved 
+                            ? 'bg-rose-500/15 border-rose-500/30 text-rose-400' 
+                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        }`}>
                           <MessageSquare className="w-5 h-5" />
                         </div>
                         <div>
@@ -395,8 +548,19 @@ export const AdminCallChatArchiveView: React.FC = () => {
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold uppercase">
                               {conv.userRole}
                             </span>
+                            {isResolved ? (
+                              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Résolu</span>
+                              </span>
+                            ) : (
+                              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                                <span>Action Requise</span>
+                              </span>
+                            )}
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
-                              {conv.messagesCount} messages échangés
+                              {conv.messagesCount} messages
                             </span>
                           </div>
                           <p className="text-xs text-slate-400 mt-1 line-clamp-1">
@@ -416,11 +580,28 @@ export const AdminCallChatArchiveView: React.FC = () => {
                         </div>
 
                         <button
-                          onClick={() => setSelectedConversation(conv)}
-                          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setSelectedConversation(conv);
+                            setAdminReplyText('');
+                            setMarkResolvedOnSend(!isResolved);
+                          }}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-md ${
+                            !isResolved
+                              ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 shadow-amber-500/20'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                          }`}
                         >
-                          <Eye className="w-4 h-4 text-cyan-400" />
-                          <span>Lire la discussion</span>
+                          {!isResolved ? (
+                            <>
+                              <Send className="w-3.5 h-3.5" />
+                              <span>Intervenir / Répondre</span>
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                              <span>Consulter Archive</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -556,35 +737,72 @@ export const AdminCallChatArchiveView: React.FC = () => {
         </div>
       )}
 
-      {/* CONVERSATION DETAIL MODAL */}
+      {/* CONVERSATION DETAIL & ADMIN LIVE INTERVENTION MODAL */}
       {selectedConversation && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0C121E] border border-cyan-500/30 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-[#0C121E] border border-cyan-500/30 rounded-3xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95">
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+            <div className="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-900 via-slate-900 to-[#0F172A]">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
-                  <MessageSquare className="w-5 h-5" />
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-cyan-500/20 to-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shrink-0">
+                  <Crown className="w-6 h-6 text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-white text-base">
-                    Archive Discussion #{selectedConversation.id}
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Utilisateur : <strong className="text-white">{selectedConversation.userName}</strong> ({selectedConversation.userPhone})
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-black text-white text-base">
+                      Console Administrateur • Discussion #{selectedConversation.id}
+                    </h3>
+                    {selectedConversation.resolvedByAdmin || selectedConversation.status === 'closed' ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Résolu par Admin</span>
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                        <span>En attente de résolution</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Utilisateur : <strong className="text-white">{selectedConversation.userName}</strong> ({selectedConversation.userPhone}) • <span className="uppercase text-amber-400 font-mono text-[11px]">{selectedConversation.userRole}</span>
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedConversation(null)}
-                className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleToggleResolution(selectedConversation.id, !!(selectedConversation.resolvedByAdmin || selectedConversation.status === 'closed'))}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${
+                    selectedConversation.resolvedByAdmin || selectedConversation.status === 'closed'
+                      ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                  }`}
+                  title="Basculer le statut résolu / ouvert"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{selectedConversation.resolvedByAdmin || selectedConversation.status === 'closed' ? 'Réouvrir' : 'Marquer Résolu'}</span>
+                </button>
+
+                <button
+                  onClick={() => handleDeleteConversation(selectedConversation.id)}
+                  className="p-2 text-slate-400 hover:text-rose-400 rounded-xl hover:bg-slate-800 transition-colors"
+                  title="Supprimer cette archive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => setSelectedConversation(null)}
+                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors ml-1"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
+            {/* Modal Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-sm bg-slate-950/60">
               {/* Technical IP Data */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3">
@@ -598,59 +816,165 @@ export const AdminCallChatArchiveView: React.FC = () => {
                 <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3">
                   <span className="text-xs text-slate-400 block mb-1">Terminal & Commune</span>
                   <strong className="text-white text-xs block">{selectedConversation.commune}</strong>
-                  <span className="text-[11px] text-slate-400 block mt-0.5">{selectedConversation.deviceFingerprint}</span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5 truncate">{selectedConversation.deviceFingerprint}</span>
                 </div>
               </div>
 
               {/* Chat Thread */}
               <div className="space-y-3">
-                <h4 className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-cyan-400" />
-                  <span>Fil de Discussion Complet</span>
-                </h4>
-
-                <div className="space-y-2.5 bg-slate-950/80 border border-slate-800 rounded-2xl p-4 max-h-72 overflow-y-auto">
-                  {selectedConversation.messages.map((msg, idx) => (
-                    <div 
-                      key={idx}
-                      className={`p-3 rounded-xl text-xs space-y-1 ${
-                        msg.sender === 'user'
-                          ? 'bg-amber-500/10 border border-amber-500/20 ml-6'
-                          : 'bg-slate-900 border border-slate-800 mr-6'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <strong className={msg.sender === 'user' ? 'text-amber-300' : 'text-cyan-300'}>
-                          {msg.sender === 'user' ? selectedConversation.userName : selectedConversation.advisorName}
-                        </strong>
-                        <span className="text-[10px] text-slate-500 font-mono">{msg.timestamp}</span>
-                      </div>
-                      <p className="text-slate-200 leading-relaxed">{msg.text}</p>
-                      {msg.attachmentName && (
-                        <div className="text-[10px] text-amber-300 font-mono pt-1">
-                          📎 Pièce jointe archivée : {msg.attachmentName}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-white text-xs uppercase tracking-wider flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-cyan-400" />
+                    <span>Fil de Discussion Certifié ({selectedConversation.messages.length} messages)</span>
+                  </h4>
+                  <span className="text-[11px] text-slate-400 font-mono">ID: {selectedConversation.id}</span>
                 </div>
+
+                <div className="space-y-3 bg-slate-950/90 border border-slate-800 rounded-2xl p-4 max-h-72 overflow-y-auto">
+                  {selectedConversation.messages.map((msg, idx) => {
+                    const isAdminMsg = msg.sender === 'admin' || (msg as any).isAdmin;
+                    const isUserMsg = msg.sender === 'user';
+
+                    return (
+                      <div 
+                        key={idx}
+                        className={`p-3.5 rounded-2xl text-xs space-y-1.5 transition-all ${
+                          isAdminMsg
+                            ? 'bg-gradient-to-r from-amber-500/20 via-slate-900 to-slate-900 border-2 border-amber-400/80 mr-4 shadow-lg'
+                            : isUserMsg
+                            ? 'bg-amber-500/10 border border-amber-500/25 ml-6 text-amber-100'
+                            : 'bg-slate-900 border border-slate-800 mr-6 text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between pb-1 border-b border-slate-800/60">
+                          <div className="flex items-center gap-2">
+                            {isAdminMsg && <Crown className="w-3.5 h-3.5 text-amber-400" />}
+                            <strong className={
+                              isAdminMsg 
+                                ? 'text-amber-300 font-black flex items-center gap-1' 
+                                : isUserMsg 
+                                ? 'text-amber-300 font-bold' 
+                                : 'text-cyan-300 font-bold'
+                            }>
+                              {isAdminMsg 
+                                ? "Direction BRAD'CI (Super Admin)" 
+                                : isUserMsg 
+                                ? selectedConversation.userName 
+                                : selectedConversation.advisorName}
+                            </strong>
+                            {isAdminMsg && (
+                              <span className="px-2 py-0.2 rounded-full bg-amber-500/30 text-amber-200 text-[9px] font-black uppercase tracking-wider">
+                                Réponse Officielle
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-mono">{msg.timestamp}</span>
+                        </div>
+                        <p className="text-slate-100 leading-relaxed whitespace-pre-line">{msg.text}</p>
+                        {msg.attachmentName && (
+                          <div className="text-[10px] text-amber-300 font-mono pt-1">
+                            📎 Pièce jointe archivée : {msg.attachmentName}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* LIVE ADMIN RESPONSE CONSOLE */}
+              <div className="bg-slate-900/90 border-2 border-amber-500/40 rounded-2xl p-4 space-y-3.5 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <Zap className="w-3.5 h-3.5" />
+                    </div>
+                    <h4 className="font-extrabold text-white text-xs uppercase tracking-wider">
+                      Intervention Directe Administrateur (Temps Réel)
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-amber-400 font-mono">Transmis immédiatement au client</span>
+                </div>
+
+                {/* Quick Templates Row */}
+                <div className="space-y-1.5">
+                  <span className="text-[11px] text-slate-400 font-semibold block">Réponses types rapides de la Direction :</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {QUICK_ADMIN_TEMPLATES.map((tmpl, tidx) => (
+                      <button
+                        key={tidx}
+                        type="button"
+                        onClick={() => handleApplyTemplate(tmpl)}
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 text-[11px] font-medium border border-slate-700 hover:border-amber-500/40 transition-colors"
+                      >
+                        {tmpl.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Input form */}
+                <form onSubmit={handleSendAdminReply} className="space-y-3">
+                  <textarea
+                    value={adminReplyText}
+                    onChange={e => setAdminReplyText(e.target.value)}
+                    rows={3}
+                    placeholder={`Rédigez ici la décision ou réponse officielle de la Direction BRAD'CI pour ${selectedConversation.userName}...`}
+                    className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 leading-relaxed"
+                  />
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300 select-none">
+                      <input
+                        type="checkbox"
+                        checked={markResolvedOnSend}
+                        onChange={e => setMarkResolvedOnSend(e.target.checked)}
+                        className="rounded bg-slate-950 border-slate-700 text-amber-500 focus:ring-0 w-4 h-4 cursor-pointer"
+                      />
+                      <span>Marquer automatiquement la discussion comme résolue</span>
+                    </label>
+
+                    <button
+                      type="submit"
+                      disabled={!adminReplyText.trim() || isSendingReply}
+                      className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSendingReply ? 'Envoi en cours...' : 'Transmettre la Réponse Directe'}</span>
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-800 bg-slate-900/50 flex items-center justify-between">
-              <button
-                onClick={() => {
-                  adminImpersonateUser(selectedConversation.userId);
-                  setSelectedConversation(null);
-                }}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg"
-              >
-                <span>🔑 Accès Direct au Compte de {selectedConversation.userName}</span>
-              </button>
+            <div className="p-4 border-t border-slate-800 bg-slate-900/70 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    adminAuthorizeSupportCall(`conv-direct-${selectedConversation.id}`);
+                    addToast("Appel Prioritaire Programmé", `Rappel vocal lancé pour ${selectedConversation.userName}`, "success");
+                  }}
+                  className="px-3.5 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                >
+                  <PhoneForwarded className="w-3.5 h-3.5" />
+                  <span>Programmer Appel d'Urgence</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    adminImpersonateUser(selectedConversation.userId);
+                    setSelectedConversation(null);
+                  }}
+                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md transition-colors"
+                >
+                  <span>🔑 Accès Compte {selectedConversation.userName}</span>
+                </button>
+              </div>
+
               <button
                 onClick={() => setSelectedConversation(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-colors"
               >
                 Fermer
               </button>

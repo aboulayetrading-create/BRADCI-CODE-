@@ -217,15 +217,6 @@ export const AdminBackOffice: React.FC = () => {
               <Lock className="w-4 h-4" />
               <span>{translate("Déverrouiller l'Espace Admin", "Unlock Admin Back-Office")}</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => adminLogin('aboulayetrading@gmail.com', 'admin123')}
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold text-xs rounded-xl border border-amber-500/30 flex items-center justify-center gap-2 transition-all"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>{translate("Connexion Directe Administrateur Propriétaire", "Direct Owner Admin Login")}</span>
-            </button>
           </form>
         </div>
       </div>

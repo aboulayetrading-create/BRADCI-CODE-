@@ -250,22 +250,22 @@ export const DriverEarningsView: React.FC = () => {
       {/* 4. Retrait Modal (Wave / Mobile Money) */}
       {isWithdrawModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-md bg-[#0C121E] border border-slate-800 rounded-3xl p-6 shadow-2xl relative text-slate-100 space-y-4">
+          <div className="w-full max-w-md bg-white dark:bg-[#0C121E] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl relative text-slate-900 dark:text-slate-100 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/30">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">Demande de Retrait Livreur</h3>
-                  <p className="text-xs text-slate-400">
-                    Solde disponible : <strong className="text-emerald-400 font-mono">{availableBalance.toLocaleString('fr-FR')} FCFA</strong>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Demande de Retrait Livreur</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Solde disponible : <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{availableBalance.toLocaleString('fr-FR')} FCFA</strong>
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsWithdrawModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-900 border border-slate-800"
+                className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -274,38 +274,38 @@ export const DriverEarningsView: React.FC = () => {
             <form onSubmit={handleWithdrawSubmit} className="space-y-4 pt-1">
               {/* Method choice */}
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1.5">Moyen de Réception :</label>
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1.5">Moyen de Réception :</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['Wave', 'Orange Money', 'MTN MoMo'] as PaymentMethod[]).map(m => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setWithdrawMethod(m)}
-                      className={`p-2 rounded-xl text-xs font-bold border transition-all ${
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         withdrawMethod === m
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-md'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500 shadow-xs'
+                          : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 border-slate-300 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800'
                       }`}
                     >
                       {m}
                     </button>
                   ))}
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {withdrawMethod === 'Wave' ? '✓ Virement Wave direct instantané (0% commission)' : 'Virement sécurisé vers votre compte Mobile Money'}
-                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-1.5">
+                  <span>⚡ Frais de retrait : 1% sur tous les opérateurs (Wave, Orange, MTN)</span>
+                </div>
               </div>
 
               {/* Amount input */}
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Montant à Retirer (FCFA) :</label>
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1">Montant à Retirer (FCFA) :</label>
                 <input
                   type="number"
                   min={1000}
                   max={availableBalance}
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
@@ -317,7 +317,7 @@ export const DriverEarningsView: React.FC = () => {
                     key={amt}
                     type="button"
                     onClick={() => setWithdrawAmount(amt.toString())}
-                    className="flex-1 py-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-mono font-bold text-slate-300 rounded-lg"
+                    className="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-800 text-[10.5px] font-mono font-bold text-slate-800 dark:text-slate-300 rounded-lg cursor-pointer"
                   >
                     {amt === availableBalance ? 'Tout' : `${amt / 1000}k`}
                   </button>
@@ -326,27 +326,33 @@ export const DriverEarningsView: React.FC = () => {
 
               {/* Phone input */}
               <div>
-                <label className="text-xs font-bold text-slate-300 block mb-1">Numéro Mobile de Réception :</label>
+                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1">Numéro Mobile de Réception :</label>
                 <input
                   type="tel"
                   value={withdrawPhone}
                   onChange={(e) => setWithdrawPhone(e.target.value)}
                   placeholder="+225 07 XX XX XX XX"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-500"
                   required
                 />
               </div>
 
-              {/* Net Payout Summary */}
-              <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                <div className="flex justify-between">
+              {/* Net Payout Summary with 1% fee */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                <div className="flex justify-between text-slate-700 dark:text-slate-300">
                   <span>Montant brut demandé :</span>
-                  <span className="font-mono text-white">{Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA</span>
+                  <span className="font-mono text-slate-900 dark:text-white font-bold">{Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
+                  <span>Frais de retrait (1%) :</span>
+                  <span className="font-mono font-bold">
+                    - {Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01)).toLocaleString('fr-FR')} FCFA
+                  </span>
+                </div>
+                <div className="flex justify-between font-bold text-slate-900 dark:text-white pt-1.5 border-t border-slate-200 dark:border-slate-800">
                   <span>Net crédité sur votre mobile :</span>
-                  <span className="font-mono text-emerald-400 font-bold">
-                    {Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA
+                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                    {(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA
                   </span>
                 </div>
               </div>
@@ -355,15 +361,15 @@ export const DriverEarningsView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsWithdrawModalOpen(false)}
-                  className="px-4 py-2 bg-slate-900 text-slate-400 text-xs font-bold rounded-xl border border-slate-800"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-xs rounded-xl shadow-lg transition-all"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg transition-all cursor-pointer"
                 >
-                  Valider le Virement
+                  Valider le Virement (Net: {(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} F)
                 </button>
               </div>
             </form>

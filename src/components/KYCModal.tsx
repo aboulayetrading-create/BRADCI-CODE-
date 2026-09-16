@@ -25,7 +25,8 @@ import {
   BookOpen,
   ArrowRight,
   Zap,
-  Info
+  Info,
+  Smartphone
 } from 'lucide-react';
 import { UserRole, VehicleType } from '../types';
 import { getTranslation } from '../utils/translations';
@@ -169,6 +170,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -288,7 +290,7 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     startCamera(nextMode);
   };
 
-  // Start Camera Stream with optimized aspect ratio constraints
+  // Start Camera Stream with optimized aspect ratio constraints and multi-level fallbacks
   const startCamera = async (overrideFacingMode?: 'user' | 'environment') => {
     setCameraError(null);
     stopCamera();
@@ -301,35 +303,60 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
 
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            facingMode: targetMode, 
-            width: isSelfie ? { ideal: 720, max: 1080 } : { ideal: 1280, max: 1920 }, 
-            height: isSelfie ? { ideal: 960, max: 1440 } : { ideal: 720, max: 1080 } 
-          },
-          audio: false
-        });
+        let stream: MediaStream | null = null;
         
-        streamRef.current = stream;
-        setIsCameraActive(true);
-
-        setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(e => console.warn("Video play warning:", e));
+        // Level 1: Try high-quality preferred dimensions
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+              facingMode: targetMode, 
+              width: isSelfie ? { ideal: 720, max: 1080 } : { ideal: 1280, max: 1920 }, 
+              height: isSelfie ? { ideal: 960, max: 1440 } : { ideal: 720, max: 1080 } 
+            },
+            audio: false
+          });
+        } catch (constraintErr) {
+          console.warn("Optimized camera constraints failed, attempting basic facingMode:", constraintErr);
+          // Level 2: Try basic facing mode
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: targetMode },
+              audio: false
+            });
+          } catch (basicErr) {
+            console.warn("Basic facingMode failed, attempting standard video stream:", basicErr);
+            // Level 3: Bare minimum video stream
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false
+            });
           }
-        }, 100);
+        }
+
+        if (stream) {
+          streamRef.current = stream;
+          setIsCameraActive(true);
+
+          setTimeout(() => {
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              videoRef.current.play().catch(e => console.warn("Video play warning:", e));
+            }
+          }, 100);
+        } else {
+          throw new Error("Impossible d'obtenir le flux caméra.");
+        }
       } else {
         setCameraError(translate(
-          "Caméra non disponible sur ce navigateur. Utilisez le bouton 'Importer depuis la galerie' ou 'Photo Démo'.",
-          "Camera not available. Please use 'Upload from gallery' or 'Demo Photo'."
+          "Caméra directe indisponible sur ce navigateur/WebView. Utilisez l'appareil photo natif du téléphone ou la galerie ci-dessous.",
+          "Direct camera unavailable. Please use native phone camera or gallery below."
         ));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("getUserMedia error:", err);
       setCameraError(translate(
-        "Accès caméra refusé. Vérifiez les autorisations de caméra dans votre navigateur.",
-        "Camera access denied. Please check camera permissions in your browser."
+        "Accès caméra refusé ou non supporté par le système. Vous pouvez utiliser le bouton 'Appareil photo du téléphone' ou 'Galerie'.",
+        "Camera permission denied or unsupported. You can use 'Phone Camera' or 'Gallery' button."
       ));
     }
   };
@@ -381,17 +408,8 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
     }
   };
 
-  // Handle manual file selection (only permitted for official documents, not for live selfies)
+  // Handle file or native phone camera selection
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (isSelfieStep) {
-      addToast(
-        translate('Caméra en direct requise', 'Live camera required'),
-        translate('Pour des raisons de conformité et sécurité biométrique, le selfie doit être capturé en direct avec votre caméra.', 'For biometric security and anti-fraud compliance, selfies must be captured live via camera.'),
-        'error'
-      );
-      if (e.target) e.target.value = '';
-      return;
-    }
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -399,8 +417,8 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
         if (event.target?.result) {
           assignPhotoForCurrentStep(event.target.result as string);
           addToast(
-            translate('Document importé', 'Document imported'),
-            translate('Le document est prêt pour la vérification.', 'Document ready for verification.'),
+            translate('Photo enregistrée', 'Photo recorded'),
+            translate('Votre photo a été enregistrée pour cette étape.', 'Your photo has been saved for this step.'),
             'success'
           );
         }
@@ -960,11 +978,21 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
 
         {/* Central View: Live Camera OR Captured Photo Preview */}
         <div className="mb-4">
+          {/* Native Phone Camera Input (Directly invokes Android camera intent) */}
+          <input
+            ref={nativeCameraInputRef}
+            type="file"
+            accept="image/*"
+            capture={isSelfieStep ? "user" : "environment"}
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+
+          {/* Gallery / File Picker */}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -1197,26 +1225,33 @@ export const KYCModal: React.FC<KYCModalProps> = ({ isOpen: propIsOpen, onClose:
 
           {/* Action triggers */}
           {!isCameraActive && (
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 mt-3.5">
               <button
                 type="button"
                 onClick={() => startCamera(formatConfig.facingMode)}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-900/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-900/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
               >
                 <Camera className="w-4 h-4 text-white" />
-                <span>{currentPhoto ? translate("Reprendre la Photo", "Retake Photo") : translate("Ouvrir la Caméra", "Open Camera")}</span>
+                <span>{currentPhoto ? translate("Reprendre (Caméra)", "Retake (Camera)") : translate("Caméra Intégrée", "In-App Camera")}</span>
               </button>
 
-              {!isSelfieStep && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5 text-blue-400" />
-                  <span>{translate("Choisir dans la Galerie", "Choose from Gallery")}</span>
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => nativeCameraInputRef.current?.click()}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black shadow-md shadow-amber-500/20 text-xs flex items-center gap-1.5 transition-all cursor-pointer hover:scale-105 active:scale-95"
+              >
+                <Smartphone className="w-4 h-4 text-slate-950" />
+                <span>{translate("Appareil Photo Téléphone", "Phone Camera")}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3.5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
+              >
+                <Upload className="w-3.5 h-3.5 text-blue-400" />
+                <span>{translate("Galerie / Fichiers", "Gallery / Files")}</span>
+              </button>
             </div>
           )}
         </div>

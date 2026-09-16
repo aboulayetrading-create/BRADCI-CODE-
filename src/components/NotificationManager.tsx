@@ -230,103 +230,36 @@ export function useNotificationManager() {
  */
 export const NotificationManager: React.FC = () => {
   const {
-    permission,
-    isDenied,
-    isDefault,
+    isGranted,
+    isBannerDismissed,
     requestPermission,
     refreshPermissionState,
-    isBannerDismissed,
-    dismissBanner,
     showHelpModal,
     setShowHelpModal
   } = useNotificationManager();
 
-  // Ne pas afficher la bannière agressive si dans une iframe (Google Studio preview)
-  const isIframe = isRunningInIframe();
-  const shouldShowBanner = isDenied && !isBannerDismissed && !isIframe;
-
   return (
     <>
-      {/* 1. Bannière d'alerte amicale et discrète en haut de l'écran */}
-      {shouldShowBanner && (
-        <aside 
-          aria-label="Alerte autorisation notifications"
-          id="banner-notification-blocked" 
-          className="w-full bg-gradient-to-r from-amber-950/90 via-slate-900/95 to-amber-950/90 border-b border-amber-500/40 text-amber-100 shadow-lg px-3 py-2 sm:px-4 sm:py-2.5 transition-all animate-fadeIn relative z-40"
-        >
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs sm:text-sm">
-            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-              <div className="p-1.5 rounded-full bg-amber-500/20 text-amber-400 shrink-0">
-                <BellOff className="w-4 h-4 animate-pulse" />
-              </div>
-              <div className="leading-snug">
-                <span className="font-bold text-amber-300">
-                  {isPlatformIOS() ? 'Notifications iPhone : ' : 'Notifications Android APK : '}
-                </span>
-                <span className="text-slate-200">
-                  {isPlatformIOS() 
-                    ? 'Installez BRAD\'CI sur l\'écran d\'accueil pour recevoir les alertes d\'enchères et livraisons.'
-                    : 'Activez les notifications dans Paramètres > Applications > BRAD\'CI > Notifications.'}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-              <button
-                id="btn-how-to-enable-notifications"
-                type="button"
-                onClick={() => setShowHelpModal(true)}
-                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-sm transition-transform active:scale-95 cursor-pointer"
-              >
-                <HelpCircle className="w-3.5 h-3.5" />
-                <span>Comment activer ?</span>
-              </button>
-
-              <button
-                id="btn-refresh-permission"
-                type="button"
-                onClick={refreshPermissionState}
-                title="Vérifier si vous avez activé les notifications"
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs transition-colors cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                id="btn-dismiss-notification-banner"
-                type="button"
-                onClick={dismissBanner}
-                aria-label="Fermer la bannière temporairement"
-                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      {/* Bannière d'alerte notifications en direct format officiel BRAD'CI */}
+      {!isGranted && !isBannerDismissed && (
+        <div className="bg-blue-50/80 dark:bg-[#0B1736] border-b border-blue-200 dark:border-[#1E3E85] px-3 sm:px-4 py-2 flex items-center justify-between gap-2.5 text-xs">
+          <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 min-w-0">
+            <Bell className="w-4 h-4 text-[#1E53E5] shrink-0" />
+            <span className="leading-tight text-slate-800 dark:text-slate-200 text-xs truncate sm:whitespace-normal font-semibold">
+              Recevez les alertes en direct pour vos enchères et livraisons.
+            </span>
           </div>
-        </aside>
-      )}
-
-      {/* 2. Cas où la permission est toujours en 'default' (par exemple sur mobile après un premier échec silencieux) */}
-      {isDefault && (
-        <div className="w-full bg-slate-900/90 border-b border-blue-500/30 text-slate-200 px-3 py-1.5 text-xs flex items-center justify-between">
-          <div className="flex items-center gap-2 max-w-4xl mx-auto w-full justify-between">
-            <div className="flex items-center gap-2">
-              <Bell className="w-3.5 h-3.5 text-blue-400 animate-bounce" />
-              <span>Recevez les alertes en direct pour vos enchères et livraisons.</span>
-            </div>
-            <button
-              id="btn-prompt-notification-default"
-              type="button"
-              onClick={() => requestPermission()}
-              className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] shrink-0 transition-transform active:scale-95 cursor-pointer"
-            >
-              Activer les alertes
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => requestPermission()}
+            className="px-3 py-1.5 bg-[#1E53E5] hover:bg-[#1844C4] active:scale-95 text-white font-bold rounded-lg text-xs shrink-0 transition-all shadow-md shadow-blue-500/25 cursor-pointer whitespace-nowrap"
+          >
+            Activer les alertes
+          </button>
         </div>
       )}
 
-      {/* 3. Modale Explicative "Comment Activer les Notifications sur Android & Mobile" */}
+      {/* Modale Explicative "Comment Activer les Notifications sur Android & Mobile" (ouverte uniquement sur demande explicite) */}
       {showHelpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
           <div 

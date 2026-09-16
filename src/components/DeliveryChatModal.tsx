@@ -242,22 +242,22 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm p-3 sm:p-4 flex items-center justify-center animate-in fade-in">
-      <div className="w-full max-w-lg bg-[#0C121E] border border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[85vh] max-h-[680px]">
+      <div className="w-full max-w-lg bg-white dark:bg-[#0C121E] border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col h-[85vh] max-h-[680px]">
         
         {/* Header */}
-        <div className="p-4 bg-[#0F172A] border-b border-slate-800 flex items-center justify-between gap-3 shrink-0">
+        <div className="p-4 bg-slate-100 dark:bg-[#0F172A] border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center font-bold text-sm shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-500 dark:text-amber-400 flex items-center justify-center font-bold text-sm shrink-0">
               {partnerName.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-black text-white truncate">{partnerName}</h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold uppercase">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white truncate">{partnerName}</h3>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold uppercase">
                   {partnerRole === 'driver' ? 'Livreur' : 'Client'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                 {vehicleInfo ? `${vehicleInfo} • ` : ''}{partnerPhone}
               </p>
             </div>
@@ -273,7 +273,7 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
             </a>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -281,7 +281,7 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
         </div>
 
         {/* Messages Feed */}
-        <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#080E1A]">
+        <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-slate-50 dark:bg-[#080E1A]">
           {messages.map((m) => {
             const isMe = m.senderId === (currentUser?.id || 'me') || m.senderRole === currentRole;
             const isAudio = !!m.audioBlobUrl;
@@ -291,8 +291,8 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
                 key={m.id}
                 className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
               >
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1 px-1">
-                  <span className="font-semibold text-slate-300">{isMe ? 'Moi' : m.senderName}</span>
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 mb-1 px-1">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{isMe ? 'Moi' : m.senderName}</span>
                   <span>•</span>
                   <span>{m.timestamp}</span>
                 </div>
@@ -301,7 +301,7 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
                   className={`max-w-[85%] rounded-2xl p-3 shadow-md ${
                     isMe
                       ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-tr-none'
-                      : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'
+                      : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-none'
                   }`}
                 >
                   {/* Message Texte */}
@@ -356,7 +356,7 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
         </div>
 
         {/* Input Bar or Active Recording Bar */}
-        <div className="p-3 bg-[#0F172A] border-t border-slate-800 shrink-0">
+        <div className="p-3 bg-slate-100 dark:bg-[#0F172A] border-t border-slate-200 dark:border-slate-800 shrink-0">
           {isRecording ? (
             /* Bar d'enregistrement vocal en cours */
             <div className="flex items-center justify-between gap-3 p-2 bg-red-950/40 border border-red-500/50 rounded-2xl animate-pulse">
@@ -406,7 +406,7 @@ export const DeliveryChatModal: React.FC<DeliveryChatModalProps> = ({
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder="Écrivez un message ou envoyez une note vocale..."
-                className="flex-1 bg-slate-950 border border-slate-700 focus:border-amber-500 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
+                className="flex-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 focus:border-amber-500 rounded-2xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none transition-colors"
               />
 
               <button

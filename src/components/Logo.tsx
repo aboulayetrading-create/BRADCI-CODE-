@@ -327,17 +327,17 @@ export const Logo: React.FC<LogoProps> = ({
         )}
 
         {/* Main "BRAD'CI" Typography */}
-        <div className={`flex items-baseline justify-center font-display ${selectedSize.title} tracking-tight leading-none text-white drop-shadow-md`}>
-          <span className="text-white font-black tracking-normal">BRAD</span>
-          <span className="text-[#F97316] font-black mx-0.5">'</span>
-          <span className="text-[#38BDF8] font-black bg-gradient-to-b from-[#38BDF8] to-[#2563EB] bg-clip-text text-transparent">
+        <div className={`flex items-baseline justify-center font-display ${selectedSize.title} tracking-tight leading-none drop-shadow-xs`}>
+          <span className="text-[#0B1B3D] dark:text-white font-black tracking-normal transition-colors">BRAD</span>
+          <span className="text-[#FF5B00] font-black mx-0.5">'</span>
+          <span className="text-[#1E53E5] font-black bg-gradient-to-b from-[#1E53E5] to-[#0047FF] dark:from-[#38BDF8] dark:to-[#2563EB] bg-clip-text text-transparent">
             CI
           </span>
         </div>
 
         {/* Subtitle / Tagline */}
         {showSubtitle && (
-          <p className={`mt-1.5 uppercase font-bold text-slate-300 ${selectedSize.subtitle} leading-tight drop-shadow-sm`}>
+          <p className={`mt-1.5 uppercase font-bold text-slate-600 dark:text-slate-300 ${selectedSize.subtitle} leading-tight drop-shadow-xs transition-colors`}>
             {subtitleText}
           </p>
         )}
@@ -361,16 +361,16 @@ export const Logo: React.FC<LogoProps> = ({
 
       {/* Text block */}
       <div className="flex flex-col justify-center min-w-0">
-        <div className={`flex items-baseline font-display ${selectedSize.title} tracking-tight leading-none text-white drop-shadow-sm`}>
-          <span className="text-white font-black">BRAD</span>
-          <span className="text-[#F97316] font-black mx-0.5">'</span>
-          <span className="text-[#38BDF8] font-black bg-gradient-to-b from-[#38BDF8] to-[#2563EB] bg-clip-text text-transparent">
+        <div className={`flex items-baseline font-display ${selectedSize.title} tracking-tight leading-none drop-shadow-xs`}>
+          <span className="text-[#0B1B3D] dark:text-white font-black transition-colors">BRAD</span>
+          <span className="text-[#FF5B00] font-black mx-0.5">'</span>
+          <span className="text-[#1E53E5] font-black bg-gradient-to-b from-[#1E53E5] to-[#0047FF] dark:from-[#38BDF8] dark:to-[#2563EB] bg-clip-text text-transparent">
             CI
           </span>
         </div>
 
         {showSubtitle && (
-          <p className={`hidden 2xl:block mt-0.5 uppercase font-extrabold text-slate-300 ${selectedSize.subtitle} opacity-90 whitespace-nowrap leading-none`}>
+          <p className={`hidden 2xl:block mt-0.5 uppercase font-extrabold text-slate-600 dark:text-slate-300 ${selectedSize.subtitle} opacity-90 whitespace-nowrap leading-none transition-colors`}>
             {subtitleText}
           </p>
         )}

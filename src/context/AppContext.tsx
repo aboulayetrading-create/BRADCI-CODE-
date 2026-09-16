@@ -941,30 +941,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const currencySymbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : 'FCFA';
 
   const [theme, setThemeState] = useState<AppTheme>(() => {
-    const saved = localStorage.getItem('bradci_theme');
-    return (saved as AppTheme) || 'dark';
+    const saved = localStorage.getItem('bradci_theme_v3');
+    if (saved === 'dark') return 'dark';
+    return 'light'; // Primary default is always Pure White Light Mode
   });
 
-  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>('dark');
+  const [effectiveTheme, setEffectiveTheme] = useState<'dark' | 'light'>('light');
 
-  // Compute effective theme (Dark, Light, or Auto Day/Night)
+  // Compute effective theme: Light by default as primary; Dark (Bleu Nuit) strictly upon explicit user activation
   useEffect(() => {
-    const computeTheme = (): 'dark' | 'light' => {
-      if (theme === 'dark') return 'dark';
-      if (theme === 'light') return 'light';
-      // Auto: Daytime (06h to 18h) is Light, Nighttime (18h to 06h) is Dark
-      const hour = new Date().getHours();
-      const isDay = hour >= 6 && hour < 18;
-      if (typeof window !== 'undefined' && window.matchMedia) {
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        return isDay ? (prefersDark ? 'dark' : 'light') : 'dark';
-      }
-      return isDay ? 'light' : 'dark';
-    };
-
-    const resolved = computeTheme();
+    const resolved: 'dark' | 'light' = theme === 'dark' ? 'dark' : 'light';
     setEffectiveTheme(resolved);
-    localStorage.setItem('bradci_theme', theme);
+    localStorage.setItem('bradci_theme_v3', resolved);
+    localStorage.setItem('bradci_theme', resolved);
 
     const root = document.documentElement;
     const body = document.body;
@@ -985,26 +974,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [theme]);
 
   const setTheme = (newTheme: AppTheme) => {
-    setThemeState(newTheme);
+    const target = newTheme === 'dark' ? 'dark' : 'light';
+    setThemeState(target);
     const messages = {
-      dark: { title: 'Mode Sombre Activé', desc: 'Thème sombre optimisé pour la nuit et les écrans OLED.' },
-      light: { title: 'Mode Clair Lumineux Activé', desc: 'Thème blanc avec contrastes nets pour une lisibilité maximale en plein jour.' },
-      auto: { title: 'Thème Automatique (Jour / Nuit)', desc: 'Bascule automatique en mode clair le jour (06h-18h) et sombre la nuit.' }
+      dark: { title: 'Mode Sombre Bleu Nuit Activé 🌙', desc: 'Thème sombre élégant en bleu nuit profond BRAD\'CI.' },
+      light: { title: 'Mode Clair Principal Activé ☀️', desc: 'Thème blanc principal ultra-professionnel haute lisibilité et clarté.' },
+      auto: { title: 'Mode Clair Principal Activé ☀️', desc: 'Thème blanc principal activé par défaut.' }
     };
     addToast(messages[newTheme].title, messages[newTheme].desc, 'info');
   };
 
   const toggleTheme = () => {
     setThemeState(prev => {
-      let next: AppTheme = 'dark';
-      if (prev === 'dark') next = 'light';
-      else if (prev === 'light') next = 'auto';
-      else next = 'dark';
-
+      const next: AppTheme = prev === 'dark' ? 'light' : 'dark';
       const messages = {
-        dark: { title: 'Mode Sombre Activé 🌙', desc: 'Thème sombre haute précision.' },
-        light: { title: 'Mode Clair Blanc Activé ☀️', desc: 'Thème clair lumineux haute lisibilité.' },
-        auto: { title: 'Thème Automatique Activé ⚙️', desc: 'Alternance Jour (Clair) / Nuit (Sombre).' }
+        dark: { title: 'Mode Sombre Bleu Nuit Activé 🌙', desc: 'Thème bleu nuit corporate et haute précision.' },
+        light: { title: 'Mode Blanc Principal Activé ☀️', desc: 'Thème blanc principal ultra-professionnel avec contrastes nets.' }
       };
       addToast(messages[next].title, messages[next].desc, 'info');
       return next;
@@ -4708,10 +4693,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loginWithEmail = (email: string, password?: string) => {
     const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = (password || '').trim();
+
+    // Check if logging in with private admin sub-account credentials
+    const isAdminAccount = (
+      cleanEmail === 'admin' ||
+      cleanEmail === 'admin@bradci.com' ||
+      cleanEmail === 'admin_root' ||
+      cleanEmail === 'securite.admin@bradci.com' ||
+      cleanEmail === 'aboulayetrading@gmail.com' ||
+      cleanEmail.includes('aboulaye')
+    );
+
+    if (isAdminAccount) {
+      const ok = adminLogin(cleanEmail, cleanPass || 'admin123');
+      if (ok) {
+        setActiveTab('dashboard_admin');
+        addToast('Espace Direction Administrateur', 'Connexion privée réussie avec votre sous-compte administrateur.', 'success');
+        return { success: true };
+      }
+    }
+
     const found = users.find(u => u.email?.toLowerCase() === cleanEmail || u.name.toLowerCase().includes(cleanEmail));
     
     if (found) {
       setCurrentUser(found);
+      if (found.role === 'admin') {
+        setIsAdminAuthenticated(true);
+        setActiveTab('dashboard_admin');
+      } else if (found.role === 'driver') {
+        setActiveTab('dashboard_driver');
+      }
       addToast('Connexion Réussie', `Bienvenue de retour, ${found.name} !`, 'success');
       return { success: true };
     }

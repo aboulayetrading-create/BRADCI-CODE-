@@ -81,7 +81,7 @@ export const MobileBottomNav: React.FC = () => {
     return (
       <nav 
         id="mobile-bottom-nav-driver" 
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#06102E]/95 backdrop-blur-xl border-t border-slate-800 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#06102E]/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-2xl transition-colors duration-200"
       >
         <div className="flex items-center justify-around max-w-lg mx-auto">
           {/* 1. ONGLET RADAR */}
@@ -93,10 +93,10 @@ export const MobileBottomNav: React.FC = () => {
               window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'radar' }));
             }}
             className={`relative flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
-              isRadarActive ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-emerald-400'
+              isRadarActive ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400 hover:text-emerald-600'
             }`}
           >
-            <Navigation className={`w-5 h-5 ${isRadarActive ? 'text-emerald-400 stroke-[2.5]' : 'text-slate-400'}`} />
+            <Navigation className={`w-5 h-5 ${isRadarActive ? 'text-emerald-600 dark:text-emerald-400 stroke-[2.5]' : 'text-slate-500 dark:text-slate-400'}`} />
             <span className="text-[10px] mt-1 font-bold tracking-tight">Radar</span>
           </button>
 
@@ -109,14 +109,14 @@ export const MobileBottomNav: React.FC = () => {
               window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'orders' }));
             }}
             className={`relative flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
-              isOrdersActive ? 'text-[#F97316] font-black' : 'text-slate-400 hover:text-[#F97316]'
+              isOrdersActive ? 'text-[#FF5B00] font-black' : 'text-slate-500 dark:text-slate-400 hover:text-[#FF5B00]'
             }`}
           >
-            <Package className={`w-5 h-5 ${isOrdersActive ? 'text-[#F97316] stroke-[2.5]' : 'text-slate-400'}`} />
+            <Package className={`w-5 h-5 ${isOrdersActive ? 'text-[#FF5B00] stroke-[2.5]' : 'text-slate-500 dark:text-slate-400'}`} />
             {driverActiveJob ? (
-              <span className="absolute top-0 right-3 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <span className="absolute top-0 right-3 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
             ) : availableOrdersCount > 0 ? (
-              <span className="absolute top-0 right-3 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[#F97316] text-white font-mono font-black text-[9px] flex items-center justify-center border border-[#06102E]">
+              <span className="absolute top-0 right-3 min-w-[15px] h-[15px] px-0.5 rounded-full bg-[#FF5B00] text-white font-mono font-black text-[9px] flex items-center justify-center border border-white dark:border-[#06102E]">
                 {availableOrdersCount}
               </span>
             ) : null}
@@ -132,10 +132,10 @@ export const MobileBottomNav: React.FC = () => {
               window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'earnings' }));
             }}
             className={`flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
-              isEarningsActive ? 'text-emerald-400 font-black' : 'text-slate-400 hover:text-emerald-400'
+              isEarningsActive ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400 hover:text-emerald-600'
             }`}
           >
-            <TrendingUp className={`w-5 h-5 ${isEarningsActive ? 'text-emerald-400 stroke-[2.5]' : 'text-slate-400'}`} />
+            <TrendingUp className={`w-5 h-5 ${isEarningsActive ? 'text-emerald-600 dark:text-emerald-400 stroke-[2.5]' : 'text-slate-500 dark:text-slate-400'}`} />
             <span className="text-[10px] mt-1 font-bold tracking-tight">Revenus</span>
           </button>
 
@@ -148,10 +148,10 @@ export const MobileBottomNav: React.FC = () => {
               window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'history' }));
             }}
             className={`flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
-              isHistoryActive ? 'text-white font-black' : 'text-slate-400 hover:text-white'
+              isHistoryActive ? 'text-slate-900 dark:text-white font-black' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <Receipt className={`w-5 h-5 ${isHistoryActive ? 'text-white stroke-[2.5]' : 'text-slate-400'}`} />
+            <Receipt className={`w-5 h-5 ${isHistoryActive ? 'text-slate-900 dark:text-white stroke-[2.5]' : 'text-slate-500 dark:text-slate-400'}`} />
             <span className="text-[10px] mt-1 font-bold tracking-tight">Historique</span>
           </button>
 
@@ -164,10 +164,10 @@ export const MobileBottomNav: React.FC = () => {
               window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'settings' }));
             }}
             className={`flex flex-col items-center justify-center flex-1 py-1 rounded-xl transition-all cursor-pointer ${
-              isSettingsActive ? 'text-blue-400 font-black' : 'text-slate-400 hover:text-blue-400'
+              isSettingsActive ? 'text-[#1E53E5] font-black' : 'text-slate-500 dark:text-slate-400 hover:text-[#1E53E5]'
             }`}
           >
-            <Settings className={`w-5 h-5 ${isSettingsActive ? 'text-blue-400 stroke-[2.5]' : 'text-slate-400'}`} />
+            <Settings className={`w-5 h-5 ${isSettingsActive ? 'text-[#1E53E5] stroke-[2.5]' : 'text-slate-500 dark:text-slate-400'}`} />
             <span className="text-[10px] mt-1 font-bold tracking-tight">Paramètres</span>
           </button>
         </div>
@@ -178,7 +178,7 @@ export const MobileBottomNav: React.FC = () => {
   return (
     <nav 
       id="mobile-bottom-nav" 
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B1021]/95 backdrop-blur-xl border-t border-[#222D4A] px-2 pt-1.5 pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/98 dark:bg-[#0B1021]/95 backdrop-blur-xl border-t border-slate-200 dark:border-[#222D4A] px-2 pt-1.5 pb-[calc(0.4rem+env(safe-area-inset-bottom,0px))] shadow-xl transition-colors duration-200"
     >
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {/* 1. Explore / Auctions */}
@@ -187,12 +187,12 @@ export const MobileBottomNav: React.FC = () => {
           onClick={() => setActiveTab('explore')}
           className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'explore' || activeTab === 'feed'
-              ? 'text-[#FF5B00] font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-[#FF5B00] font-black'
+              : 'text-slate-700 hover:text-[#0B1B3D] dark:text-slate-400 dark:hover:text-slate-200 font-bold'
           }`}
         >
-          <Gavel className={`w-5 h-5 ${activeTab === 'explore' ? 'text-[#FF5B00] scale-110' : ''}`} />
-          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">
+          <Gavel className={`w-5 h-5 ${activeTab === 'explore' ? 'text-[#FF5B00] scale-110' : 'text-slate-600 dark:text-slate-400'}`} />
+          <span className="text-[10px] mt-0.5 tracking-tight truncate max-w-full text-center font-bold">
             {translate("Enchères", "Auctions")}
           </span>
         </button>
@@ -203,21 +203,21 @@ export const MobileBottomNav: React.FC = () => {
           onClick={() => setActiveTab('express_courier')}
           className={`relative flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl transition-all cursor-pointer ${
             activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
-              ? 'text-violet-400 font-bold'
-              : 'text-slate-400 hover:text-violet-300'
+              ? 'text-[#1E53E5] font-black'
+              : 'text-slate-700 hover:text-[#1E53E5] dark:text-slate-400 dark:hover:text-blue-300 font-bold'
           }`}
         >
           <div className="relative">
             <Bike className={`w-5 h-5 ${
               activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
-                ? 'text-violet-400 scale-110' 
-                : 'text-slate-400'
+                ? 'text-[#1E53E5] scale-110' 
+                : 'text-slate-600 dark:text-slate-400'
             }`} />
-            <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-[7.5px] font-black uppercase tracking-tighter scale-90">
+            <span className="absolute -top-1 -right-2 px-1 py-0.2 rounded-full bg-[#1E53E5] text-white text-[7.5px] font-black uppercase tracking-tighter scale-90 shadow-xs">
               EXP
             </span>
           </div>
-          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">
+          <span className="text-[10px] mt-0.5 tracking-tight truncate max-w-full text-center font-bold">
             {translate("Coursier", "Courier")}
           </span>
         </button>
@@ -226,22 +226,22 @@ export const MobileBottomNav: React.FC = () => {
         <button
           id="btn-mobile-nav-cart"
           onClick={() => setCartModalOpen(true)}
-          className="relative flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl text-slate-400 hover:text-amber-400 transition-all cursor-pointer"
+          className="relative flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl text-slate-700 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400 font-bold transition-all cursor-pointer"
         >
-          <ShoppingCart className="w-5 h-5 text-amber-400" />
+          <ShoppingCart className="w-5 h-5 text-slate-600 dark:text-slate-400" />
           {cart.length > 0 && (
-            <span className="absolute top-0 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[8.5px] flex items-center justify-center border border-[#0B1021]">
+            <span className="absolute top-0 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[#FF5B00] text-white font-mono-num font-black text-[8.5px] flex items-center justify-center border border-white dark:border-[#0B1021]">
               {cart.reduce((s, i) => s + i.quantity, 0)}
             </span>
           )}
-          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">{translate("Panier", "Cart")}</span>
+          <span className="text-[10px] mt-0.5 tracking-tight truncate max-w-full text-center font-bold">{translate("Panier", "Cart")}</span>
         </button>
 
         {/* 4. Central Sell Action Button (Prominent Vibrant Orange #FF5B00) */}
         <button
           id="btn-mobile-nav-sell"
           onClick={handleSellClick}
-          className="flex flex-col items-center justify-center -mt-3.5 bg-[#FF5B00] hover:bg-[#E05000] text-white w-11 h-11 sm:w-12 sm:h-12 rounded-2xl shadow-xl shadow-[#FF5B00]/30 border-2 border-[#0B1021] active:scale-95 transition-all cursor-pointer shrink-0"
+          className="flex flex-col items-center justify-center -mt-3.5 bg-[#FF5B00] hover:bg-[#E05000] text-white w-11 h-11 sm:w-12 sm:h-12 rounded-2xl shadow-xl shadow-[#FF5B00]/30 border-2 border-white dark:border-[#0B1021] active:scale-95 transition-all cursor-pointer shrink-0"
           title={translate("Publier une annonce ou enchère", "Post an auction")}
         >
           <PlusCircle className="w-6 h-6 stroke-[2.5]" />
@@ -252,15 +252,15 @@ export const MobileBottomNav: React.FC = () => {
         <button
           id="btn-mobile-nav-notifs"
           onClick={() => setNotificationsModalOpen(true)}
-          className="relative flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl text-slate-400 hover:text-[#FF5B00] transition-all cursor-pointer"
+          className="relative flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl text-slate-700 hover:text-[#FF5B00] dark:text-slate-400 dark:hover:text-[#FF5B00] font-bold transition-all cursor-pointer"
         >
-          <Bell className="w-5 h-5" />
+          <Bell className="w-5 h-5 text-slate-600 dark:text-slate-400" />
           {unreadNotificationsCount > 0 && (
-            <span className="absolute top-0 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[8.5px] flex items-center justify-center border border-[#0B1021] animate-pulse">
+            <span className="absolute top-0 right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-red-500 text-white font-mono-num font-black text-[8.5px] flex items-center justify-center border border-white dark:border-[#0B1021] animate-pulse">
               {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
             </span>
           )}
-          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">{translate("Notifs", "Notifs")}</span>
+          <span className="text-[10px] mt-0.5 tracking-tight truncate max-w-full text-center font-bold">{translate("Notifs", "Notifs")}</span>
         </button>
 
         {/* 6. Profile / Role Space */}
@@ -269,18 +269,18 @@ export const MobileBottomNav: React.FC = () => {
           onClick={handleProfileClick}
           className={`flex flex-col items-center justify-center flex-1 min-w-0 py-1 rounded-xl transition-all cursor-pointer ${
             isProfileActive
-              ? 'text-[#1E53E5] font-bold'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-[#1E53E5] font-black'
+              : 'text-slate-700 hover:text-[#0B1B3D] dark:text-slate-400 dark:hover:text-slate-200 font-bold'
           }`}
         >
           {currentUser?.role === 'driver' ? (
-            <Bike className="w-5 h-5" />
+            <Bike className="w-5 h-5 text-slate-600 dark:text-slate-400" />
           ) : currentUser?.role === 'admin' ? (
-            <ShieldCheck className="w-5 h-5" />
+            <ShieldCheck className="w-5 h-5 text-slate-600 dark:text-slate-400" />
           ) : (
-            <User className="w-5 h-5" />
+            <User className="w-5 h-5 text-slate-600 dark:text-slate-400" />
           )}
-          <span className="text-[9.5px] mt-0.5 tracking-tight truncate max-w-full text-center">
+          <span className="text-[10px] mt-0.5 tracking-tight truncate max-w-full text-center font-bold">
             {currentUser 
               ? (currentUser.role === 'driver' ? translate('Livreur', 'Courier') : currentUser.role === 'admin' ? 'Admin' : translate('Moi', 'Me'))
               : translate('Profil', 'Profile')}

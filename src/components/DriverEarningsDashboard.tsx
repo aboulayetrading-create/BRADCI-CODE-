@@ -338,7 +338,7 @@ export const DriverEarningsDashboard: React.FC<DriverEarningsDashboardProps> = (
 
             <form onSubmit={handleWithdrawSubmit} className="space-y-4">
               <div>
-                <label className="text-xs text-slate-300 font-bold block mb-1">
+                <label className="text-xs text-slate-800 dark:text-slate-200 font-bold block mb-1">
                   Moyen de Paiement Téléphone :
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -347,20 +347,23 @@ export const DriverEarningsDashboard: React.FC<DriverEarningsDashboardProps> = (
                       key={provider}
                       type="button"
                       onClick={() => setWithdrawProvider(provider)}
-                      className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all ${
+                      className={`p-2.5 rounded-xl border text-xs font-bold text-left transition-all cursor-pointer ${
                         withdrawProvider === provider
-                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-md'
-                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                          ? 'bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs'
+                          : 'bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200'
                       }`}
                     >
                       {provider}
                     </button>
                   ))}
                 </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-1.5">
+                  <span>⚡ Frais de retrait : 1% sur tous les opérateurs (Wave, Orange, MTN, Moov)</span>
+                </div>
               </div>
 
               <div>
-                <label className="text-xs text-slate-300 font-bold block mb-1">
+                <label className="text-xs text-slate-800 dark:text-slate-200 font-bold block mb-1">
                   Numéro de téléphone bénéficiaire :
                 </label>
                 <input
@@ -368,15 +371,15 @@ export const DriverEarningsDashboard: React.FC<DriverEarningsDashboardProps> = (
                   value={withdrawPhone}
                   onChange={e => setWithdrawPhone(e.target.value)}
                   placeholder="+225 01 XX XX XX XX"
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-mono font-bold placeholder-slate-400"
                   required
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs text-slate-300 font-bold">Montant à retirer (FCFA) :</label>
-                  <span className="text-[11px] text-emerald-400 font-bold">
+                  <label className="text-xs text-slate-800 dark:text-slate-200 font-bold">Montant Brut à retirer (FCFA) :</label>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
                     Max : {availableBalance.toLocaleString('fr-FR')} F
                   </span>
                 </div>
@@ -386,20 +389,24 @@ export const DriverEarningsDashboard: React.FC<DriverEarningsDashboardProps> = (
                   onChange={e => setWithdrawAmount(e.target.value)}
                   min="1000"
                   max={availableBalance}
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm text-white focus:outline-none focus:border-emerald-500 font-mono-num font-black"
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 font-mono-num font-black"
                   required
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400 space-y-1">
-                <div className="flex justify-between">
-                  <span>Frais de virement BRAD'CI :</span>
-                  <span className="text-emerald-400 font-bold">0 FCFA (Gratuit)</span>
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                <div className="flex justify-between text-slate-700 dark:text-slate-400">
+                  <span>Montant Brut demandé :</span>
+                  <span className="font-mono text-slate-900 dark:text-white font-bold">{parseInt(withdrawAmount || '0', 10).toLocaleString('fr-FR')} FCFA</span>
                 </div>
-                <div className="flex justify-between font-bold text-white pt-1 border-t border-slate-800">
+                <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
+                  <span>Frais de retrait BRAD'CI (1%) :</span>
+                  <span className="font-mono font-bold">- {Math.max(1, Math.round(parseInt(withdrawAmount || '0', 10) * 0.01)).toLocaleString('fr-FR')} FCFA</span>
+                </div>
+                <div className="flex justify-between font-bold text-slate-900 dark:text-white pt-1.5 border-t border-slate-200 dark:border-slate-800">
                   <span>Net reçu sur votre mobile :</span>
-                  <span className="text-emerald-300 font-mono">
-                    {parseInt(withdrawAmount || '0', 10).toLocaleString('fr-FR')} FCFA
+                  <span className="text-emerald-600 dark:text-emerald-300 font-mono font-black text-sm">
+                    {(parseInt(withdrawAmount || '0', 10) - Math.max(1, Math.round(parseInt(withdrawAmount || '0', 10) * 0.01))).toLocaleString('fr-FR')} FCFA
                   </span>
                 </div>
               </div>
@@ -409,7 +416,7 @@ export const DriverEarningsDashboard: React.FC<DriverEarningsDashboardProps> = (
                 className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Confirmer le virement vers {withdrawProvider}</span>
+                <span>Confirmer le virement vers {withdrawProvider} (Net: {(parseInt(withdrawAmount || '0', 10) - Math.max(1, Math.round(parseInt(withdrawAmount || '0', 10) * 0.01))).toLocaleString('fr-FR')} F)</span>
               </button>
             </form>
           </div>

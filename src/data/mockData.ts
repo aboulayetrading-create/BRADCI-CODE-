@@ -1730,8 +1730,8 @@ export const INITIAL_WITHDRAWAL_REQUESTS: WithdrawalRequest[] = [
     userPhone: '+225 05 99 82 44 10',
     userRole: 'client',
     requestedAmount: 150000,
-    feeAmount: 0,
-    netAmount: 150000,
+    feeAmount: 1500, // 1%
+    netAmount: 148500,
     paymentMethod: 'Wave',
     destinationPhone: '+225 05 99 82 44 10',
     status: 'pending',
@@ -1760,8 +1760,8 @@ export const INITIAL_WITHDRAWAL_REQUESTS: WithdrawalRequest[] = [
     userPhone: '+225 01 44 77 89 22',
     userRole: 'driver',
     requestedAmount: 15000,
-    feeAmount: 0,
-    netAmount: 15000,
+    feeAmount: 150, // 1%
+    netAmount: 14850,
     paymentMethod: 'Wave',
     destinationPhone: '+225 01 44 77 89 22',
     status: 'approved',

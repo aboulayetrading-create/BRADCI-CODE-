@@ -2,10 +2,12 @@ import { UserRole } from '../types';
 
 export interface RecordedChatMessage {
   id: string;
-  sender: 'user' | 'assistant' | 'system';
+  sender: 'user' | 'assistant' | 'system' | 'admin';
   text: string;
   timestamp: string; // HH:mm or ISO
   attachmentName?: string;
+  isAdmin?: boolean;
+  adminName?: string;
 }
 
 export interface AssistantConversationArchive {
@@ -483,6 +485,82 @@ class AssistantRecordingService {
       window.dispatchEvent(new CustomEvent('bradci_assistant_conv_updated'));
     } catch {
       // storage error
+    }
+  }
+
+  public adminReplyToConversation(params: {
+    conversationId: string;
+    replyText: string;
+    adminName?: string;
+    markAsResolved?: boolean;
+  }): RecordedChatMessage | null {
+    try {
+      const all = this.getConversations();
+      const conv = all.find(c => c.id === params.conversationId);
+      if (!conv) return null;
+
+      const adminMsg: RecordedChatMessage = {
+        id: `admin-msg-${Date.now()}`,
+        sender: 'admin',
+        text: params.replyText,
+        timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        isAdmin: true,
+        adminName: params.adminName || "Direction BRAD'CI (Super Admin)"
+      };
+
+      conv.messages.push(adminMsg);
+      conv.messagesCount = conv.messages.length;
+      conv.lastMessageAt = new Date().toISOString();
+      if (params.markAsResolved !== undefined) {
+        conv.resolvedByAdmin = params.markAsResolved;
+        if (params.markAsResolved) {
+          conv.status = 'closed';
+        }
+      }
+
+      localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(all));
+      
+      // Dispatch update events for admin and user chat
+      window.dispatchEvent(new CustomEvent('bradci_assistant_conv_updated', { detail: { conversationId: params.conversationId, message: adminMsg } }));
+      window.dispatchEvent(new CustomEvent('bradci_admin_live_message', { 
+        detail: { 
+          targetUserId: conv.userId, 
+          messageText: params.replyText, 
+          adminName: params.adminName || "Direction BRAD'CI",
+          timestamp: adminMsg.timestamp
+        } 
+      }));
+
+      return adminMsg;
+    } catch {
+      return null;
+    }
+  }
+
+  public updateConversationStatus(conversationId: string, resolved: boolean): boolean {
+    try {
+      const all = this.getConversations();
+      const conv = all.find(c => c.id === conversationId);
+      if (!conv) return false;
+
+      conv.resolvedByAdmin = resolved;
+      conv.status = resolved ? 'closed' : 'active';
+      localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(all));
+      window.dispatchEvent(new CustomEvent('bradci_assistant_conv_updated'));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public deleteConversation(conversationId: string): boolean {
+    try {
+      const all = this.getConversations().filter(c => c.id !== conversationId);
+      localStorage.setItem(CONVERSATIONS_STORAGE_KEY, JSON.stringify(all));
+      window.dispatchEvent(new CustomEvent('bradci_assistant_conv_updated'));
+      return true;
+    } catch {
+      return false;
     }
   }
 

@@ -313,7 +313,7 @@ export const ExpressCourierView: React.FC = () => {
       {/* ========================================================================= */}
       {/* 1. HERO BANNER STYLE APPLICATION DE COURSIER MODERNE (UBER CONNECT / YANGO) */}
       {/* ========================================================================= */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#060D20] via-[#0B1530] to-[#141F45] border border-violet-500/30 p-5 sm:p-7 shadow-2xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#060D20] via-[#0B1530] to-[#141F45] border border-violet-500/30 p-5 sm:p-7 shadow-2xl dark-banner banner-text-white">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-b from-violet-600/20 to-indigo-600/0 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-72 h-72 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 

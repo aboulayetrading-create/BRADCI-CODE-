@@ -43,6 +43,7 @@ import { B2BLiquidationHub } from './components/B2BLiquidationHub';
 import { CartModal } from './components/CartModal';
 import { ExpressCourierOrderModal } from './components/ExpressCourierOrderModal';
 import { ExpressCourierView } from './components/ExpressCourierView';
+import { BradciMobileApp } from './components/BradciMobileApp';
 import { CartInvoiceModal } from './components/CartInvoiceModal';
 import { NativePermissionModal } from './components/NativePermissionModal';
 import { SplashScreen } from './components/SplashScreen';
@@ -161,13 +162,6 @@ const AppContent: React.FC = () => {
     }
   };
 
-  // If driver account is active, ensure driver stays strictly in the delivery dashboard
-  useEffect(() => {
-    if (currentUser?.role === 'driver' && (activeTab === 'explore' || activeTab === 'feed' || activeTab === 'b2b_liquidation' || activeTab === 'dashboard_client')) {
-      setActiveTab('dashboard_driver');
-    }
-  }, [currentUser?.role, activeTab, setActiveTab]);
-
   // If site is in maintenance mode and user is not an authenticated admin, show maintenance screen
   if (isMaintenanceMode && !isAdminAuthenticated && activeTab !== 'dashboard_admin') {
     return (
@@ -179,7 +173,7 @@ const AppContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950 transition-colors duration-200">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#F8FAFC] dark:bg-[#091127] text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-[#FF5B00] selection:text-white transition-colors duration-200">
       {/* 1. Main Navigation Bar */}
       <ErrorBoundary fallbackTitle="Navigation">
         <Navbar />

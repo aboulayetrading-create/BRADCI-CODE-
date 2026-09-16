@@ -37,6 +37,7 @@ import { voiceNavigator, playSuccessChime, createPhoneRingtoneController } from 
 import { AFRICAN_SUPPORT_ADVISORS, SupportAdvisor } from '../data/africanAdvisors';
 import { auditLogger } from '../utils/activityAuditLogger';
 import { assistantArchive } from '../utils/assistantRecordingArchive';
+import { startVoiceRecording, stopVoiceRecording, isVoiceRecordingActive } from '../utils/voiceRecorder';
 
 export const SUPPORT_ADVISORS: SupportAdvisor[] = AFRICAN_SUPPORT_ADVISORS;
 export type { SupportAdvisor };
@@ -62,6 +63,8 @@ export interface ChatMessage {
   isClosingNotice?: boolean;
   isCallRecap?: boolean;
   isVoiceSpoken?: boolean;
+  isAdminDirect?: boolean;
+  adminName?: string;
 }
 
 export interface SessionRating {
@@ -100,7 +103,8 @@ export const AIChatSupport: React.FC = () => {
     translate,
     currentUser,
     createSupportTicket,
-    supportTickets
+    supportTickets,
+    addToast
   } = useApp();
 
   // Primary UI state
@@ -255,6 +259,42 @@ export const AIChatSupport: React.FC = () => {
       }
     };
   }, []);
+
+  // Listen to live intervention messages from the Super Admin
+  useEffect(() => {
+    const handleAdminMessage = (e: any) => {
+      const detail = e.detail;
+      if (!detail) return;
+      if (detail.targetUserId && currentUser && detail.targetUserId !== currentUser.id && currentUser.role !== 'admin') {
+        return;
+      }
+
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `admin-incoming-${Date.now()}`,
+          sender: 'bot',
+          advisorName: detail.adminName || "Direction BRAD'CI (Super Admin)",
+          text: detail.messageText,
+          timestamp: detail.timestamp || new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+          category: 'general',
+          isAdminDirect: true,
+          adminName: detail.adminName || "Direction BRAD'CI (Super Admin)"
+        }
+      ]);
+
+      addToast(
+        "Message Officiel Administrateur",
+        detail.messageText.length > 80 ? detail.messageText.slice(0, 80) + '...' : detail.messageText,
+        'success'
+      );
+    };
+
+    window.addEventListener('bradci_admin_live_message', handleAdminMessage);
+    return () => {
+      window.removeEventListener('bradci_admin_live_message', handleAdminMessage);
+    };
+  }, [currentUser, addToast]);
 
   // ==========================================
   // COUNTDOWN INTERVAL FOR 10-MINUTE CALL REQUEST
@@ -665,20 +705,117 @@ export const AIChatSupport: React.FC = () => {
     );
   };
 
-  // Toggle voice recognition
-  const handleToggleListening = () => {
-    if (!recognitionRef.current) return;
+  // Toggle voice recognition / native audio recording fallback
+  const handleToggleListening = async () => {
     if (isListening) {
-      try {
-        recognitionRef.current.stop();
-      } catch {}
+      // Arrêt de l'écoute ou de l'enregistrement
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      if (isVoiceRecordingActive()) {
+        try {
+          const audioBlob = await stopVoiceRecording();
+          if (audioBlob && audioBlob.size > 0) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (reader.result) {
+                setSelectedFile({
+                  id: `voice-${Date.now()}`,
+                  name: `Note_vocale_${new Date().toLocaleTimeString('fr-FR').replace(/:/g, '-')}.webm`,
+                  size: audioBlob.size,
+                  type: audioBlob.type || 'audio/webm',
+                  dataUrl: reader.result as string
+                });
+                if (!inputText.trim()) {
+                  setInputText(translate("🎙️ [Message vocal enregistré - Prêt à envoyer]", "🎙️ [Voice note recorded - Ready to send]"));
+                }
+              }
+            };
+            reader.readAsDataURL(audioBlob);
+          }
+        } catch (e) {
+          console.warn("Erreur arrêt note vocale:", e);
+        }
+      }
       setIsListening(false);
+      playSuccessChime();
     } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch {}
+      // Démarrage : essayer SpeechRecognition en créant une nouvelle instance propre
+      const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      let speechStarted = false;
+
+      if (SpeechRecognitionClass) {
+        try {
+          const recog = new SpeechRecognitionClass();
+          recog.continuous = false;
+          recog.interimResults = true;
+          recog.lang = language === 'en' ? 'en-US' : 'fr-FR';
+
+          recog.onstart = () => {
+            setIsListening(true);
+          };
+
+          recog.onresult = (event: any) => {
+            let transcript = '';
+            for (let i = 0; i < event.results.length; i++) {
+              transcript += event.results[i][0].transcript;
+            }
+            if (transcript.trim()) {
+              setInputText(transcript);
+            }
+          };
+
+          recog.onerror = async (err: any) => {
+            console.warn("SpeechRecognition error:", err?.error);
+            // Fallback direct sur l'enregistrement audio si non supporté ou bloqué
+            if (err?.error !== 'no-speech') {
+              try {
+                await startVoiceRecording();
+                setIsListening(true);
+              } catch {
+                setIsListening(false);
+              }
+            } else {
+              setIsListening(false);
+            }
+          };
+
+          recog.onend = () => {
+            setIsListening(false);
+          };
+
+          recog.start();
+          recognitionRef.current = recog;
+          speechStarted = true;
+          setIsListening(true);
+        } catch (e) {
+          console.warn("SpeechRecognition start failed:", e);
+        }
+      }
+
+      // Si SpeechRecognition non disponible (WebViews, Safari strict, navigateurs sans WebSpeech)
+      if (!speechStarted) {
+        try {
+          await startVoiceRecording();
+          setIsListening(true);
+        } catch (e) {
+          console.warn("Audio recording fallback failed:", e);
+          setIsListening(false);
+        }
+      }
     }
+  };
+
+  const handleCancelListening = async () => {
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+    if (isVoiceRecordingActive()) {
+      try { await stopVoiceRecording(); } catch {}
+    }
+    setIsListening(false);
   };
 
   // Continuous speech recognition for LIVE VOICE CALL
@@ -1324,12 +1461,12 @@ export const AIChatSupport: React.FC = () => {
       {/* ======================================================== */}
       {/* 2. FLOATING TRIGGER BUTTON (Bottom right)                */}
       {/* ======================================================== */}
-      <div id="online-customer-support-hud" className="fixed bottom-16 sm:bottom-5 right-3 sm:right-5 z-40">
-        {!isOpen && (
+      {!isOpen && (
+        <div id="online-customer-support-hud" className="fixed bottom-20 sm:bottom-5 right-3 sm:right-5 z-40">
           <button
             id="btn-open-support-chat"
             onClick={() => setIsOpen(true)}
-            className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 shadow-2xl shadow-amber-500/30 flex items-center gap-2.5 font-bold text-xs transition-all hover:scale-105 active:scale-95"
+            className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 shadow-2xl shadow-amber-500/30 flex items-center gap-2.5 font-bold text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer"
           >
             <div className="relative">
               <div className={`w-7 h-7 rounded-full bg-gradient-to-tr ${currentAdvisor.avatarBg} text-white flex items-center justify-center font-black text-xs shadow-inner`}>
@@ -1361,42 +1498,43 @@ export const AIChatSupport: React.FC = () => {
               </span>
             </div>
           </button>
-        )}
+        </div>
+      )}
 
-        {/* ======================================================== */}
-        {/* 3. MAIN CHAT & CALL WINDOW                               */}
-        {/* ======================================================== */}
-        {isOpen && (
-          <div 
-            id="modal-support-window" 
-            className="w-[calc(100vw-24px)] sm:w-[450px] h-[86vh] max-h-[670px] bg-slate-950 border-2 border-slate-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4"
-          >
-            {/* Header with Advisor Persona & Controls */}
-            <div className="p-3.5 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between">
+      {/* ======================================================== */}
+      {/* 3. MAIN CHAT & CALL WINDOW                               */}
+      {/* ======================================================== */}
+      {isOpen && (
+        <div 
+          id="modal-support-window" 
+          className="fixed inset-0 sm:inset-auto sm:bottom-5 sm:right-5 z-50 w-full sm:w-[460px] h-[100dvh] sm:h-[650px] sm:max-h-[88vh] bg-white dark:bg-slate-950 sm:border sm:border-slate-200 dark:sm:border-slate-800 sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4"
+        >
+          {/* Header with Advisor Persona & Controls */}
+          <div className="p-3.5 bg-[#1E53E5] text-white border-b border-[#1643BF] flex items-center justify-between shrink-0 shadow-xs">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative shrink-0">
-                  <div className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${currentAdvisor.avatarBg} text-white font-black flex items-center justify-center shadow-md text-sm`}>
+                  <div className={`w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs text-white border border-white/20 font-black flex items-center justify-center shadow-xs text-sm`}>
                     {currentAdvisor.avatarLetter}
                   </div>
-                  <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-slate-900 ${isSessionClosed ? 'bg-slate-500' : 'bg-emerald-500 animate-pulse'}`} />
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-[#1E53E5] ${isSessionClosed ? 'bg-slate-300' : 'bg-emerald-400 animate-pulse'}`} />
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <h4 className="font-bold text-sm text-white font-display">
+                    <h4 className="font-black text-sm text-white font-display">
                       {currentAdvisor.fullName}
                     </h4>
-                    <span className="text-[9px] bg-slate-800 text-slate-300 font-bold px-1.5 py-0.5 rounded border border-slate-700 truncate max-w-[150px]">
+                    <span className="text-[9px] bg-white/20 text-white font-bold px-1.5 py-0.5 rounded border border-white/30 truncate max-w-[150px]">
                       {language === 'en' ? currentAdvisor.roleEn : currentAdvisor.roleFr}
                     </span>
                     {isPassAbonne && (
-                      <span className="text-[9px] bg-amber-500/20 text-amber-300 font-black px-1.5 py-0.5 rounded border border-amber-500/40 flex items-center gap-0.5">
-                        <Crown className="w-2.5 h-2.5 text-amber-400" /> VIP
+                      <span className="text-[9px] bg-[#FF5B00] text-white font-black px-1.5 py-0.5 rounded border border-white/30 flex items-center gap-0.5 shadow-xs">
+                        <Crown className="w-2.5 h-2.5 text-white" /> VIP
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                  <p className="text-[10px] text-white/80 flex items-center gap-1.5 mt-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 inline-block animate-pulse"></span>
                     <span>{translate("Service Client Officiel en Ligne", "Official Online Customer Care")}</span>
                   </p>
                 </div>
@@ -1410,8 +1548,8 @@ export const AIChatSupport: React.FC = () => {
                   title={autoVoice ? translate("Désactiver la lecture vocale", "Disable voice speech") : translate("Activer la lecture vocale", "Enable voice speech")}
                   className={`p-1.5 rounded-xl border transition-all ${
                     autoVoice 
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-400' 
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                      ? 'bg-white/25 border-white text-white' 
+                      : 'bg-white/10 border-white/20 text-white/70 hover:text-white hover:bg-white/20'
                   }`}
                 >
                   {autoVoice ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
@@ -1423,7 +1561,7 @@ export const AIChatSupport: React.FC = () => {
                     id="btn-end-chat-session"
                     onClick={() => handleCloseSession(false)}
                     title={translate("Clôturer la conversation", "End conversation")}
-                    className="px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 transition-colors"
+                    className="px-2 py-1 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[10px] font-bold border border-white/20 transition-colors"
                   >
                     {translate("Terminer", "End")}
                   </button>
@@ -1440,7 +1578,7 @@ export const AIChatSupport: React.FC = () => {
                     setIsSpeaking(false);
                     setIsOpen(false);
                   }}
-                  className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors"
+                  className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/20 transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1449,17 +1587,17 @@ export const AIChatSupport: React.FC = () => {
 
             {/* Navigation Tabs Bar: Messagerie vs Demande d'Appel */}
             {!isVoiceCallActive && !isSearchingAdvisor && (
-              <div className="flex border-b border-slate-800 bg-slate-900/60 p-1 gap-1">
+              <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900/60 p-1 gap-1">
                 <button
                   id="tab-chat-messaging"
                   onClick={() => setActiveTab('chat')}
                   className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
                     activeTab === 'chat'
-                      ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                   }`}
                 >
-                  <MessageSquare className="w-3.5 h-3.5" />
+                  <MessageSquare className="w-3.5 h-3.5 text-[#1E53E5] dark:text-sky-400" />
                   <span>{translate("Messagerie", "Messaging")}</span>
                 </button>
 
@@ -1468,23 +1606,23 @@ export const AIChatSupport: React.FC = () => {
                   onClick={() => setActiveTab('call_request')}
                   className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all relative ${
                     activeTab === 'call_request'
-                      ? 'bg-amber-500/20 text-amber-300 shadow-sm border border-amber-500/40'
-                      : 'text-slate-400 hover:text-amber-300'
+                      ? 'bg-[#FF5B00]/15 dark:bg-amber-500/20 text-[#FF5B00] dark:text-amber-300 shadow-xs border border-[#FF5B00]/40'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-[#FF5B00]'
                   }`}
                 >
-                  <Phone className="w-3.5 h-3.5 text-amber-400" />
+                  <Phone className="w-3.5 h-3.5 text-[#FF5B00] dark:text-amber-400" />
                   <span>{translate("Demande d'Appel", "Call Request")}</span>
 
                   {pendingCallRequest ? (
-                    <span className="ml-1 px-1.5 py-0.2 rounded-full bg-emerald-500 text-slate-950 font-black text-[9px] animate-pulse">
+                    <span className="ml-1 px-1.5 py-0.2 rounded-full bg-emerald-500 text-white font-black text-[9px] animate-pulse">
                       {Math.floor(callCountdownSeconds / 60)}:{String(callCountdownSeconds % 60).padStart(2, '0')}
                     </span>
                   ) : isPassAbonne ? (
-                    <span className="ml-1 text-[9px] bg-amber-500 text-slate-950 font-black px-1.5 py-0.2 rounded">
+                    <span className="ml-1 text-[9px] bg-[#FF5B00] text-white font-black px-1.5 py-0.2 rounded">
                       &lt; 10 min
                     </span>
                   ) : (
-                    <Lock className="w-3 h-3 text-slate-500 ml-0.5" />
+                    <Lock className="w-3 h-3 text-slate-400 dark:text-slate-500 ml-0.5" />
                   )}
                 </button>
               </div>
@@ -1839,7 +1977,7 @@ export const AIChatSupport: React.FC = () => {
               /* SCREEN 4: STANDARD MESSAGING TAB                    */
               /* =================================================== */
               <>
-                <div id="chat-messages-container" className="flex-1 p-3.5 overflow-y-auto space-y-3.5 bg-slate-950">
+                <div id="chat-messages-container" className="flex-1 p-3.5 overflow-y-auto space-y-3.5 bg-slate-50 dark:bg-slate-950">
                   {messages.map((m) => {
                     const isBot = m.sender === 'bot';
                     const isCurrentSpeaking = speakingMessageId === m.id && isSpeaking;
@@ -1851,7 +1989,7 @@ export const AIChatSupport: React.FC = () => {
                         className={`flex gap-2.5 ${isBot ? 'justify-start' : 'justify-end'}`}
                       >
                         {isBot && (
-                          <div className={`w-8 h-8 rounded-full bg-gradient-to-tr ${currentAdvisor.avatarBg} text-white font-black text-xs flex items-center justify-center shrink-0 shadow-sm mt-0.5`}>
+                          <div className={`w-8 h-8 rounded-full bg-[#1E53E5] text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs mt-0.5`}>
                             {currentAdvisor.avatarLetter}
                           </div>
                         )}
@@ -1859,17 +1997,27 @@ export const AIChatSupport: React.FC = () => {
                         <div className={`space-y-1.5 max-w-[84%] ${isBot ? 'items-start' : 'items-end'}`}>
                           <div
                             className={`p-3 rounded-2xl text-xs leading-relaxed transition-all ${
-                              isBot
+                              m.isAdminDirect
+                                ? 'bg-gradient-to-br from-[#FF5B00]/15 via-white dark:via-slate-900 to-slate-50 dark:to-slate-950 border-2 border-[#FF5B00] text-slate-900 dark:text-slate-100 shadow-md'
+                                : isBot
                                 ? isSecurityBlocked
-                                  ? 'bg-red-950/40 border border-red-500/40 text-red-200'
-                                  : 'bg-slate-900/90 border border-slate-800 text-slate-200 shadow-sm'
-                                : 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-medium ml-auto shadow-md'
+                                  ? 'bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-500/40 text-red-900 dark:text-red-200'
+                                  : 'bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 shadow-xs'
+                                : 'bg-[#FF5B00] text-white font-medium ml-auto shadow-md shadow-[#FF5B00]/25'
                             }`}
                           >
+                            {/* Special Admin Verified Header */}
+                            {m.isAdminDirect && (
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/30 text-amber-300 font-black text-[10px] tracking-wide mb-2 border border-amber-400/40">
+                                <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <span>👑 DIRECTION BRAD'CI • RÉPONSE OFFICIELLE EN DIRECT</span>
+                              </div>
+                            )}
+
                             {/* Sender Info for Bot */}
-                            {isBot && (
-                              <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-slate-800 text-[10px] text-slate-400">
-                                <span className="font-bold text-white">
+                            {isBot && !m.isAdminDirect && (
+                              <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400">
+                                <span className="font-black text-slate-900 dark:text-white">
                                   {m.advisorName || currentAdvisor.name}
                                 </span>
                                 <span className="font-mono text-[9px]">
@@ -1878,7 +2026,7 @@ export const AIChatSupport: React.FC = () => {
                               </div>
                             )}
 
-                            {/* Attached Image / File Display */}
+                            {/* Attached Image / Audio / File Display */}
                             {m.attachment && (
                               <div className="mb-2 p-2 rounded-xl bg-slate-950/60 border border-slate-800 text-xs">
                                 {m.attachment.type.startsWith('image/') ? (
@@ -1891,6 +2039,18 @@ export const AIChatSupport: React.FC = () => {
                                     />
                                     <div className="flex items-center justify-between text-[10px] text-slate-400">
                                       <span className="truncate max-w-[140px]">{m.attachment.name}</span>
+                                      <span>{formatFileSize(m.attachment.size)}</span>
+                                    </div>
+                                  </div>
+                                ) : m.attachment.type.startsWith('audio/') ? (
+                                  <div className="space-y-1.5 p-1">
+                                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300">
+                                      <Mic className="w-3.5 h-3.5 text-amber-400" />
+                                      <span>{translate("Note vocale enregistrée", "Recorded voice note")}</span>
+                                    </div>
+                                    <audio controls src={m.attachment.dataUrl} className="w-full h-8" />
+                                    <div className="text-[9.5px] text-slate-400 flex justify-between items-center">
+                                      <span className="truncate">{m.attachment.name}</span>
                                       <span>{formatFileSize(m.attachment.size)}</span>
                                     </div>
                                   </div>
@@ -1917,7 +2077,7 @@ export const AIChatSupport: React.FC = () => {
 
                             {/* Timestamp for user */}
                             {!isBot && (
-                              <div className="text-[9px] text-slate-900/70 text-right mt-1 font-mono">
+                              <div className="text-[9px] text-white/80 text-right mt-1 font-mono">
                                 {m.timestamp}
                               </div>
                             )}
@@ -1932,8 +2092,8 @@ export const AIChatSupport: React.FC = () => {
                                 title={isCurrentSpeaking ? translate("Arrêter", "Stop") : translate("Écouter la réponse", "Listen to answer")}
                                 className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors ${
                                   isCurrentSpeaking 
-                                    ? 'bg-amber-500 text-slate-950 font-black' 
-                                    : 'bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700'
+                                    ? 'bg-[#FF5B00] text-white font-black' 
+                                    : 'bg-white dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs'
                                 }`}
                               >
                                 {isCurrentSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
@@ -2052,6 +2212,61 @@ export const AIChatSupport: React.FC = () => {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {/* Quick Questions Shortcuts (FAQ 1-Click) */}
+                {!isSessionClosed && (
+                  <div className="px-2.5 py-1.5 bg-slate-100/90 dark:bg-slate-950/80 border-t border-slate-200 dark:border-slate-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+                    {[
+                      { label: translate("🛡️ Paiement livraison", "🛡️ Delivery Payment"), q: translate("Comment fonctionne le paiement à la livraison (POD) ?", "How does Payment on Delivery work?") },
+                      { label: translate("📦 Suivre colis", "📦 Track Parcel"), q: translate("Comment puis-je suivre l'arrivée de mon colis avec le coursier ?", "How do I track my parcel delivery with the courier?") },
+                      { label: translate("🔨 Remporter enchère", "🔨 Win Auction"), q: translate("Quelles sont les règles pour remporter une enchère express ?", "What are the rules to win an express auction?") },
+                      { label: translate("💰 Retrait Wave/OM", "💰 Wave/OM Cashout"), q: translate("Comment retirer les fonds de mon solde portefeuille ?", "How can I withdraw my wallet funds via Wave or Orange Money?") },
+                      { label: translate("📞 Demander un rappel", "📞 Request Call"), q: translate("Je souhaite être rappelé rapidement par un conseiller humain.", "I would like a fast phone call from an advisor.") },
+                    ].map((faq, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setInputText(faq.q);
+                        }}
+                        className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white dark:bg-slate-900 hover:bg-[#FF5B00]/10 text-slate-700 dark:text-slate-300 hover:text-[#FF5B00] border border-slate-200 dark:border-slate-800 hover:border-[#FF5B00]/40 whitespace-nowrap transition-all shrink-0 cursor-pointer shadow-xs"
+                      >
+                        {faq.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Active Microphone Recording Banner */}
+                {isListening && (
+                  <div className="px-3 py-2 bg-gradient-to-r from-red-950/70 to-slate-900 border-t border-red-500/40 flex items-center justify-between text-xs animate-in fade-in shrink-0">
+                    <div className="flex items-center gap-2 text-red-300 min-w-0">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                      </span>
+                      <span className="font-bold text-[11px] truncate">
+                        {translate("Micro activé : Parlez, nous vous écoutons...", "Mic active: Speak, we are listening...")}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleToggleListening}
+                        className="px-2.5 py-1 bg-red-500 hover:bg-red-400 text-white rounded-lg font-bold text-[10.5px] transition-colors cursor-pointer shadow-sm"
+                      >
+                        {translate("Terminer", "Done")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelListening}
+                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10.5px] transition-colors cursor-pointer"
+                      >
+                        {translate("Annuler", "Cancel")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Selected File / Image Attachment Preview */}
                 {selectedFile && (
                   <div className="px-3.5 py-2 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-xs">
@@ -2077,7 +2292,7 @@ export const AIChatSupport: React.FC = () => {
                 {/* Bottom Input Form */}
                 <form 
                   onSubmit={handleSend}
-                  className="p-3 bg-slate-900/95 border-t border-slate-800 flex items-center gap-2"
+                  className="p-2.5 sm:p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0 pb-[calc(0.85rem+env(safe-area-inset-bottom,0px))]"
                 >
                   <input
                     type="file"
@@ -2093,7 +2308,7 @@ export const AIChatSupport: React.FC = () => {
                     onClick={() => fileInputRef.current?.click()}
                     title={translate("Joindre une photo ou un document", "Attach photo or document")}
                     disabled={isSessionClosed || isTyping}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-400 hover:text-white transition-colors border border-slate-700 shrink-0"
+                    className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-40 text-slate-600 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-700 shrink-0 flex items-center justify-center cursor-pointer active:scale-95"
                   >
                     <Paperclip className="w-4 h-4" />
                   </button>
@@ -2109,7 +2324,7 @@ export const AIChatSupport: React.FC = () => {
                         : translate("Posez votre question à votre conseiller...", "Ask your advisor a question...")
                     }
                     disabled={isSessionClosed || isTyping}
-                    className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+                    className="flex-1 min-w-0 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-[#FF5B00] disabled:opacity-50"
                   />
 
                   {/* Mic Button */}
@@ -2118,20 +2333,22 @@ export const AIChatSupport: React.FC = () => {
                     onClick={handleToggleListening}
                     disabled={isSessionClosed || isTyping}
                     title={isListening ? translate("Écoute en cours...", "Listening...") : translate("Dicter au micro", "Dictate with mic")}
-                    className={`p-2 rounded-xl border transition-all shrink-0 ${
+                    className={`w-10 h-10 rounded-xl border transition-all shrink-0 flex items-center justify-center cursor-pointer active:scale-95 ${
                       isListening 
-                        ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse' 
-                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                        ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' 
+                        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white'
                     }`}
                   >
                     <Mic className="w-4 h-4" />
                   </button>
 
-                  {/* Send Button */}
+                  {/* Send Button (Always prominent and perfectly accessible) */}
                   <button
+                    id="btn-chat-send-message"
                     type="submit"
                     disabled={(!inputText.trim() && !selectedFile) || isSessionClosed || isTyping}
-                    className="p-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 disabled:opacity-40 text-slate-950 transition-all font-bold shrink-0"
+                    className="w-11 h-10 rounded-xl bg-[#FF5B00] hover:bg-[#E05000] disabled:opacity-40 text-white transition-all font-bold shrink-0 flex items-center justify-center shadow-lg shadow-[#FF5B00]/25 cursor-pointer active:scale-95"
+                    title={translate("Envoyer le message", "Send message")}
                   >
                     <Send className="w-4 h-4" />
                   </button>
@@ -2140,7 +2357,6 @@ export const AIChatSupport: React.FC = () => {
             )}
           </div>
         )}
-      </div>
 
       {/* ======================================================== */}
       {/* 4. PREVIEW MODAL FOR ATTACHED IMAGES                     */}

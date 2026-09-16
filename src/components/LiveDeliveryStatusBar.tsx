@@ -289,27 +289,27 @@ export const LiveDeliveryStatusBar: React.FC = () => {
       {/* Buyer Quick Cancellation Dialog */}
       {showBuyerReturnModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-md bg-[#0C121E] border border-red-500/40 rounded-3xl p-6 shadow-2xl space-y-4 text-slate-100">
+          <div className="w-full max-w-md bg-white dark:bg-[#0C121E] border border-red-500/40 rounded-3xl p-6 shadow-2xl space-y-4 text-slate-900 dark:text-slate-100">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center border border-red-500/30">
+                <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center border border-red-500/30">
                   <RotateCcw className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">Refuser & Retourner le Colis</h3>
-                  <p className="text-xs text-slate-400">Garantie Conformité Brad'CI</p>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Refuser & Retourner le Colis</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Garantie Conformité Brad'CI</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowBuyerReturnModal(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-900"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg bg-slate-100 dark:bg-slate-900"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-slate-300 space-y-1">
-              <p className="font-bold text-red-400">Modalités de Remboursement & Frais :</p>
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-slate-700 dark:text-slate-300 space-y-1">
+              <p className="font-bold text-red-600 dark:text-red-400">Modalités de Remboursement & Frais :</p>
               <ul className="list-disc pl-4 space-y-1 text-[11px]">
                 <li>La valeur de l'article ({activeJob.itemValue?.toLocaleString('fr-FR') || '0'} FCFA) est immédiatement recréditée sur votre solde disponible Wave.</li>
                 <li>Les frais de livraison ({activeJob.deliveryFee.toLocaleString('fr-FR')} FCFA) restent acquis au livreur pour son déplacement.</li>
@@ -318,11 +318,11 @@ export const LiveDeliveryStatusBar: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-300 block mb-1">Motif de non-conformité :</label>
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">Motif de non-conformité :</label>
               <select
                 value={returnReason}
                 onChange={(e) => setReturnReason(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white"
               >
                 <option value="Produit non conforme à la description de l'annonce">Produit non conforme à la description</option>
                 <option value="Article défectueux ou endommagé">Article défectueux ou endommagé</option>
@@ -335,7 +335,7 @@ export const LiveDeliveryStatusBar: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowBuyerReturnModal(false)}
-                className="px-4 py-2 bg-slate-900 text-slate-400 text-xs font-bold rounded-xl border border-slate-800"
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-800"
               >
                 Conserver le Colis
               </button>

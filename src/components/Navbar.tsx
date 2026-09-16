@@ -13,6 +13,7 @@ import {
   Lock, 
   Sparkles, 
   Menu, 
+  MoreVertical,
   X,
   CreditCard,
   PhoneCall,
@@ -37,7 +38,8 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Coins,
-  Check
+  Check,
+  Smartphone
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -76,7 +78,11 @@ export const Navbar: React.FC = () => {
     toggleDriverAvailability,
     freightJobs,
     activeDriverTab,
-    setActiveDriverTab
+    setActiveDriverTab,
+    loginWithRole,
+    adminLogin,
+    isAdminAuthenticated,
+    addToast
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -112,15 +118,16 @@ export const Navbar: React.FC = () => {
   const availableJobsCount = isDriver && freightJobs ? freightJobs.filter(j => j.status === 'available').length : 0;
 
   return (
-    <header id="main-navbar" className="sticky top-0 z-40 bg-[#0B1021]/95 backdrop-blur-md border-b border-[#222D4A] transition-colors">
+    <header id="main-navbar" className="sticky top-0 z-40 bg-white/95 dark:bg-[#0A1128]/95 backdrop-blur-md border-b border-slate-200 dark:border-[#1E3E85] transition-colors shadow-xs">
       <div className="w-full max-w-[1800px] mx-auto px-2 sm:px-3 md:px-4 lg:px-6">
-        <div className="flex items-center justify-between h-14 sm:h-16 lg:h-[68px] gap-1 sm:gap-2 lg:gap-3 w-full min-w-0 overflow-x-auto no-scrollbar">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-1 sm:gap-2 lg:gap-2.5 w-full min-w-0 relative">
           {/* Brand Logo & Tag */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button 
               id="nav-logo"
-              onClick={() => setActiveTab(isDriver ? 'dashboard_driver' : 'explore')}
+              onClick={() => setActiveTab('explore')}
               className="flex items-center text-left group focus:outline-none transition-transform active:scale-95 shrink-0 cursor-pointer"
+              title="BRAD'CI - Accueil & Enchères"
             >
               <BradCiLogo 
                 size="sm" 
@@ -130,266 +137,203 @@ export const Navbar: React.FC = () => {
             </button>
 
             {/* Direct POD Guarantee Pill */}
-            <div className="hidden 2xl:flex items-center gap-1.5 text-[11px] bg-[#1E53E5]/10 text-[#467BFF] px-2.5 py-1 rounded-full border border-[#1E53E5]/30 whitespace-nowrap shrink-0">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#1E53E5] shrink-0" />
-              <span className="font-semibold">{translate("Paiement Direct à la Livraison", "Direct Pay on Delivery")}</span>
+            <div className="hidden 2xl:flex items-center gap-1 text-[10px] bg-[#1E53E5]/10 text-[#1E53E5] dark:text-[#467BFF] px-2 py-0.5 rounded-full border border-[#1E53E5]/25 dark:border-[#1E53E5]/40 whitespace-nowrap shrink-0 font-bold">
+              <ShieldCheck className="w-3 h-3 text-[#1E53E5] shrink-0" />
+              <span>{translate("Paiement Livraison Garanti", "Guaranteed POD")}</span>
             </div>
           </div>
 
-          {/* Desktop Navigation Links (Strict RBAC Routing) */}
-          {isDriver ? (
-            <nav id="nav-desktop-driver" className="hidden lg:flex items-center justify-center gap-0.5 xl:gap-1.5 flex-1 min-w-0 px-1">
-              {/* 1. Radar */}
-              <button
-                id="nav-tab-driver-radar"
-                onClick={() => {
-                  setActiveTab('dashboard_driver');
-                  setActiveDriverTab('radar');
-                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'radar' }));
-                }}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 xl:gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'dashboard_driver' && (activeDriverTab === 'radar' || activeDriverTab === 'radar_map')
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Navigation className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>{translate("Radar", "Radar")}</span>
-              </button>
+          {/* Desktop Navigation Links - Compact, Ultra-Clean Web Portal Format */}
+          <nav id="nav-desktop-unified" className="hidden md:flex items-center justify-center gap-1 xl:gap-1.5 flex-1 min-w-0 px-1 overflow-x-auto no-scrollbar">
+            {/* 1. Enchères */}
+            <button
+              id="nav-tab-explore"
+              onClick={() => setActiveTab('explore')}
+              className={`h-8 px-2 xl:px-2.5 rounded-xl text-[11.5px] xl:text-xs font-bold transition-all whitespace-nowrap flex items-center justify-center gap-1.5 cursor-pointer shrink-0 ${
+                activeTab === 'explore' || activeTab === 'feed'
+                  ? 'bg-[#FF5B00] text-white font-black shadow-sm shadow-[#FF5B00]/30' 
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <Gavel className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'explore' || activeTab === 'feed' ? 'text-white' : 'text-[#FF5B00]'}`} />
+              <span>{translate("Enchères", "Auctions")}</span>
+            </button>
 
-              {/* 2. Courses */}
+            {/* 2. Déstockage B2B */}
+            <button
+              id="nav-tab-b2b"
+              onClick={() => setActiveTab('b2b_liquidation')}
+              className={`h-8 px-2 xl:px-2.5 rounded-xl text-[11.5px] xl:text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                activeTab === 'b2b_liquidation' 
+                  ? 'bg-[#1E53E5] text-white font-bold shadow-sm shadow-blue-500/30' 
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <Building2 className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'b2b_liquidation' ? 'text-white' : 'text-[#1E53E5]'}`} />
+              <span>{translate("B2B Lots", "B2B Lots")}</span>
+              <span className={`text-[8px] font-black px-1 py-0.2 rounded ${
+                activeTab === 'b2b_liquidation' ? 'bg-white/20 text-white' : 'bg-blue-500/15 text-[#1E53E5] dark:text-cyan-300'
+              }`}>LOTS</span>
+            </button>
+
+            {/* 3. Coursier Express (Point A ➔ Point B) */}
+            <button
+              id="nav-tab-express-courier"
+              onClick={() => setActiveTab('express_courier')}
+              className={`h-8 px-2 xl:px-2.5 rounded-xl text-[11.5px] xl:text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
+                  ? 'bg-violet-600 text-white font-bold shadow-sm shadow-violet-500/30' 
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <Bike className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier' ? 'text-white' : 'text-violet-600 dark:text-amber-400'}`} />
+              <span>{translate("Coursier", "Courier")}</span>
+              <span className="text-[8px] bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black px-1 py-0.2 rounded shadow-xs">
+                A➔B
+              </span>
+            </button>
+
+            {/* 4. Tarifs & Pass */}
+            <button
+              id="nav-tab-pricing"
+              onClick={() => setActiveTab('tarifs')}
+              className={`h-8 px-2 xl:px-2.5 rounded-xl text-[11.5px] xl:text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                activeTab === 'tarifs' 
+                  ? 'bg-slate-900 text-white dark:bg-slate-800 dark:text-amber-400 font-bold border border-slate-300 dark:border-slate-700' 
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+              <span>{translate("Pass & Tarifs", "Pass & Rates")}</span>
+            </button>
+
+            {/* 5. Séquestre & Sécurité */}
+            <button
+              id="nav-tab-about"
+              onClick={() => setActiveTab('about')}
+              className={`h-8 px-2 xl:px-2 rounded-xl text-[11.5px] xl:text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                activeTab === 'about' 
+                  ? 'bg-emerald-600 text-white font-bold shadow-sm shadow-emerald-500/30' 
+                  : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <ShieldCheck className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'about' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+              <span>{translate("Séquestre", "Escrow")}</span>
+            </button>
+
+            {/* 6. Mon Espace Client (Visible uniquement si connecté en tant que client) */}
+            {currentUser?.role === 'client' && (
               <button
-                id="nav-tab-driver-jobs"
-                onClick={() => {
-                  setActiveTab('dashboard_driver');
-                  setActiveDriverTab('orders');
-                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'orders' }));
-                }}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 xl:gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'dashboard_driver' && (activeDriverTab === 'orders' || activeDriverTab === 'available_orders' || activeDriverTab === 'active_mission')
-                    ? 'bg-[#F97316]/20 text-[#F97316] border border-[#F97316]/40 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                id="nav-tab-client-dashboard"
+                onClick={() => setActiveTab('dashboard_client')}
+                className={`h-8 px-2 xl:px-2.5 rounded-xl text-[11.5px] xl:text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                  activeTab === 'dashboard_client' 
+                    ? 'bg-[#1E53E5] text-white font-bold shadow-sm shadow-blue-500/30' 
+                    : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
                 }`}
               >
-                <Package className="w-3.5 h-3.5 text-[#F97316] shrink-0" />
-                <span>{translate("Courses", "Deliveries")}</span>
-                {driverActiveMission ? (
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                ) : availableJobsCount > 0 ? (
-                  <span className="px-1.5 py-0.2 rounded-full bg-[#F97316] text-white font-mono-num font-black text-[10px]">
+                <User className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'dashboard_client' ? 'text-white' : 'text-[#1E53E5] dark:text-blue-400'}`} />
+                <span>{translate("Mon Espace", "My Space")}</span>
+              </button>
+            )}
+
+            {/* 7. Espace Livreur (Visible uniquement si connecté en tant que livreur) */}
+            {currentUser?.role === 'driver' && (
+              <button
+                id="nav-tab-driver-dashboard"
+                onClick={() => setActiveTab('dashboard_driver')}
+                className={`h-8 px-2 xl:px-2.5 rounded-xl text-[11.5px] xl:text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                  activeTab === 'dashboard_driver' 
+                    ? 'bg-emerald-600 text-white font-bold shadow-sm shadow-emerald-500/30' 
+                    : 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800/60'
+                }`}
+              >
+                <Bike className={`w-3.5 h-3.5 shrink-0 ${activeTab === 'dashboard_driver' ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+                <span>{translate("Livreur", "Courier")}</span>
+                {availableJobsCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-[#FF5B00] text-white font-mono-num font-black text-[9px]">
                     {availableJobsCount}
                   </span>
-                ) : null}
+                )}
               </button>
+            )}
 
-              {/* 3. Revenus */}
+            {/* 8. Console Administrative (STRICTEMENT PRIVÉ : Uniquement si connecté avec le sous-compte administrateur) */}
+            {currentUser?.role === 'admin' && (
               <button
-                id="nav-tab-driver-earnings"
-                onClick={() => {
-                  setActiveTab('dashboard_driver');
-                  setActiveDriverTab('earnings');
-                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'earnings' }));
-                }}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 xl:gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'dashboard_driver' && activeDriverTab === 'earnings'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                id="nav-tab-admin-dashboard"
+                onClick={() => setActiveTab('dashboard_admin')}
+                className={`h-8 px-2 xl:px-2.5 rounded-xl text-[11.5px] xl:text-xs font-black transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
+                  activeTab === 'dashboard_admin' 
+                    ? 'bg-red-600/35 text-red-200 border border-red-500/60 font-black shadow-sm' 
+                    : 'text-red-300 hover:text-white bg-red-950/40 border border-red-500/30 hover:border-red-400'
                 }`}
+                title={translate("Back-Office Administration", "Admin Back-Office")}
               >
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>{translate("Revenus", "Earnings")}</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                <span>{translate("Admin", "Admin")}</span>
               </button>
-
-              {/* 4. Historique */}
-              <button
-                id="nav-tab-driver-history"
-                onClick={() => {
-                  setActiveTab('dashboard_driver');
-                  setActiveDriverTab('history');
-                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'history' }));
-                }}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 xl:gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'dashboard_driver' && activeDriverTab === 'history'
-                    ? 'bg-slate-800 text-white border border-slate-700 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Receipt className="w-3.5 h-3.5 text-slate-300 shrink-0" />
-                <span>{translate("Historique", "History")}</span>
-              </button>
-
-              {/* 5. Paramètres */}
-              <button
-                id="nav-tab-driver-settings"
-                onClick={() => {
-                  setActiveTab('dashboard_driver');
-                  setActiveDriverTab('settings');
-                  window.dispatchEvent(new CustomEvent('bradci_driver_tab', { detail: 'settings' }));
-                }}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 xl:gap-1.5 cursor-pointer whitespace-nowrap ${
-                  activeTab === 'dashboard_driver' && (activeDriverTab === 'settings' || activeDriverTab === 'profile')
-                    ? 'bg-blue-600/20 text-blue-300 border border-blue-500/40 shadow-sm'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Settings className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>{translate("Paramètres", "Settings")}</span>
-              </button>
-            </nav>
-          ) : (
-            <nav id="nav-desktop-client" className="hidden lg:flex items-center justify-center gap-0.5 xl:gap-1.5 flex-1 min-w-0 px-1">
-              {/* Feed / Explore */}
-              <button
-                id="nav-tab-explore"
-                onClick={() => setActiveTab('explore')}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors whitespace-nowrap flex items-center justify-center cursor-pointer ${
-                  activeTab === 'explore' 
-                    ? 'bg-slate-800 text-amber-400 font-semibold shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                {translate("Enchères", "Auctions")}
-              </button>
-
-              {/* Coursier Express (Point A ➔ Point B) */}
-              <button
-                id="nav-tab-express-courier"
-                onClick={() => setActiveTab('express_courier')}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-all flex items-center justify-center gap-1 xl:gap-1.5 whitespace-nowrap cursor-pointer ${
-                  activeTab === 'express_courier' || activeTab === 'coursier_express' || activeTab === 'coursier'
-                    ? 'bg-violet-600/30 text-violet-300 border border-violet-500/40 font-bold shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <Bike className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>{translate("Coursier Express", "Express Courier")}</span>
-                <span className="hidden xl:inline-block text-[9px] bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold px-1.5 py-0.2 rounded shadow">
-                  A ➔ B
-                </span>
-              </button>
-
-              {/* B2B Liquidation Hub */}
-              <button
-                id="nav-tab-b2b"
-                onClick={() => setActiveTab('b2b_liquidation')}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors flex items-center justify-center gap-1 xl:gap-1.5 whitespace-nowrap cursor-pointer ${
-                  activeTab === 'b2b_liquidation' 
-                    ? 'bg-blue-600/30 text-cyan-300 border border-blue-500/40 font-bold shadow-sm' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <Building2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>{translate("Déstockage B2B", "B2B Liquidation")}</span>
-                <span className="hidden xl:inline-block text-[9px] bg-blue-500/30 text-cyan-300 font-extrabold px-1.5 py-0.2 rounded">LOTS</span>
-              </button>
-
-              {/* Client Dashboard (Only for Client role) */}
-              {currentUser?.role === 'client' && (
-                <button
-                  id="nav-tab-client-dashboard"
-                  onClick={() => setActiveTab('dashboard_client')}
-                  className={`h-9 px-2 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors flex items-center justify-center gap-1 xl:gap-1.5 whitespace-nowrap cursor-pointer ${
-                    activeTab === 'dashboard_client' 
-                      ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 font-semibold' 
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                  }`}
-                >
-                  <User className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>{translate("Mon Espace", "My Space")}</span>
-                </button>
-              )}
-
-              {/* Admin Dashboard (Only for Admin role - Strict RBAC) */}
-              {currentUser?.role === 'admin' && (
-                <button
-                  id="nav-tab-admin-dashboard"
-                  onClick={() => setActiveTab('dashboard_admin')}
-                  className={`h-9 px-2 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors flex items-center justify-center gap-1 xl:gap-1.5 whitespace-nowrap cursor-pointer ${
-                    activeTab === 'dashboard_admin' 
-                      ? 'bg-red-600/20 text-red-400 border border-red-500/30 font-semibold' 
-                      : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                  }`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                  <span>{translate("Back-Office", "Back-Office")}</span>
-                </button>
-              )}
-
-              {/* Tarifs & Pass */}
-              <button
-                id="nav-tab-pricing"
-                onClick={() => setActiveTab('tarifs')}
-                className={`h-9 px-2 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors flex items-center justify-center gap-1 xl:gap-1.5 whitespace-nowrap cursor-pointer ${
-                  activeTab === 'tarifs' 
-                    ? 'bg-slate-800 text-amber-400 font-semibold' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span>{translate("Pass & Tarifs", "Pass & Rates")}</span>
-              </button>
-
-              {/* À Propos & Sécurité */}
-              <button
-                id="nav-tab-about"
-                onClick={() => setActiveTab('about')}
-                className={`hidden xl:flex h-9 px-2 xl:px-3 rounded-xl text-xs xl:text-sm font-medium transition-colors items-center justify-center whitespace-nowrap cursor-pointer ${
-                  activeTab === 'about' 
-                    ? 'bg-slate-800 text-amber-400 font-semibold' 
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                {translate("Séquestre", "Escrow")}
-              </button>
-            </nav>
-          )}
+            )}
+          </nav>
 
           {/* Right Action Bar - Organized, Executive, Clean & Responsive */}
           <div 
             id="navbar-actions-bar" 
             className="flex items-center gap-1 sm:gap-1.5 lg:gap-2 shrink-0 justify-end min-w-0"
           >
-            {/* Quick Voix Off / Voice Guide Toggle Button (Always visible on mobile & desktop) */}
+            {/* Desktop Notifications & Alerts Button (Visible uniquement sur ordinateur car barre en bas sur mobile) */}
+            <button
+              id="navbar-direct-notifications-btn"
+              type="button"
+              onClick={() => setNotificationsModalOpen(true)}
+              className="hidden md:flex relative h-8 sm:h-8.5 px-2 sm:px-2.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-100/90 dark:bg-slate-900/90 text-slate-800 dark:text-slate-300 hover:text-amber-500 dark:hover:text-amber-400 hover:border-amber-400/50 hover:bg-slate-200 dark:hover:bg-slate-800 transition-all items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-xs"
+              title={translate("Notifications & Alertes de Surenchère", "Notifications & Alerts")}
+            >
+              <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500 dark:text-amber-400 shrink-0" />
+              <span className="hidden 2xl:inline text-[11px] text-slate-800 dark:text-slate-300 font-bold">{translate("Alertes", "Alerts")}</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-white font-mono-num font-black text-[9px] leading-tight">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+            {/* Quick Voix Off / Voice Guide Toggle Button */}
             <button
               id="btn-navbar-voice-toggle"
               type="button"
               onClick={() => toggleVoice()}
-              className={`h-8 sm:h-9 px-2 sm:px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-sm ${
+              className={`flex h-8 w-8 sm:h-9 sm:w-auto sm:px-2.5 rounded-xl border transition-all items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-xs ${
                 voiceEnabled
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25'
-                  : 'bg-slate-900/90 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25'
+                  : 'bg-slate-100/90 dark:bg-slate-900/90 border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800'
               }`}
               title={voiceEnabled ? translate("Voix Off Activée (Cliquer pour couper)", "Voice Assistance On (Click to mute)") : translate("Voix Off Coupée (Cliquer pour activer)", "Voice Assistance Off (Click to unmute)")}
             >
-              {voiceEnabled ? (
-                <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0 animate-pulse" />
-              ) : (
-                <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 shrink-0" />
-              )}
+              <Volume2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span className="hidden 2xl:inline text-[11px] font-bold">
                 {voiceEnabled ? translate("Voix ON", "Voice ON") : translate("Voix OFF", "Voice OFF")}
               </span>
             </button>
 
-            {/* Currency Selector (FCFA / EUR / USD) - Hidden on mobile, visible from sm screen up */}
-            <div className="relative shrink-0 hidden sm:block" ref={currencyRef}>
+            {/* Currency Selector (FCFA / EUR / USD) - Masqué sur mobile, visible sur desktop */}
+            <div className="relative shrink-0 hidden md:block" ref={currencyRef}>
               <button
                 id="btn-navbar-currency"
                 type="button"
                 onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
-                className={`h-8 sm:h-9 px-1.5 sm:px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1 sm:gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-sm ${
+                className={`h-8 sm:h-9 px-1.5 sm:px-2.5 rounded-xl border transition-all flex items-center justify-center gap-1 sm:gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-xs ${
                   currencyDropdownOpen
-                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                    : 'bg-slate-900/90 border-slate-800 text-slate-200 hover:text-white hover:bg-slate-800 hover:border-slate-700'
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-700 dark:text-amber-300'
+                    : 'bg-slate-100/90 dark:bg-slate-900/90 border-slate-300 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800'
                 }`}
                 title={translate("Devise d'affichage (FCFA, EUR, USD) pour suivre les enchères", "Display currency (FCFA, EUR, USD) to track auctions")}
               >
-                <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0 hidden xs:inline" />
+                <Coins className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0 hidden xs:inline" />
                 <span className="text-[11px] sm:text-xs font-extrabold flex items-center gap-1 font-mono-num">
                   <span>{currency === 'FCFA' ? '🇨🇮' : currency === 'EUR' ? '🇪🇺' : '🇺🇸'}</span>
                   <span>{currency === 'FCFA' ? 'FCFA' : currency === 'EUR' ? 'EUR' : 'USD'}</span>
                 </span>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${currencyDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3 h-3 text-slate-500 dark:text-slate-400 transition-transform ${currencyDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {currencyDropdownOpen && (
@@ -502,12 +446,41 @@ export const Navbar: React.FC = () => {
               )}
             </div>
 
-            {/* For Drivers: Quick Master Availability Switch */}
+            {/* Shopping Cart Button (Visible sur desktop, dans la barre du bas sur mobile) */}
+            <button
+              id="navbar-direct-cart-btn"
+              type="button"
+              onClick={() => setCartModalOpen(true)}
+              className="hidden md:flex relative h-8 sm:h-8.5 px-2 sm:px-2.5 rounded-xl border border-slate-300 dark:border-slate-800 bg-slate-100/90 dark:bg-slate-900/90 text-amber-600 dark:text-amber-400 hover:border-amber-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition-all items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-xs"
+              title={translate("Ouvrir mon Panier", "Open My Cart")}
+            >
+              <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="hidden xl:inline text-[11px] text-slate-800 dark:text-slate-200 font-bold">{translate("Panier", "Cart")}</span>
+              {cart && cart.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-[#FF5B00] text-white font-mono-num font-black text-[10px] leading-tight">
+                  {cart.reduce((s, i) => s + i.quantity, 0)}
+                </span>
+              )}
+            </button>
+
+            {/* Sell Button (+ Vendre) (Visible sur desktop, bouton central orange dans la barre du bas sur mobile) */}
+            <button
+              id="navbar-direct-sell-btn"
+              type="button"
+              onClick={handleSellClick}
+              className="hidden md:flex h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-xl bg-[#FF5B00] hover:bg-[#E05000] text-white font-black text-xs items-center justify-center gap-1.5 shadow-sm shadow-[#FF5B00]/30 active:scale-95 transition-all cursor-pointer shrink-0"
+              title={translate("Vendre un article aux enchères ou prix fixe (Gratuit)", "Sell an item for free")}
+            >
+              <PlusCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0 stroke-[2.5]" />
+              <span className="whitespace-nowrap">{translate("Vendre", "Sell")}</span>
+            </button>
+
+            {/* For Drivers: Quick Master Availability Switch (Visible sur desktop, géré dans radar sur mobile) */}
             {isDriver && (
               <button
                 id="navbar-driver-status-toggle"
                 onClick={toggleDriverAvailability}
-                className={`flex h-8 sm:h-9 px-2 sm:px-3 rounded-xl font-black text-xs items-center justify-center gap-1.5 transition-all border shadow-sm cursor-pointer ${
+                className={`hidden md:flex h-8 sm:h-8.5 px-2 sm:px-2.5 rounded-xl font-black text-xs items-center justify-center gap-1.5 transition-all border shadow-sm cursor-pointer ${
                   currentUser.driverAvailability !== 'offline'
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
                     : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
@@ -515,11 +488,29 @@ export const Navbar: React.FC = () => {
                 title={currentUser.driverAvailability !== 'offline' ? '🟢 En Service (Recevez des courses)' : '🔴 En Pause (Indisponible)'}
               >
                 <Power className={`w-3.5 h-3.5 ${currentUser.driverAvailability !== 'offline' ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
-                <span className="hidden sm:inline text-[11px] sm:text-xs">
+                <span className="hidden sm:inline text-[11px]">
                   {currentUser.driverAvailability !== 'offline' ? '🟢 EN SERVICE' : '🔴 EN PAUSE'}
                 </span>
               </button>
             )}
+
+            {/* Quick Theme Toggle Button (Mobile & Desktop) */}
+            <button
+              id="btn-navbar-theme-toggle"
+              type="button"
+              onClick={() => toggleTheme()}
+              className="flex h-8 sm:h-8.5 px-2 sm:px-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-slate-100/90 dark:bg-slate-900/90 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-all items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-xs active:scale-95"
+              title={effectiveTheme === 'light' ? translate("Passer au Mode Sombre 🌙", "Switch to Dark Mode 🌙") : translate("Passer au Mode Clair Pro ☀️", "Switch to Pro Light Mode ☀️")}
+            >
+              {effectiveTheme === 'light' ? (
+                <Moon className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+              ) : (
+                <Sun className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
+              )}
+              <span className="hidden sm:inline text-[11px] font-bold">
+                {effectiveTheme === 'light' ? translate("Clair", "Light") : translate("Sombre", "Dark")}
+              </span>
+            </button>
 
             {/* Auth / Profile Area */}
             {currentUser ? (
@@ -527,7 +518,7 @@ export const Navbar: React.FC = () => {
                 <button
                   id="user-profile-menu-btn"
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="h-8 sm:h-9 flex items-center justify-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 xl:px-2.5 rounded-xl hover:bg-slate-800 border border-amber-400/70 hover:border-amber-400 transition-all bg-slate-900/90 shadow-sm shadow-amber-500/10 shrink-0 group cursor-pointer"
+                  className="h-8 sm:h-8.5 flex items-center justify-center gap-1 sm:gap-1.5 px-1 sm:px-2 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-800 border border-amber-500/70 hover:border-amber-500 transition-all bg-slate-100/90 dark:bg-slate-900/90 shadow-xs shrink-0 group cursor-pointer"
                   title={`${translate("Connecté :", "Logged in:")} ${currentUser.name}`}
                 >
                   <div className="relative shrink-0 flex items-center justify-center">
@@ -535,32 +526,31 @@ export const Navbar: React.FC = () => {
                       src={currentUser.avatar}
                       alt={currentUser.name}
                       referrerPolicy="no-referrer"
-                      className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover border border-amber-300 shadow-sm shrink-0 block group-hover:scale-105 transition-transform"
+                      className="w-6 h-6 sm:w-6 sm:h-6 rounded-full object-cover border border-amber-400 shadow-sm shrink-0 block group-hover:scale-105 transition-transform"
                     />
-                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border-2 border-[#080C14]" />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border-2 border-white dark:border-[#080C14]" />
                   </div>
-                  <div className="hidden xl:block text-left text-xs pr-1">
-                    <div className="font-bold text-slate-100 truncate max-w-[95px] flex items-center gap-1">
+                  <div className="hidden xl:block text-left text-xs pr-0.5">
+                    <div className="font-bold text-slate-800 dark:text-slate-100 truncate max-w-[85px] flex items-center gap-1">
                       <span>{currentUser.name.split(' ')[0]}</span>
-                      {currentUser.isVIP && <Crown className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />}
+                      {currentUser.isVIP && <Crown className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />}
                     </div>
-                    <span className="text-[9.5px] text-amber-400 font-mono block leading-none font-bold">
-                      {currentUser.kycStatus === 'verified' ? '✓ KYC' : 'KYC ?'}
-                    </span>
                   </div>
+                  <ChevronDown className={`w-3 h-3 text-slate-500 dark:text-slate-400 transition-transform hidden sm:block ${profileDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* Dropdown Menu */}
                 {profileDropdownOpen && (
                   <div 
                     id="user-profile-dropdown"
-                    className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-[#0B1120] border border-slate-200 dark:border-slate-700/90 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 max-h-[85vh] overflow-y-auto"
                   >
                     {/* User Header */}
-                    <div className="p-2 border-b border-slate-800/80 mb-2">
+                    <div className="p-2.5 bg-slate-50 dark:bg-slate-900/90 rounded-xl border border-slate-200 dark:border-slate-800/80 mb-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-white truncate">{currentUser.name}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                        <span className="text-xs font-black text-white truncate">{currentUser.name}</span>
+                        <span className={`text-[9.5px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider ${
                           currentUser.role === 'admin' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
                           currentUser.role === 'driver' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
                           'bg-blue-500/20 text-blue-400 border border-blue-500/30'
@@ -568,102 +558,197 @@ export const Navbar: React.FC = () => {
                           {currentUser.role}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5 font-mono">{currentUser.email}</p>
+                      <p className="text-[10.5px] text-slate-400 truncate mt-0.5 font-mono">{currentUser.email}</p>
                       
                       {/* Solde Disponible et Séquestre */}
-                      <div className="mt-2.5 p-2 bg-slate-950/80 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs font-mono-num">
+                      <div className="mt-2 p-2 bg-slate-950/90 rounded-xl border border-slate-800 flex items-center justify-between text-xs font-mono-num">
                         <div>
-                          <div className="text-[10px] text-slate-500">{translate("Solde Retirable", "Available Balance")}</div>
-                          <div className="text-sm font-bold text-amber-400">{currentUser.walletBalance.toLocaleString('fr-FR')} F</div>
+                          <div className="text-[9.5px] text-slate-400">{translate("Solde Retirable", "Available Balance")}</div>
+                          <div className="text-sm font-black text-amber-400">{currentUser.walletBalance.toLocaleString('fr-FR')} F</div>
                         </div>
                         {currentUser.blockedBalance ? (
                           <div className="text-right">
-                            <div className="text-[10px] text-slate-500">{translate("Séquestre Ventes", "Sales Escrow")}</div>
+                            <div className="text-[9.5px] text-slate-400">{translate("Séquestre", "Escrow")}</div>
                             <div className="text-xs font-bold text-blue-400">{currentUser.blockedBalance.toLocaleString('fr-FR')} F</div>
                           </div>
                         ) : null}
                       </div>
 
                       {/* KYC Status Badge */}
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-[11px] text-slate-400">{translate("Statut Identité :", "Identity Status:")}</span>
+                      <div className="mt-2 flex items-center justify-between pt-1 border-t border-slate-800/60">
+                        <span className="text-[10.5px] text-slate-400">{translate("Statut KYC :", "KYC Status:")}</span>
                         {currentUser.kycStatus === 'verified' ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold flex items-center gap-1 border border-emerald-500/30">
-                            <ShieldCheck className="w-3 h-3" />
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold flex items-center gap-1 border border-emerald-500/30">
+                            <ShieldCheck className="w-3 h-3 text-emerald-400" />
                             {translate("Vérifié KYC", "KYC Verified")}
                           </span>
                         ) : currentUser.kycStatus === 'pending' ? (
-                          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-semibold flex items-center gap-1 border border-amber-500/30">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-semibold flex items-center gap-1 border border-amber-500/30">
                             <Clock className="w-2.5 h-2.5 text-amber-400 animate-pulse" />
-                            <span>{translate("KYC en cours de vérification", "KYC under verification")}</span>
+                            <span>{translate("KYC en cours", "Pending")}</span>
                           </span>
                         ) : (
                           <button
+                            type="button"
                             onClick={() => { setProfileDropdownOpen(false); setKycModalOpen(true); }}
-                            className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold flex items-center gap-1 border border-red-500/30 underline"
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold flex items-center gap-1 border border-red-500/30 underline cursor-pointer"
                           >
-                            {translate("Non vérifié (Vérifier)", "Unverified (Verify)")}
+                            {translate("Vérifier KYC", "Verify KYC")}
                           </button>
                         )}
                       </div>
                     </div>
 
-                    {/* Navigation shortcuts */}
-                    <div className="space-y-1">
-                      {currentUser.role === 'client' && (
-                        <button
-                          onClick={() => { setActiveTab('dashboard_client'); setProfileDropdownOpen(false); }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-colors"
-                        >
-                          <User className="w-4 h-4 text-blue-400" />
-                          <span>{translate("Tableau de bord Client", "Client Dashboard")}</span>
-                        </button>
-                      )}
-
-                      {currentUser.role === 'driver' && (
-                        <button
-                          onClick={() => { setActiveTab('dashboard_driver'); setProfileDropdownOpen(false); }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-colors"
-                        >
-                          <Bike className="w-4 h-4 text-emerald-400" />
-                          <span>{translate("Espace Livreur & Missions", "Courier & Deliveries")}</span>
-                        </button>
-                      )}
-
+                    {/* Section Rôles & Espaces Dédiés */}
+                    <div className="mb-2 p-1.5 bg-slate-950/70 rounded-xl border border-slate-800/90 space-y-1">
+                      {/* 1. Admin Space (Strictly if authenticated with admin role) */}
                       {currentUser.role === 'admin' && (
                         <button
-                          onClick={() => { setActiveTab('dashboard_admin'); setProfileDropdownOpen(false); }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-colors"
+                          id="btn-profile-dropdown-admin"
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('dashboard_admin');
+                            setProfileDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                            activeTab === 'dashboard_admin'
+                              ? 'bg-red-600/30 text-red-200 border border-red-500/50 font-black shadow-sm'
+                              : 'bg-red-950/30 text-red-300 hover:bg-red-900/40 border border-red-500/30'
+                          }`}
                         >
-                          <ShieldCheck className="w-4 h-4 text-red-400" />
-                          <span>{translate("Back-Office Super Admin", "Super Admin Back-Office")}</span>
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-red-400 shrink-0" />
+                            <div className="leading-tight">
+                              <div className="font-bold">{translate("Back-Office Administration", "Admin Back-Office")}</div>
+                              <div className="text-[9px] text-red-300/80">{translate("Gestion & Supervision Globale", "Management & Global Supervision")}</div>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/30 text-red-200 border border-red-500/40">
+                            ADMIN
+                          </span>
                         </button>
                       )}
 
-                      {/* Cart Shortcut */}
-                      {!isDriver && (
+                      {/* 2. Client Space (If logged in as client) */}
+                      {currentUser.role === 'client' && (
                         <button
-                          id="btn-profile-dropdown-cart"
-                          onClick={() => { setCartModalOpen(true); setProfileDropdownOpen(false); }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
+                          id="btn-profile-dropdown-client"
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('dashboard_client');
+                            setProfileDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                            activeTab === 'dashboard_client'
+                              ? 'bg-blue-600/30 text-blue-200 border border-blue-500/50 font-bold shadow-sm'
+                              : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                          }`}
                         >
                           <div className="flex items-center gap-2">
-                            <ShoppingCart className="w-4 h-4 text-amber-400" />
-                            <span>{translate("Mon Panier Multi-Articles", "My Cart")}</span>
+                            <User className="w-4 h-4 text-blue-400 shrink-0" />
+                            <div className="leading-tight">
+                              <div className="font-semibold">{translate("Tableau de bord Client", "Client Dashboard")}</div>
+                              <div className="text-[9px] text-slate-400">{translate("Mes achats, ventes, solde", "Purchases, sales, balance")}</div>
+                            </div>
                           </div>
-                          {cart.length > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[10px]">
-                              {cart.reduce((s, i) => s + i.quantity, 0)}
-                            </span>
-                          )}
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
+                            {translate("Mon Espace", "My Space")}
+                          </span>
                         </button>
                       )}
+
+                      {/* 3. Driver Space (If logged in as driver) */}
+                      {currentUser.role === 'driver' && (
+                        <button
+                          id="btn-profile-dropdown-driver"
+                          type="button"
+                          onClick={() => {
+                            setActiveTab('dashboard_driver');
+                            setProfileDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-all cursor-pointer ${
+                            activeTab === 'dashboard_driver'
+                              ? 'bg-emerald-600/30 text-emerald-200 border border-emerald-500/50 font-bold shadow-sm'
+                              : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Bike className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <div className="leading-tight">
+                              <div className="font-semibold">{translate("Espace Livreur Partenaire", "Delivery Partner Space")}</div>
+                              <div className="text-[9px] text-slate-400">{translate("Radar GPS, courses, gains", "GPS radar, orders, payouts")}</div>
+                            </div>
+                          </div>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                            {translate("Livreur", "Courier")}
+                          </span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Navigation shortcuts */}
+                    <div className="space-y-1">
+                      {/* Enchères */}
+                      <button
+                        type="button"
+                        onClick={() => { setActiveTab('explore'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Gavel className="w-4 h-4 text-amber-400" />
+                          <span>{translate("Catalogue des Enchères", "Auctions Catalog")}</span>
+                        </div>
+                      </button>
+
+                      {/* B2B Lots */}
+                      <button
+                        type="button"
+                        onClick={() => { setActiveTab('b2b_liquidation'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-blue-400" />
+                          <span>{translate("Déstockage B2B Grossistes", "B2B Liquidation")}</span>
+                        </div>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-500/20 text-cyan-300">LOTS</span>
+                      </button>
+
+                      {/* Coursier Express */}
+                      <button
+                        type="button"
+                        onClick={() => { setActiveTab('express_courier'); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Bike className="w-4 h-4 text-amber-400" />
+                          <span>{translate("Coursier Express Point A ➔ B", "Express Courier A ➔ B")}</span>
+                        </div>
+                      </button>
+
+                      {/* Cart Shortcut */}
+                      <button
+                        id="btn-profile-dropdown-cart"
+                        type="button"
+                        onClick={() => { setCartModalOpen(true); setProfileDropdownOpen(false); }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ShoppingCart className="w-4 h-4 text-amber-400" />
+                          <span>{translate("Mon Panier Multi-Articles", "My Cart")}</span>
+                        </div>
+                        {cart.length > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-mono-num font-black text-[10px]">
+                            {cart.reduce((s, i) => s + i.quantity, 0)}
+                          </span>
+                        )}
+                      </button>
 
                       {/* Notifications Shortcut */}
                       <button
                         id="btn-profile-dropdown-notifications"
+                        type="button"
                         onClick={() => { setNotificationsModalOpen(true); setProfileDropdownOpen(false); }}
-                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors"
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-2">
                           <Bell className="w-4 h-4 text-amber-400" />
@@ -676,46 +761,41 @@ export const Navbar: React.FC = () => {
                         )}
                       </button>
 
+                      {/* Direct Identity Verification (KYC) Shortcut */}
                       <button
+                        id="btn-profile-dropdown-kyc"
+                        type="button"
+                        onClick={() => {
+                          setKycModalOpen(true);
+                          setProfileDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className={`w-4 h-4 ${currentUser.kycStatus === 'verified' ? 'text-emerald-400' : 'text-amber-400'}`} />
+                          <span>{translate("Vérification d'Identité (KYC)", "Identity Verification (KYC)")}</span>
+                        </div>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          currentUser.kycStatus === 'verified' ? 'bg-emerald-500/20 text-emerald-300' :
+                          currentUser.kycStatus === 'pending' ? 'bg-amber-500/20 text-amber-300' :
+                          'bg-slate-800 text-slate-400'
+                        }`}>
+                          {currentUser.kycStatus === 'verified' ? 'Vérifié' : currentUser.kycStatus === 'pending' ? 'En cours' : 'À faire'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
                         onClick={() => { setPricingModalOpen(true); setProfileDropdownOpen(false); }}
-                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-colors"
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
                       >
                         <Sparkles className="w-4 h-4 text-amber-400" />
                         <span>{translate("Souscrire un Pass / Boost", "Get a Pass / Boost")}</span>
                       </button>
 
-                      {/* Devise d'affichage dans le menu Compte */}
-                      <div className="px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-slate-300 text-xs font-semibold">
-                            <Coins className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{translate("Devise des montants", "Display Currency")}</span>
-                          </div>
-                          <span className="text-[10px] font-mono font-bold text-amber-400">
-                            {currency}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-3 gap-1 pt-0.5">
-                          {(['FCFA', 'EUR', 'USD'] as const).map((curr) => (
-                            <button
-                              key={curr}
-                              type="button"
-                              onClick={() => setCurrency(curr)}
-                              className={`py-1 px-1.5 rounded-lg text-[10.5px] font-bold font-mono transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                                currency === curr
-                                  ? 'bg-amber-500 text-slate-950 shadow-sm'
-                                  : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
-                              }`}
-                            >
-                              <span>{curr === 'FCFA' ? '🇨🇮' : curr === 'EUR' ? '🇪🇺' : '🇺🇸'}</span>
-                              <span>{curr}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
                       <button
                         id="btn-profile-settings"
+                        type="button"
                         onClick={() => {
                           setActiveTab('dashboard_client');
                           setTimeout(() => {
@@ -723,16 +803,43 @@ export const Navbar: React.FC = () => {
                           }, 60);
                           setProfileDropdownOpen(false);
                         }}
-                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-amber-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-colors font-bold"
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-amber-300 hover:bg-slate-800 hover:text-white flex items-center gap-2 transition-colors font-bold cursor-pointer"
                       >
                         <Settings className="w-4 h-4 text-amber-400" />
                         <span>{translate("Paramètres & Préférences", "Settings & Preferences")}</span>
                       </button>
 
+                      {/* Theme Toggle in Profile Dropdown */}
+                      <button
+                        id="btn-profile-theme-toggle"
+                        type="button"
+                        onClick={() => {
+                          toggleTheme();
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          {effectiveTheme === 'light' ? (
+                            <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+                          ) : (
+                            <Moon className="w-4 h-4 text-sky-400 shrink-0" />
+                          )}
+                          <span>{translate("Thème d'affichage", "Display Theme")}</span>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
+                          effectiveTheme === 'light'
+                            ? 'bg-amber-500/20 text-amber-600 border-amber-500/40'
+                            : 'bg-slate-800 text-slate-300 border-slate-700'
+                        }`}>
+                          {effectiveTheme === 'light' ? '☀️ Mode Clair' : '🌙 Mode Sombre'}
+                        </span>
+                      </button>
+
                       <div className="pt-2 border-t border-slate-800">
                         <button
+                          type="button"
                           onClick={() => { logout(); setProfileDropdownOpen(false); }}
-                          className="w-full text-left px-3 py-2 rounded-xl text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors font-medium"
+                          className="w-full text-left px-3 py-2 rounded-xl text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2 transition-colors font-medium cursor-pointer"
                         >
                           <LogOut className="w-4 h-4" />
                           <span>{translate("Se Déconnecter", "Sign Out")}</span>
@@ -746,30 +853,34 @@ export const Navbar: React.FC = () => {
               <button
                 id="btn-navbar-auth"
                 onClick={() => setAuthModalOpen(true)}
-                className="h-8 sm:h-9 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-slate-600 px-2.5 sm:px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer"
+                className="h-8 sm:h-9 bg-[#1E53E5] hover:bg-[#1643BF] text-white font-bold border border-[#1E53E5] px-2.5 sm:px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
               >
-                <User className="w-3.5 h-3.5 text-slate-400" />
+                <User className="w-3.5 h-3.5 text-white/90" />
                 <span className="hidden xs:inline">{translate("Connexion", "Sign In")}</span>
               </button>
             )}
 
-            {/* Mobile hamburger button */}
+            {/* Mobile Android Options & Menu (Menu 3 barres) */}
             <button
               id="btn-toggle-mobile-menu"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-slate-300 hover:text-white rounded-xl bg-slate-900/90 hover:bg-slate-800 lg:hidden shrink-0 border border-slate-800 transition-colors cursor-pointer"
-              title={translate("Menu Mobile", "Mobile Menu")}
+              className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center text-slate-700 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white rounded-xl bg-slate-100/90 dark:bg-slate-900/90 hover:bg-slate-200 dark:hover:bg-slate-800 md:hidden shrink-0 border border-slate-300 dark:border-slate-800 transition-colors cursor-pointer shadow-xs active:scale-95"
+              title={translate("Menu & Options", "Menu & Options")}
             >
-              {mobileMenuOpen ? <X className="w-4 h-4 sm:w-4.5 sm:h-4.5" /> : <Menu className="w-4 h-4 sm:w-4.5 sm:h-4.5" />}
+              {mobileMenuOpen ? (
+                <X className="w-4.5 h-4.5 text-[#FF5B00]" />
+              ) : (
+                <Menu className="w-5 h-5 text-slate-700 dark:text-slate-200" />
+              )}
             </button>
           </div>
         </div>
 
         {/* Mobile Dropdown Menu Drawer */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-slate-800/80 py-3 space-y-3 bg-[#06102E]/98 backdrop-blur-xl animate-in slide-in-from-top duration-200">
+          <div className="md:hidden border-t border-slate-200 dark:border-slate-800/80 py-3 space-y-3 bg-white dark:bg-[#06102E]/98 backdrop-blur-xl animate-in slide-in-from-top duration-200 shadow-xl">
             {/* Branded Mobile Drawer Header */}
-            <div className="px-3 pb-2 border-b border-slate-800/80 flex items-center justify-between">
+            <div className="px-3 pb-2 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
               <BradCiLogo 
                 size="sm" 
                 showSubtitle={true} 
@@ -781,17 +892,17 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* Mobile Currency Selector Bar */}
-            <div className="px-3 py-2 bg-slate-900/90 rounded-2xl mx-3 border border-slate-800">
+            <div className="px-3 py-2 bg-slate-100 dark:bg-slate-900/90 rounded-2xl mx-3 border border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <span className="text-[11px] font-black uppercase tracking-wider text-[#FF5B00] dark:text-amber-400 flex items-center gap-1.5">
                   <Coins className="w-3.5 h-3.5" />
                   <span>{translate("Devise des Enchères", "Auction Currency")}</span>
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                   {currency === 'FCFA' ? '🇨🇮 CFA (XOF)' : currency === 'EUR' ? '🇪🇺 1€ = 655,957 F' : '🇺🇸 1$ ≈ 610 F'}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800/80">
+              <div className="grid grid-cols-3 gap-1.5 bg-white dark:bg-slate-950 p-1 rounded-xl border border-slate-200 dark:border-slate-800/80">
                 {(['FCFA', 'EUR', 'USD'] as const).map((curr) => (
                   <button
                     key={curr}
@@ -799,8 +910,8 @@ export const Navbar: React.FC = () => {
                     onClick={() => setCurrency(curr)}
                     className={`py-1.5 px-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1 transition-all cursor-pointer ${
                       currency === curr
-                        ? 'bg-amber-500 text-slate-950 shadow-md font-black'
-                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        ? 'bg-[#FF5B00] text-white shadow-md font-black'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/50'
                     }`}
                   >
                     <span className="text-xs">{curr === 'FCFA' ? '🇨🇮' : curr === 'EUR' ? '🇪🇺' : '🇺🇸'}</span>
@@ -1058,6 +1169,51 @@ export const Navbar: React.FC = () => {
                         <span>{translate("Back-Office Super Admin", "Super Admin Back-Office")}</span>
                       </button>
                     )}
+
+                    {/* Theme Mode Toggle in Drawer */}
+                    <button
+                      id="btn-mobile-drawer-theme"
+                      type="button"
+                      onClick={() => {
+                        toggleTheme();
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        {effectiveTheme === 'light' ? (
+                          <Sun className="w-4 h-4 text-amber-500 shrink-0" />
+                        ) : (
+                          <Moon className="w-4 h-4 text-sky-400 shrink-0" />
+                        )}
+                        <span>{translate("Thème d'affichage", "Display Theme")}</span>
+                      </div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-black border ${
+                        effectiveTheme === 'light'
+                          ? 'bg-amber-500/20 text-amber-600 border-amber-500/40'
+                          : 'bg-slate-800 text-slate-300 border-slate-700'
+                      }`}>
+                        {effectiveTheme === 'light' ? '☀️ CLAIR PRO' : '🌙 BLEU NUIT'}
+                      </span>
+                    </button>
+
+                    {/* Mode Application Android Ultra-Légère in Drawer */}
+                    <button
+                      id="btn-mobile-drawer-lite-app"
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        window.dispatchEvent(new CustomEvent('bradci_open_lite_app'));
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl bg-[#FF5B00]/15 border border-[#FF5B00]/30 hover:bg-[#FF5B00]/25 text-white text-xs font-black flex items-center justify-between transition-colors cursor-pointer shadow-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-[#FF5B00] shrink-0" />
+                        <span>Mode App Android Ultra-Légère</span>
+                      </div>
+                      <span className="bg-[#FF5B00] text-white text-[9px] px-2 py-0.5 rounded font-black">
+                        OUVRIR
+                      </span>
+                    </button>
 
                     {/* Voix Off Toggle in Drawer */}
                     <button
