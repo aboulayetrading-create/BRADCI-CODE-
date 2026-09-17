@@ -8,13 +8,16 @@ import {
   CheckCircle2, 
   AlertCircle,
   Smartphone,
-  Navigation
+  Navigation,
+  Mic,
+  Bell
 } from 'lucide-react';
 import { nativeBridge } from '../utils/nativeBridge';
 import { useApp } from '../context/AppContext';
+import { requestUniversalNotificationPermission } from '../utils/universalNotifications';
 
 export interface PermissionPromptConfig {
-  type: 'geolocation' | 'camera' | 'photos';
+  type: 'geolocation' | 'camera' | 'photos' | 'microphone' | 'notifications';
   title: string;
   description: string;
   reason: string;
@@ -54,13 +57,9 @@ export const NativePermissionModal: React.FC<NativePermissionModalProps> = ({
             translate('Détection précise de votre position à Abidjan activée.', 'Accurate Abidjan location tracking active.'),
             'success'
           );
-          config.onGranted();
-          onClose();
-        } else {
-          // If browser or denied, still invoke onGranted which falls back to GPS/commune picker
-          config.onGranted();
-          onClose();
         }
+        config.onGranted();
+        onClose();
       } else if (config.type === 'camera' || config.type === 'photos') {
         const granted = await nativeBridge.requestCameraPermission();
         if (granted) {
@@ -69,12 +68,31 @@ export const NativePermissionModal: React.FC<NativePermissionModalProps> = ({
             translate('L’accès à l’appareil photo est déverrouillé.', 'Camera hardware access unlocked.'),
             'success'
           );
-          config.onGranted();
-          onClose();
-        } else {
-          config.onGranted();
-          onClose();
         }
+        config.onGranted();
+        onClose();
+      } else if (config.type === 'microphone') {
+        const granted = await nativeBridge.requestMicrophonePermission();
+        if (granted) {
+          addToast(
+            translate('Autorisation Microphone Accordée', 'Microphone Permission Granted'),
+            translate('Enregistrement vocal et assistance déverrouillés.', 'Voice recording and assistant unlocked.'),
+            'success'
+          );
+        }
+        config.onGranted();
+        onClose();
+      } else if (config.type === 'notifications') {
+        const res = await requestUniversalNotificationPermission();
+        if (res.granted || res.permissionState === 'granted') {
+          addToast(
+            translate('Notifications Activées', 'Notifications Enabled'),
+            translate('Vous recevrez les alertes de courses et d\'enchères.', 'You will receive courier and auction alerts.'),
+            'success'
+          );
+        }
+        config.onGranted();
+        onClose();
       }
     } catch (e) {
       console.warn('[NativePermissionModal] error:', e);
@@ -86,6 +104,8 @@ export const NativePermissionModal: React.FC<NativePermissionModalProps> = ({
   };
 
   const isGeo = config.type === 'geolocation';
+  const isMic = config.type === 'microphone';
+  const isNotif = config.type === 'notifications';
   const isNative = nativeBridge.isNative();
 
   return (
@@ -116,8 +136,24 @@ export const NativePermissionModal: React.FC<NativePermissionModalProps> = ({
 
         {/* Icon & Title */}
         <div className="flex items-start gap-3.5 pt-1">
-          <div className={`p-3 rounded-2xl ${isGeo ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
-            {isGeo ? <Navigation className="w-6 h-6 animate-pulse" /> : <Camera className="w-6 h-6" />}
+          <div className={`p-3 rounded-2xl ${
+            isGeo 
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+              : isMic 
+              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+              : isNotif
+              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+              : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+          }`}>
+            {isGeo ? (
+              <Navigation className="w-6 h-6 animate-pulse" />
+            ) : isMic ? (
+              <Mic className="w-6 h-6" />
+            ) : isNotif ? (
+              <Bell className="w-6 h-6" />
+            ) : (
+              <Camera className="w-6 h-6" />
+            )}
           </div>
           <div>
             <h3 className="text-lg font-black text-white font-display">
@@ -140,7 +176,7 @@ export const NativePermissionModal: React.FC<NativePermissionModalProps> = ({
             <span>
               {isNative
                 ? "Une boîte de dialogue Android s'affichera pour valider l'accès de l'application."
-                : "Autorisez l'accès dans votre navigateur pour une précision maximale à Abidjan."}
+                : "Autorisez l'accès dans votre navigateur pour profiter pleinement des fonctionnalités."}
             </span>
           </div>
         </div>
@@ -154,6 +190,10 @@ export const NativePermissionModal: React.FC<NativePermissionModalProps> = ({
             className={`flex-1 py-3 px-4 rounded-xl font-black text-xs text-white shadow-lg flex items-center justify-center gap-2 transition-all cursor-pointer ${
               isGeo
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-900/40'
+                : isMic
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/40'
+                : isNotif
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 shadow-purple-900/40'
                 : 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 shadow-amber-900/40'
             }`}
           >
@@ -161,6 +201,10 @@ export const NativePermissionModal: React.FC<NativePermissionModalProps> = ({
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : isGeo ? (
               <MapPin className="w-4 h-4" />
+            ) : isMic ? (
+              <Mic className="w-4 h-4" />
+            ) : isNotif ? (
+              <Bell className="w-4 h-4" />
             ) : (
               <Camera className="w-4 h-4" />
             )}

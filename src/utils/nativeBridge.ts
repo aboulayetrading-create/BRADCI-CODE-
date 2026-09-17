@@ -79,6 +79,16 @@ class NativeBridgeService {
         });
         return req.location === 'granted' || req.coarseLocation === 'granted';
       }
+
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        return new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            () => resolve(true),
+            (err) => resolve(err.code !== 1),
+            { timeout: 10000, enableHighAccuracy: true }
+          );
+        });
+      }
       return true;
     } catch (err) {
       console.warn('[NativeBridge] requestLocationPermission error:', err);
@@ -217,9 +227,23 @@ class NativeBridgeService {
    */
   public async checkCameraPermission(): Promise<'granted' | 'denied' | 'prompt'> {
     try {
-      const perm = await Camera.checkPermissions();
-      if (perm.camera === 'granted') return 'granted';
-      if (perm.camera === 'denied') return 'denied';
+      if (this.isNative()) {
+        const perm = await Camera.checkPermissions();
+        if (perm.camera === 'granted') return 'granted';
+        if (perm.camera === 'denied') return 'denied';
+        return 'prompt';
+      }
+
+      if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
+        try {
+          const status = await (navigator.permissions as any).query({ name: 'camera' });
+          if (status.state === 'granted') return 'granted';
+          if (status.state === 'denied') return 'denied';
+          return 'prompt';
+        } catch {
+          return 'prompt';
+        }
+      }
       return 'prompt';
     } catch {
       return 'prompt';
@@ -227,14 +251,29 @@ class NativeBridgeService {
   }
 
   /**
-   * Request native camera permissions
+   * Request native camera permissions (triggers browser getUserMedia prompt on Web/PWA)
    */
   public async requestCameraPermission(): Promise<boolean> {
     try {
-      const req = await Camera.requestPermissions({
-        permissions: ['camera', 'photos']
-      });
-      return req.camera === 'granted' || req.photos === 'granted';
+      if (this.isNative()) {
+        const req = await Camera.requestPermissions({
+          permissions: ['camera', 'photos']
+        });
+        return req.camera === 'granted' || req.photos === 'granted';
+      }
+
+      // Web/PWA: invoke getUserMedia to display browser permission prompt
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          stream.getTracks().forEach(t => t.stop());
+          return true;
+        } catch (err: any) {
+          console.warn('[NativeBridge] Web camera prompt error:', err);
+          return false;
+        }
+      }
+      return false;
     } catch (e) {
       console.warn('[NativeBridge] requestCameraPermission error:', e);
       return false;
@@ -242,7 +281,108 @@ class NativeBridgeService {
   }
 
   /**
-   * Capture photo or select from gallery using Capacitor Camera API
+   * Check microphone permission status
+   */
+  public async checkMicrophonePermission(): Promise<'prompt' | 'granted' | 'denied'> {
+    try {
+      if (typeof navigator !== 'undefined' && 'permissions' in navigator) {
+        try {
+          const status = await (navigator.permissions as any).query({ name: 'microphone' });
+          if (status.state === 'granted') return 'granted';
+          if (status.state === 'denied') return 'denied';
+          return 'prompt';
+        } catch {
+          return 'prompt';
+        }
+      }
+      return 'prompt';
+    } catch {
+      return 'prompt';
+    }
+  }
+
+  /**
+   * Request microphone permission with real browser getUserMedia trigger
+   */
+  public async requestMicrophonePermission(): Promise<boolean> {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(t => t.stop());
+          return true;
+        } catch (err: any) {
+          console.warn('[NativeBridge] Web microphone prompt error:', err);
+          return false;
+        }
+      }
+      return false;
+    } catch (err: any) {
+      console.warn('[NativeBridge] requestMicrophonePermission error:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Web fallback photo capture via HTML5 file input with camera capture attribute
+   */
+  public capturePhotoViaInput(options?: {
+    source?: NativePhotoSource;
+    direction?: NativeCameraFacing;
+  }): Promise<NativePhotoResult> {
+    return new Promise((resolve, reject) => {
+      if (typeof document === 'undefined') {
+        reject(new Error("Document non disponible"));
+        return;
+      }
+
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+
+      // If user wants camera capture directly
+      if (options?.source !== 'photos') {
+        input.setAttribute('capture', options?.direction === 'user' ? 'user' : 'environment');
+      }
+
+      input.style.position = 'fixed';
+      input.style.top = '-9999px';
+      input.style.opacity = '0';
+      document.body.appendChild(input);
+
+      input.onchange = (e: any) => {
+        const file = e.target?.files?.[0];
+        if (!file) {
+          try { document.body.removeChild(input); } catch {}
+          reject(new Error("Opération annulée par l’utilisateur"));
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          try { document.body.removeChild(input); } catch {}
+          if (typeof reader.result === 'string') {
+            resolve({
+              dataUrl: reader.result,
+              format: file.type.split('/')[1] || 'jpeg'
+            });
+          } else {
+            reject(new Error("Échec de conversion de l'image"));
+          }
+        };
+        reader.onerror = (err) => {
+          try { document.body.removeChild(input); } catch {}
+          reject(err);
+        };
+        reader.readAsDataURL(file);
+      };
+
+      input.click();
+    });
+  }
+
+  /**
+   * Capture photo or select from gallery using Capacitor Camera API with Web fallback
    */
   public async capturePhoto(options?: {
     source?: NativePhotoSource;
@@ -266,47 +406,47 @@ class NativeBridgeService {
     const selectedSource = options?.source ? sourceMap[options.source] : CameraSource.Camera;
     const selectedDirection = options?.direction ? directionMap[options.direction] : CameraDirection.Rear;
 
-    try {
-      // Request permission before invoking camera if needed
-      if (this.isNative()) {
+    if (this.isNative()) {
+      try {
         const perm = await this.checkCameraPermission();
         if (perm !== 'granted') {
           await this.requestCameraPermission();
         }
-      }
 
-      const photo = await Camera.getPhoto({
-        quality: options?.quality ?? 85,
-        allowEditing: options?.allowEditing ?? false,
-        resultType: CameraResultType.DataUrl,
-        source: selectedSource,
-        direction: selectedDirection,
-        width: options?.width,
-        height: options?.height,
-        correctOrientation: true,
-        saveToGallery: false,
-        promptLabelHeader: 'Sélectionner la Photo',
-        promptLabelPhoto: 'Choisir dans la Galerie Photos',
-        promptLabelPicture: 'Prendre une Nouvelle Photo'
-      });
+        const photo = await Camera.getPhoto({
+          quality: options?.quality ?? 85,
+          allowEditing: options?.allowEditing ?? false,
+          resultType: CameraResultType.DataUrl,
+          source: selectedSource,
+          direction: selectedDirection,
+          width: options?.width,
+          height: options?.height,
+          correctOrientation: true,
+          saveToGallery: false,
+          promptLabelHeader: 'Sélectionner la Photo',
+          promptLabelPhoto: 'Choisir dans la Galerie Photos',
+          promptLabelPicture: 'Prendre une Nouvelle Photo'
+        });
 
-      if (!photo.dataUrl) {
-        throw new Error("Impossible d'obtenir la photo capturée");
-      }
+        if (!photo.dataUrl) {
+          throw new Error("Impossible d'obtenir la photo capturée");
+        }
 
-      return {
-        dataUrl: photo.dataUrl,
-        format: photo.format
-      };
-    } catch (err: unknown) {
-      // If user cancelled, rethrow clean cancellation
-      const msg = err instanceof Error ? err.message : String(err);
-      if (msg.includes('User cancelled') || msg.includes('cancelled') || msg.includes('canceled')) {
-        throw new Error('Opération annulée par l’utilisateur');
+        return {
+          dataUrl: photo.dataUrl,
+          format: photo.format
+        };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('User cancelled') || msg.includes('cancelled') || msg.includes('canceled')) {
+          throw new Error('Opération annulée par l’utilisateur');
+        }
+        console.warn('[NativeBridge] Capacitor Camera error, falling back to Web Input:', err);
       }
-      console.warn('[NativeBridge] Capacitor Camera error, falling back:', err);
-      throw err;
     }
+
+    // On Web / PWA / WebAPK fallback
+    return this.capturePhotoViaInput(options);
   }
 }
 

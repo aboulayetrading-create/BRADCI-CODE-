@@ -88,11 +88,13 @@ import {
 import { sendOtpEmail } from '../services/resendEmailService';
 import { auditLogger } from '../utils/activityAuditLogger';
 
-interface ToastNotification {
+export interface ToastNotification {
   id: string;
   title: string;
   desc: string;
   type: 'success' | 'error' | 'warning' | 'info';
+  role?: 'driver' | 'buyer' | 'seller' | 'admin' | 'system';
+  duration?: number;
 }
 
 interface AppContextType {
@@ -188,6 +190,8 @@ interface AppContextType {
     openPrompt: (config: any) => void;
     closePrompt: () => void;
   };
+  devicePermissionsModalOpen: boolean;
+  setDevicePermissionsModalOpen: (open: boolean) => void;
 
   // Modals & UI States
   authModalOpen: boolean;
@@ -223,12 +227,18 @@ interface AppContextType {
   setExpressCourierModalOpen: (open: boolean) => void;
   createDirectCourierJob: (input: DirectCourierOrderInput) => DeliveryJob;
   driverPass: DriverRechargePass;
-  rechargeDriverPass: () => void;
+  rechargeDriverPass: (passType?: 'daily' | 'monthly') => void;
   decrementFreeCourierCourse: () => void;
   setDriverPassTestingState?: (state: 'active' | 'expired') => void;
 
   toasts: ToastNotification[];
-  addToast: (title: string, desc: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
+  addToast: (
+    title: string, 
+    desc: string, 
+    type?: 'success' | 'error' | 'warning' | 'info',
+    role?: 'driver' | 'buyer' | 'seller' | 'admin' | 'system',
+    duration?: number
+  ) => void;
   removeToast: (id: string) => void;
 
   // ================= ADMIN SUITE & FINANCIALS =================
@@ -397,6 +407,19 @@ interface AppContextType {
   setCartInvoiceModalOrder: (order: CartOrderRecord | null) => void;
   driverConfirmStopPickup: (jobId: string, stopIndex: number, enteredCode: string) => boolean;
 
+  // Favorites Suite (Favoris)
+  favoriteProductIds: string[];
+  toggleFavorite: (productId: string, productTitle?: string) => void;
+  isFavorite: (productId: string) => boolean;
+  clearAllFavorites: () => void;
+  favoritesCount: number;
+
+  // Search History & Quick Suggestions (Histoire Recherches)
+  searchHistory: string[];
+  addSearchQuery: (query: string) => void;
+  removeSearchQuery: (query: string) => void;
+  clearSearchHistory: () => void;
+
   // Admin Direct Access & Anti-Theft Investigation (Supervision Administrateur Exclusif)
   adminImpersonatedUserId: string | null;
   adminOriginalAdminUser: User | null;
@@ -536,6 +559,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPermissionPromptConfig(null);
   }, []);
 
+  const [devicePermissionsModalOpen, setDevicePermissionsModalOpen] = useState<boolean>(false);
+
   const [gpsModalOpen, setGpsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('explore');
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -558,14 +583,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     return {
-      dailyCostFCFA: 5000,
+      dailyCostFCFA: 2000,
+      monthlyCostFCFA: 5000,
       status: 'active', // 100% active during launch!
       expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
       freeCoursesRemaining: 5,
       totalFreeCoursesGranted: 5,
       isComingSoon: true, // "Mode Bientôt"
       unlimitedDirectAccess: true,
-      lastRechargedAt: new Date().toISOString()
+      lastRechargedAt: new Date().toISOString(),
+      activePassType: 'daily'
     };
   });
 
@@ -573,11 +600,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('bradci_driver_recharge_pass', JSON.stringify(driverPass));
   }, [driverPass]);
 
-  const rechargeDriverPass = useCallback(() => {
+  const rechargeDriverPass = useCallback((passType: 'daily' | 'monthly' = 'daily') => {
+    const durationMs = passType === 'monthly' ? 30 * 24 * 3600 * 1000 : 24 * 3600 * 1000;
     setDriverPass(prev => ({
       ...prev,
+      dailyCostFCFA: 2000,
+      monthlyCostFCFA: 5000,
       status: 'active',
-      expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      activePassType: passType,
+      expiresAt: new Date(Date.now() + durationMs).toISOString(),
       lastRechargedAt: new Date().toISOString()
     }));
   }, []);
@@ -594,7 +625,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
       status: state,
       expiresAt: state === 'active' 
-        ? new Date(Date.now() + 24 * 3600 * 1000).toISOString() 
+        ? new Date(Date.now() + (prev.activePassType === 'monthly' ? 30 * 24 : 24) * 3600 * 1000).toISOString() 
         : new Date(Date.now() - 3600 * 1000).toISOString()
     }));
   }, []);
@@ -608,13 +639,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const addToast = useCallback((title: string, desc: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
-    const id = Date.now().toString() + Math.random().toString(36).substring(2, 5);
-    setToasts(prev => [...prev, { id, title, desc, type }]);
+  const addToast = useCallback((
+    title: string, 
+    desc: string, 
+    type: 'success' | 'error' | 'warning' | 'info' = 'info',
+    role?: 'driver' | 'buyer' | 'seller' | 'admin' | 'system',
+    duration: number = 3200
+  ) => {
+    // Intelligent Role Detection if not explicitly passed
+    let computedRole = role;
+    if (!computedRole) {
+      const combined = (title + ' ' + desc).toLowerCase();
+      if (
+        combined.includes('livreur') || 
+        combined.includes('course') || 
+        combined.includes('colis') || 
+        combined.includes('enlèvement') || 
+        combined.includes('gps') || 
+        combined.includes('mission') ||
+        combined.includes('pass livreur') ||
+        combined.includes('livraison')
+      ) {
+        computedRole = 'driver';
+      } else if (
+        combined.includes('boutique') || 
+        combined.includes('enchère créée') || 
+        combined.includes('vendeur') || 
+        combined.includes('retrait') || 
+        combined.includes('b2b') ||
+        combined.includes('lot') ||
+        combined.includes('déstockage')
+      ) {
+        computedRole = 'seller';
+      } else if (
+        combined.includes('favori') || 
+        combined.includes('panier') || 
+        combined.includes('enchérir') || 
+        combined.includes('offre') || 
+        combined.includes('acheteur') ||
+        combined.includes('commande') ||
+        combined.includes('reçu')
+      ) {
+        computedRole = 'buyer';
+      } else if (currentUser?.role === 'driver') {
+        computedRole = 'driver';
+      } else if (currentUser?.role === 'admin') {
+        computedRole = 'admin';
+      } else if (currentUser?.role === 'client' || currentUser?.role === 'visitor') {
+        computedRole = 'buyer';
+      } else {
+        computedRole = 'system';
+      }
+    }
+
+    const id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
+    
+    setToasts(prev => {
+      // Deduplicate: If an existing toast has the identical title, replace it so multiple clicks don't flood the UI!
+      const withoutSameTitle = prev.filter(t => t.title !== title);
+      // Keep maximum 2 toasts at a time on screen (prevents mobile screen blocking!)
+      const trimmed = withoutSameTitle.slice(-1);
+      return [...trimmed, { id, title, desc, type, role: computedRole, duration }];
+    });
+
     setTimeout(() => {
       removeToast(id);
-    }, 5000);
-  }, [removeToast]);
+    }, duration);
+  }, [removeToast, currentUser?.role]);
 
   const createDirectCourierJob = useCallback((input: DirectCourierOrderInput): DeliveryJob => {
     const pickupCoords = getCommuneCoords(input.pickupCommune);
@@ -701,6 +792,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('bradci_cart_orders', JSON.stringify(cartOrders));
   }, [cartOrders]);
+
+  // ================= FAVORITES & WISHLIST SUITE =================
+  const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bradci_favorites');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return ['prod-1', 'prod-3']; // Default favorites for immediate rich experience
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('bradci_favorites', JSON.stringify(favoriteProductIds));
+    } catch {}
+  }, [favoriteProductIds]);
+
+  const toggleFavorite = useCallback((productId: string, productTitle?: string) => {
+    let wasFavorited = false;
+    setFavoriteProductIds(prev => {
+      const exists = prev.includes(productId);
+      wasFavorited = exists;
+      return exists ? prev.filter(id => id !== productId) : [...prev, productId];
+    });
+
+    const shortTitle = productTitle 
+      ? (productTitle.length > 30 ? productTitle.slice(0, 30).trim() + '…' : productTitle)
+      : '';
+
+    if (wasFavorited) {
+      addToast(
+        'Retiré des favoris',
+        shortTitle ? `"${shortTitle}" retiré de vos favoris.` : 'Article retiré de votre sélection.',
+        'info',
+        'buyer',
+        2200
+      );
+    } else {
+      addToast(
+        'Ajouté aux favoris ❤️',
+        shortTitle ? `"${shortTitle}" sauvegardé dans vos favoris.` : 'Article sauvegardé dans vos favoris.',
+        'success',
+        'buyer',
+        2600
+      );
+    }
+  }, [addToast]);
+
+  const isFavorite = useCallback((productId: string) => {
+    return favoriteProductIds.includes(productId);
+  }, [favoriteProductIds]);
+
+  const clearAllFavorites = useCallback(() => {
+    setFavoriteProductIds([]);
+    addToast('Favoris réinitialisés', 'Votre liste de favoris a été vidée.', 'info');
+  }, [addToast]);
+
+  // ================= SEARCH HISTORY & SUGGESTIONS SUITE =================
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bradci_search_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return ['iPhone 15 Pro', 'Moto Scooter', 'Cocody Angré', 'PlayStation 5', 'Déstockage B2B'];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('bradci_search_history', JSON.stringify(searchHistory));
+    } catch {}
+  }, [searchHistory]);
+
+  const addSearchQuery = useCallback((query: string) => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 2) return;
+    setSearchHistory(prev => {
+      const filtered = prev.filter(q => q.toLowerCase() !== trimmed.toLowerCase());
+      return [trimmed, ...filtered].slice(0, 10);
+    });
+  }, []);
+
+  const removeSearchQuery = useCallback((query: string) => {
+    setSearchHistory(prev => prev.filter(q => q !== query));
+  }, []);
+
+  const clearSearchHistory = useCallback(() => {
+    setSearchHistory([]);
+    try {
+      localStorage.removeItem('bradci_search_history');
+    } catch {}
+    addToast('Historique effacé', 'Votre historique de recherche a été réinitialisé.', 'info');
+  }, [addToast]);
 
   // ================= ADMIN SUITE & FINANCIAL STATES =================
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
@@ -6148,6 +6336,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           openPrompt: openPermissionPrompt,
           closePrompt: closePermissionPrompt
         },
+        devicePermissionsModalOpen,
+        setDevicePermissionsModalOpen,
         activeTab,
         setActiveTab,
         authModalOpen,
@@ -6376,6 +6566,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         rechargeDriverPass,
         decrementFreeCourierCourse,
         setDriverPassTestingState,
+
+        // Favorites Suite (Favoris)
+        favoriteProductIds,
+        toggleFavorite,
+        isFavorite,
+        clearAllFavorites,
+        favoritesCount: favoriteProductIds.length,
+
+        // Search History & Quick Suggestions (Histoire Recherches)
+        searchHistory,
+        addSearchQuery,
+        removeSearchQuery,
+        clearSearchHistory,
 
         // Admin Direct Access & Anti-Theft Protection
         adminImpersonatedUserId,

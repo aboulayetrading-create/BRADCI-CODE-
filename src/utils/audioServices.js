@@ -362,11 +362,21 @@ export const startRecording = async () => {
   let stream = null;
   if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
     } catch (micErr) {
-      // Permission refusée par le navigateur, iframe sandboxed ou absence de micro matériel
-      console.warn("[BRAD'CI AudioServices] Accès micro non autorisé ou restreint (" + (micErr?.name || 'Permission') + "). Basculement en mode note vocale simulée.");
-      isSyntheticFallback = true;
+      // Try fallback to basic audio
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err2) {
+        console.warn("[BRAD'CI AudioServices] Accès micro non autorisé ou restreint:", err2?.name || err2);
+        isSyntheticFallback = true;
+      }
     }
   } else {
     console.warn("[BRAD'CI AudioServices] API MediaDevices non supportée sur ce client. Mode note vocale simulée activé.");
@@ -377,21 +387,30 @@ export const startRecording = async () => {
   if (stream && !isSyntheticFallback) {
     recordingStream = stream;
 
-    // Détection du meilleur encodage audio
-    let mimeType = 'audio/webm';
-    if (typeof MediaRecorder !== 'undefined') {
-      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        mimeType = 'audio/webm;codecs=opus';
-      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        mimeType = 'audio/mp4';
-      } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
-        mimeType = 'audio/ogg';
+    // Détection du meilleur encodage audio supporté par le système
+    let mimeType = '';
+    if (typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function') {
+      const candidates = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/ogg;codecs=opus',
+        'audio/ogg'
+      ];
+      for (const c of candidates) {
+        if (MediaRecorder.isTypeSupported(c)) {
+          mimeType = c;
+          break;
+        }
       }
     }
 
     try {
       try {
-        currentMediaRecorder = new MediaRecorder(recordingStream, { mimeType });
+        currentMediaRecorder = mimeType 
+          ? new MediaRecorder(recordingStream, { mimeType })
+          : new MediaRecorder(recordingStream);
       } catch {
         currentMediaRecorder = new MediaRecorder(recordingStream);
       }
@@ -402,8 +421,13 @@ export const startRecording = async () => {
         }
       };
 
-      currentMediaRecorder.start(250);
-      console.log("[BRAD'CI AudioServices] Enregistrement matériel démarré.");
+      try {
+        currentMediaRecorder.start(250);
+      } catch {
+        currentMediaRecorder.start();
+      }
+
+      console.log("[BRAD'CI AudioServices] Enregistrement matériel démarré avec format:", currentMediaRecorder.mimeType || 'default');
       return { isFallback: false };
     } catch (recErr) {
       console.warn("[BRAD'CI AudioServices] Erreur initialisation MediaRecorder matériel:", recErr);
@@ -433,12 +457,18 @@ export const stopRecording = () => {
       return;
     }
 
-    // Arrêt de l'enregistrement matériel standard
-    currentMediaRecorder.onstop = () => {
-      const mime = currentMediaRecorder?.mimeType || 'audio/webm';
-      let audioBlob = new Blob(currentAudioChunks, { type: mime });
+    let resolved = false;
+    const finishRecording = () => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(safetyTimer);
 
-      if (audioBlob.size === 0) {
+      const mime = currentMediaRecorder?.mimeType || 'audio/webm';
+      let audioBlob = currentAudioChunks.length > 0
+        ? new Blob(currentAudioChunks, { type: mime })
+        : null;
+
+      if (!audioBlob || audioBlob.size === 0) {
         const elapsedSec = Math.max(1, Math.round((Date.now() - syntheticStartTime) / 1000));
         audioBlob = createSyntheticAudioWav(elapsedSec);
       }
@@ -461,17 +491,23 @@ export const stopRecording = () => {
       resolve(audioBlob);
     };
 
+    const safetyTimer = setTimeout(finishRecording, 1500);
+
+    // Arrêt de l'enregistrement matériel standard
+    currentMediaRecorder.onstop = finishRecording;
+
     try {
+      if (currentMediaRecorder.state === 'recording') {
+        try { currentMediaRecorder.requestData(); } catch (_) {}
+      }
       if (currentMediaRecorder.state !== 'inactive') {
         currentMediaRecorder.stop();
       } else {
-        const elapsedSec = Math.max(1, Math.round((Date.now() - syntheticStartTime) / 1000));
-        resolve(createSyntheticAudioWav(elapsedSec));
+        finishRecording();
       }
     } catch (err) {
       console.warn("[BRAD'CI AudioServices] Erreur stop MediaRecorder:", err);
-      const elapsedSec = Math.max(1, Math.round((Date.now() - syntheticStartTime) / 1000));
-      resolve(createSyntheticAudioWav(elapsedSec));
+      finishRecording();
     }
   });
 };

@@ -79,6 +79,24 @@ export const ProfileAvatarModal: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Connect stream to video element when viewfinder mounts
+  React.useEffect(() => {
+    if (isCameraActive && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(e => console.warn('Profile camera play warning:', e));
+    }
+  }, [isCameraActive]);
+
+  // Clean up media stream on unmount
+  React.useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
   if (!profileAvatarModalOpen || !currentUser) return null;
 
   // Native Capacitor Camera & Gallery capture with browser fallback
@@ -118,16 +136,22 @@ export const ProfileAvatarModal: React.FC = () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal: 640 }, height: { ideal: 640 } },
-        audio: false
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: mode, width: { ideal: 640 }, height: { ideal: 640 } },
+          audio: false
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
       }
-      setIsCameraActive(true);
+      if (stream) {
+        streamRef.current = stream;
+        setIsCameraActive(true);
+      }
     } catch (err) {
       console.warn("Camera access failed:", err);
       setCameraError(translate(

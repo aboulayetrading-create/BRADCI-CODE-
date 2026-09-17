@@ -46,6 +46,7 @@ import { ExpressCourierView } from './components/ExpressCourierView';
 import { BradciMobileApp } from './components/BradciMobileApp';
 import { CartInvoiceModal } from './components/CartInvoiceModal';
 import { NativePermissionModal } from './components/NativePermissionModal';
+import { DevicePermissionsModal } from './components/DevicePermissionsModal';
 import { SplashScreen } from './components/SplashScreen';
 import { OutbidAlertBanner } from './components/OutbidAlertBanner';
 import { NotificationManager } from './components/NotificationManager';
@@ -94,6 +95,8 @@ const AppContent: React.FC = () => {
     profileAvatarModalOpen,
     setProfileAvatarModalOpen,
     updateUserAvatar,
+    devicePermissionsModalOpen,
+    setDevicePermissionsModalOpen,
     translate
   } = useApp();
 
@@ -828,6 +831,10 @@ const AppContent: React.FC = () => {
       </ErrorBoundary>
       <ErrorBoundary fallbackTitle="Autorisations Système & Permissions Android">
         <NativePermissionModal />
+        <DevicePermissionsModal
+          isOpen={devicePermissionsModalOpen}
+          onClose={() => setDevicePermissionsModalOpen(false)}
+        />
       </ErrorBoundary>
 
       <ToastContainer />

@@ -458,18 +458,18 @@ html.light .border-slate-700\/50,
 }
 
 /* Text Hierarchy & High-Contrast Readability in Light Mode */
-html.light h1,
-html.light h2,
-html.light h3,
-html.light h4,
-html.light h5,
-html.light h6,
-[data-theme="light"] h1,
-[data-theme="light"] h2,
-[data-theme="light"] h3,
-[data-theme="light"] h4,
-[data-theme="light"] h5,
-[data-theme="light"] h6 {
+html.light h1:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light h2:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light h3:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light h4:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light h5:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light h6:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] h1:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] h2:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] h3:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] h4:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] h5:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] h6:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *) {
   color: #0B1B3D !important; /* Midnight Navy from BRAD'CI Logo - rich, bold and ultra-crisp */
 }
 
@@ -477,44 +477,58 @@ html.light h6,
 html.light .text-slate-900,
 html.light .text-slate-800,
 html.light .text-slate-950,
-html.light .text-slate-100,
-html.light .text-slate-200,
+html.light .text-slate-100:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light .text-slate-200:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
 [data-theme="light"] .text-slate-900,
 [data-theme="light"] .text-slate-800,
-[data-theme="light"] .text-slate-100,
-[data-theme="light"] .text-slate-200 {
+[data-theme="light"] .text-slate-100:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] .text-slate-200:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *) {
   color: #0B1B3D !important;
 }
 
 /* Default text-white in light mode maps to crisp dark slate unless inside protected colored CTAs/dark banners */
-html.light .text-white,
-[data-theme="light"] .text-white {
+html.light .text-white:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] .text-white:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *) {
   color: #0B1B3D !important;
 }
 
 /* Secondary body text: Deep crisp slate 800 */
-html.light .text-slate-700,
-html.light .text-slate-600,
-[data-theme="light"] .text-slate-700,
-[data-theme="light"] .text-slate-600 {
+html.light .text-slate-700:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light .text-slate-600:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] .text-slate-700:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] .text-slate-600:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *) {
   color: #1E293B !important;
 }
 
 /* Tertiary / Subtitles / Form labels / Muted info: Slate 700 (NEVER faint grey) - crystal clear legibility */
-html.light .text-slate-500,
-html.light .text-slate-400,
-html.light .text-gray-500,
-html.light .text-gray-400,
-[data-theme="light"] .text-slate-500,
-[data-theme="light"] .text-slate-400,
-[data-theme="light"] .text-gray-500,
-[data-theme="light"] .text-gray-400 {
+html.light .text-slate-500:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light .text-slate-400:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light .text-gray-500:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+html.light .text-gray-400:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] .text-slate-500:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] .text-slate-400:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] .text-gray-500:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *),
+[data-theme="light"] .text-gray-400:not(.dark-banner *):not(.banner-text-white *):not(.dark-card *) {
   color: #334155 !important;
 }
 
 /* Protected Pure White Text for CTAs, Solid Buttons, Hero Banners and Dark Cards */
+html.light .dark-banner,
+html.light .dark-banner *,
+html.light .dark-card,
+html.light .dark-card *,
+html.light .banner-text-white,
+html.light .banner-text-white *,
+[data-theme="light"] .dark-banner,
+[data-theme="light"] .dark-banner *,
+[data-theme="light"] .dark-card,
+[data-theme="light"] .dark-card *,
+[data-theme="light"] .banner-text-white,
+[data-theme="light"] .banner-text-white *,
 .dark-banner,
 .dark-banner *,
+.dark-card,
+.dark-card *,
 .banner-text-white,
 .banner-text-white *,
 .btn-cta-orange,

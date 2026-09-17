@@ -1,23 +1,40 @@
 {
+  "name": "BRAD'CI - Enchères Express & Déstockage",
   "short_name": "BRAD'CI",
-  "name": "BRAD'CI Delivery",
-  "icons": [
-    {
-      "src": "icon.png?v=14",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon.png?v=14",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "start_url": "./index.html",
+  "description": "Plateforme d'enchères express de seconde main et déstockage sécurisé à Abidjan avec Paiement Direct à la Livraison (POD Mobile Money), bourse de fret et forfaits certifiés.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#06102e",
   "theme_color": "#06102e",
-  "display": "standalone",
-  "orientation": "portrait"
+  "lang": "fr-CI",
+  "categories": ["shopping", "business"],
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
 }

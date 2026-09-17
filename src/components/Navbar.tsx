@@ -39,7 +39,8 @@ import {
   ChevronDown,
   Coins,
   Check,
-  Smartphone
+  Smartphone,
+  Heart
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -75,6 +76,7 @@ export const Navbar: React.FC = () => {
     checkKycVerifiedOrPrompt,
     cart,
     setCartModalOpen,
+    favoritesCount,
     toggleDriverAvailability,
     freightJobs,
     activeDriverTab,
@@ -82,6 +84,7 @@ export const Navbar: React.FC = () => {
     loginWithRole,
     adminLogin,
     isAdminAuthenticated,
+    setDevicePermissionsModalOpen,
     addToast
   } = useApp();
 
@@ -446,6 +449,26 @@ export const Navbar: React.FC = () => {
               )}
             </div>
 
+            {/* Mes Favoris Quick Access Button */}
+            <button
+              id="navbar-direct-favorites-btn"
+              type="button"
+              onClick={() => {
+                setActiveTab('explore');
+                window.dispatchEvent(new CustomEvent('bradci_set_feed_filter', { detail: 'favorites' }));
+              }}
+              className="flex relative h-8 sm:h-8.5 px-2 sm:px-2.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:border-rose-500 hover:bg-rose-100 dark:hover:bg-rose-900/60 transition-all items-center justify-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-xs active:scale-95"
+              title={translate("Mes Favoris (Accès direct)", "My Favorites")}
+            >
+              <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500 fill-rose-500/25 shrink-0" />
+              <span className="hidden xl:inline text-[11px] text-rose-800 dark:text-rose-300 font-bold">{translate("Favoris", "Favorites")}</span>
+              {favoritesCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-mono-num font-black text-[10px] leading-tight">
+                  {favoritesCount}
+                </span>
+              )}
+            </button>
+
             {/* Shopping Cart Button (Visible sur desktop, dans la barre du bas sur mobile) */}
             <button
               id="navbar-direct-cart-btn"
@@ -723,6 +746,47 @@ export const Navbar: React.FC = () => {
                           <Bike className="w-4 h-4 text-amber-400" />
                           <span>{translate("Coursier Express Point A ➔ B", "Express Courier A ➔ B")}</span>
                         </div>
+                      </button>
+
+                      {/* Favorites Shortcut */}
+                      <button
+                        id="btn-profile-dropdown-favorites"
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('explore');
+                          window.dispatchEvent(new CustomEvent('bradci_set_feed_filter', { detail: 'favorites' }));
+                          setProfileDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-rose-300 hover:bg-rose-950/40 hover:text-rose-200 flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Heart className="w-4 h-4 text-rose-400 fill-rose-500/20" />
+                          <span>{translate("Mes Articles Favoris", "My Favorite Items")}</span>
+                        </div>
+                        {favoritesCount > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-mono-num font-black text-[10px]">
+                            {favoritesCount}
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Device Permissions Center Shortcut */}
+                      <button
+                        id="btn-profile-dropdown-permissions"
+                        type="button"
+                        onClick={() => {
+                          setDevicePermissionsModalOpen(true);
+                          setProfileDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs text-amber-300 hover:bg-amber-950/40 hover:text-amber-200 flex items-center justify-between transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-amber-400" />
+                          <span>{translate("Accès Caméra, Micro & Alertes", "Camera, Mic & Alert Access")}</span>
+                        </div>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-bold">
+                          Gérer
+                        </span>
                       </button>
 
                       {/* Cart Shortcut */}
@@ -1083,6 +1147,29 @@ export const Navbar: React.FC = () => {
                     </button>
                   )}
 
+                  {/* Favoris in drawer */}
+                  <button
+                    id="btn-mobile-drawer-favorites"
+                    onClick={() => {
+                      setActiveTab('explore');
+                      window.dispatchEvent(new CustomEvent('bradci_set_feed_filter', { detail: 'favorites' }));
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left p-2.5 rounded-xl bg-rose-950/30 border border-rose-900/50 hover:border-rose-500/50 text-rose-300 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Heart className="w-4 h-4 text-rose-400 fill-rose-500/30 shrink-0" />
+                      <span>{translate("❤️ Mes Favoris", "❤️ My Favorites")}</span>
+                    </div>
+                    {favoritesCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white font-mono-num font-black text-[10px]">
+                        {favoritesCount} {translate("favori(s)", "favorite(s)")}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-500">0</span>
+                    )}
+                  </button>
+
                   {/* Factures & Reçus Comptables in drawer */}
                   <button
                     id="btn-mobile-drawer-receipts"
@@ -1257,6 +1344,25 @@ export const Navbar: React.FC = () => {
                       </div>
                       <span className="bg-amber-500 text-slate-950 text-[9px] px-2 py-0.5 rounded font-black">
                         {translate("PARLER", "SPEAK")}
+                      </span>
+                    </button>
+
+                    {/* Centre d'Autorisations Caméra, Micro, Notifs in Drawer */}
+                    <button
+                      id="btn-mobile-drawer-permissions"
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setDevicePermissionsModalOpen(true);
+                      }}
+                      className="w-full text-left p-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>{translate("Accès Caméra, Micro & Notifs", "Camera, Mic & Notifs Access")}</span>
+                      </div>
+                      <span className="bg-emerald-500/20 text-emerald-300 text-[9px] px-2 py-0.5 rounded font-black border border-emerald-500/30">
+                        {translate("VÉRIFIER", "CHECK")}
                       </span>
                     </button>
 

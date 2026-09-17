@@ -61,6 +61,7 @@ import { SellerProSummaryView } from './SellerProSummaryView';
 import { nativeBridge } from '../utils/nativeBridge';
 import { KYC_DRAWING_DATA_URIS } from './KYCIllustrations';
 import { voiceNavigator } from '../utils/voiceNavigator';
+import { LiveCameraCaptureModal } from './LiveCameraCaptureModal';
 
 export const ClientDashboard: React.FC = () => {
   const { 
@@ -137,6 +138,7 @@ export const ClientDashboard: React.FC = () => {
 
   // Withdrawal state
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
+  const [withdrawalChannel, setWithdrawalChannel] = useState<'mobile_money' | 'card' | 'crypto'>('mobile_money');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawMethod, setWithdrawMethod] = useState<PaymentMethod>('Wave');
   const [withdrawPhone, setWithdrawPhone] = useState(currentUser?.phone || '+225 07 00 00 00 00');
@@ -180,11 +182,36 @@ export const ClientDashboard: React.FC = () => {
   const [selfiePhoto, setSelfiePhoto] = useState(currentUser?.avatar || KYC_DRAWING_DATA_URIS.selfie);
   const [kycFeedback, setKycFeedback] = useState<{ isDuplicate?: boolean; message?: string } | null>(null);
 
+  // Live Camera capture state
+  const [cameraModalOpen, setCameraModalOpen] = useState<boolean>(false);
+  const [cameraTarget, setCameraTarget] = useState<'logo' | 'banner' | 'kyc_doc' | 'kyc_selfie'>('logo');
+
+  const handleCameraCapture = (dataUrl: string) => {
+    if (cameraTarget === 'logo') {
+      setShopForm(prev => ({ ...prev, logo: dataUrl }));
+      addToast(translate('Logo mis à jour ✅', 'Logo updated ✅'), '', 'success');
+    } else if (cameraTarget === 'banner') {
+      setShopForm(prev => ({ ...prev, banner: dataUrl }));
+      addToast(translate('Bannière mise à jour ✅', 'Banner updated ✅'), '', 'success');
+    } else if (cameraTarget === 'kyc_doc') {
+      setDocPhoto(dataUrl);
+      addToast(translate('Document CNI enregistré', 'ID Document saved'), '', 'success');
+    } else if (cameraTarget === 'kyc_selfie') {
+      setSelfiePhoto(dataUrl);
+      addToast(translate('Selfie enregistré', 'Selfie saved'), '', 'success');
+    }
+  };
+
   // Native Mobile Photo Captures (Logo & Banner)
   const handleCaptureLogo = async (source: 'camera' | 'photos') => {
+    if (source === 'camera') {
+      setCameraTarget('logo');
+      setCameraModalOpen(true);
+      return;
+    }
     try {
       const res = await nativeBridge.capturePhoto({
-        source,
+        source: 'photos',
         direction: 'user',
         quality: 90
       });
@@ -198,9 +225,14 @@ export const ClientDashboard: React.FC = () => {
   };
 
   const handleCaptureBanner = async (source: 'camera' | 'photos') => {
+    if (source === 'camera') {
+      setCameraTarget('banner');
+      setCameraModalOpen(true);
+      return;
+    }
     try {
       const res = await nativeBridge.capturePhoto({
-        source,
+        source: 'photos',
         direction: 'environment',
         quality: 85
       });
@@ -694,14 +726,14 @@ export const ClientDashboard: React.FC = () => {
       {/* Withdrawal Modal */}
       {withdrawalModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-[#0C121E] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl relative text-slate-900 dark:text-slate-100 space-y-4">
+          <div className="w-full max-w-lg bg-white dark:bg-[#0C121E] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl relative text-slate-900 dark:text-slate-100 space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/30">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Demande de Retrait Mobile Money</h3>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Demande de Retrait de Fonds</h3>
                   <p className="text-xs text-slate-600 dark:text-slate-400">Solde disponible : <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{currentUser.walletBalance.toLocaleString('fr-FR')} FCFA</strong></p>
                 </div>
               </div>
@@ -713,104 +745,361 @@ export const ClientDashboard: React.FC = () => {
               </button>
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const num = Number(withdrawAmount);
-                const res = requestUserWithdrawal(num, withdrawMethod, withdrawPhone);
-                if (res.success) {
-                  setWithdrawalModalOpen(false);
-                }
-              }}
-              className="space-y-4 pt-1"
-            >
-              <div>
-                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1.5">Opérateur de Réception :</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['Wave', 'Orange Money', 'MTN MoMo'] as PaymentMethod[]).map(m => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setWithdrawMethod(m)}
-                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        withdrawMethod === m
-                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500 shadow-xs'
-                          : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 border-slate-300 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-1.5">
-                  <span>⚡ Frais de retrait : 1% sur tous les opérateurs (Wave, Orange Money, MTN MoMo)</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1">Montant à Retirer (FCFA) :</label>
-                <input
-                  type="number"
-                  min={1000}
-                  max={currentUser.walletBalance}
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1">Numéro Mobile Money Récepteur :</label>
-                <input
-                  type="tel"
-                  value={withdrawPhone}
-                  onChange={(e) => setWithdrawPhone(e.target.value)}
-                  placeholder="+225 07 XX XX XX XX"
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-500"
-                  required
-                />
-              </div>
-
-              {/* Financial Calculation Breakdown with 1% fee */}
-              <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
-                <div className="flex justify-between text-slate-700 dark:text-slate-300">
-                  <span>Montant Brut demandé :</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-white">{Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA</span>
-                </div>
-                <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
-                  <span>Frais de retrait (1%) :</span>
-                  <span className="font-mono font-bold">
-                    - {Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01)).toLocaleString('fr-FR')} FCFA
-                  </span>
-                </div>
-                <div className="flex justify-between pt-1.5 border-t border-slate-200 dark:border-slate-800 font-bold">
-                  <span className="text-slate-800 dark:text-slate-200">Net à recevoir sur votre mobile :</span>
-                  <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-sm">
-                    {(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
+            {/* Canal de Retrait: Mobile Money (Actif) vs Carte de Crédit (Bientôt) vs Crypto (Bientôt) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block">Canal de Retrait :</label>
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={() => setWithdrawalModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                  onClick={() => setWithdrawalChannel('mobile_money')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    withdrawalChannel === 'mobile_money'
+                      ? 'bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300 shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+                  }`}
                 >
-                  {translate("Annuler", "Cancel")}
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-sm">📱</span>
+                    <span className="text-[9.5px] px-1.5 py-0.5 rounded font-black bg-emerald-500 text-white tracking-wider">ACTIF</span>
+                  </div>
+                  <span className="font-bold text-xs mt-1.5 block">Mobile Money</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Wave, Orange, MTN, Moov</span>
                 </button>
+
                 <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer"
+                  type="button"
+                  onClick={() => setWithdrawalChannel('card')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    withdrawalChannel === 'card'
+                      ? 'bg-blue-500/15 border-blue-500 text-blue-700 dark:text-blue-300 shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+                  }`}
                 >
-                  {translate(
-                    `Confirmer le Retrait (${(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA Net)`,
-                    `Confirm Withdrawal (${(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA Net)`
-                  )}
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-sm">💳</span>
+                    <span className="text-[9.5px] px-1.5 py-0.5 rounded font-black bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">BIENTÔT</span>
+                  </div>
+                  <span className="font-bold text-xs mt-1.5 block">Carte de Crédit</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">Visa & Mastercard</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWithdrawalChannel('crypto')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    withdrawalChannel === 'crypto'
+                      ? 'bg-purple-500/15 border-purple-500 text-purple-700 dark:text-purple-300 shadow-xs'
+                      : 'bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-700 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-sm">🪙</span>
+                    <span className="text-[9.5px] px-1.5 py-0.5 rounded font-black bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30">BIENTÔT</span>
+                  </div>
+                  <span className="font-bold text-xs mt-1.5 block">Crypto-monnaie</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">USDT TRC20, BTC</span>
                 </button>
               </div>
-            </form>
+            </div>
+
+            {/* CHANNEL 1: MOBILE MONEY (ACTIF - 100% FONCTIONNEL AVEC MOOV INCLUS) */}
+            {withdrawalChannel === 'mobile_money' && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const num = Number(withdrawAmount);
+                  const res = requestUserWithdrawal(num, withdrawMethod, withdrawPhone);
+                  if (res.success) {
+                    setWithdrawalModalOpen(false);
+                  }
+                }}
+                className="space-y-4 pt-1"
+              >
+                <div>
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1.5">Opérateur Mobile Money Récepteur :</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { id: 'Wave' as PaymentMethod, name: 'Wave CI', icon: '🌊', color: 'border-sky-500 bg-sky-500/15 text-sky-700 dark:text-sky-300', tag: '07, 05, 01' },
+                      { id: 'Orange Money' as PaymentMethod, name: 'Orange Money', icon: '🍊', color: 'border-orange-500 bg-orange-500/15 text-orange-700 dark:text-orange-300', tag: '07 XX' },
+                      { id: 'MTN MoMo' as PaymentMethod, name: 'MTN MoMo', icon: '🟡', color: 'border-amber-500 bg-amber-500/15 text-amber-700 dark:text-amber-300', tag: '05 XX' },
+                      { id: 'Moov Money' as PaymentMethod, name: 'Moov Money', icon: '🔵', color: 'border-blue-600 bg-blue-600/15 text-blue-700 dark:text-blue-300', tag: '01 XX' }
+                    ].map(op => (
+                      <button
+                        key={op.id}
+                        type="button"
+                        onClick={() => {
+                          setWithdrawMethod(op.id);
+                          if (op.id === 'Moov Money' && (!withdrawPhone || withdrawPhone.startsWith('+225 07') || withdrawPhone.startsWith('+225 05'))) {
+                            setWithdrawPhone('+225 01 ');
+                          } else if (op.id === 'Orange Money' && (!withdrawPhone || withdrawPhone.startsWith('+225 01') || withdrawPhone.startsWith('+225 05'))) {
+                            setWithdrawPhone('+225 07 ');
+                          } else if (op.id === 'MTN MoMo' && (!withdrawPhone || withdrawPhone.startsWith('+225 01') || withdrawPhone.startsWith('+225 07'))) {
+                            setWithdrawPhone('+225 05 ');
+                          }
+                        }}
+                        className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer text-left flex flex-col justify-between ${
+                          withdrawMethod === op.id
+                            ? `${op.color} shadow-xs ring-1 ring-emerald-500/50`
+                            : 'bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 border-slate-300 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-base">{op.icon}</span>
+                          <span className="text-[9.5px] font-mono px-1 py-0.2 rounded bg-black/10 dark:bg-white/10 text-slate-600 dark:text-slate-300 font-bold">{op.tag}</span>
+                        </div>
+                        <span className="font-bold text-xs">{op.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold mt-2 bg-emerald-50 dark:bg-emerald-950/40 p-2 rounded-xl border border-emerald-500/20">
+                    <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span>⚡ Frais de retrait : 1% sur tous les opérateurs (Wave, Orange Money, MTN MoMo, Moov Money) • Virement reçu sous 15 à 30 minutes</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-800 dark:text-slate-200">Montant à Retirer (FCFA) :</label>
+                    <span className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium">Min : 1 000 FCFA</span>
+                  </div>
+                  <input
+                    type="number"
+                    min={1000}
+                    max={currentUser.walletBalance}
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    placeholder="Ex: 25000"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                    required
+                  />
+                  {/* Quick Preset Buttons */}
+                  <div className="flex gap-1.5 mt-1.5">
+                    {[5000, 10000, 25000, 50000, currentUser.walletBalance].filter(amt => amt > 0 && amt <= Math.max(currentUser.walletBalance, 1000)).map((amt, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setWithdrawAmount(amt.toString())}
+                        className="flex-1 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-300 dark:border-slate-800 text-[10px] font-mono font-bold text-slate-800 dark:text-slate-300 rounded-lg cursor-pointer"
+                      >
+                        {amt === currentUser.walletBalance ? 'Tout le solde' : `${amt / 1000}k`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1">
+                    Numéro {withdrawMethod} Récepteur :
+                  </label>
+                  <input
+                    type="tel"
+                    value={withdrawPhone}
+                    onChange={(e) => setWithdrawPhone(e.target.value)}
+                    placeholder={
+                      withdrawMethod === 'Moov Money' ? '+225 01 XX XX XX XX' :
+                      withdrawMethod === 'MTN MoMo' ? '+225 05 XX XX XX XX' :
+                      withdrawMethod === 'Orange Money' ? '+225 07 XX XX XX XX' :
+                      '+225 07 / 05 / 01 XX XX XX XX'
+                    }
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 dark:text-white font-mono font-bold placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+                    required
+                  />
+                </div>
+
+                {/* Financial Calculation Breakdown with 1% fee */}
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+                  <div className="flex justify-between text-slate-700 dark:text-slate-300">
+                    <span>Montant Brut demandé :</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">{Number(withdrawAmount || 0).toLocaleString('fr-FR')} FCFA</span>
+                  </div>
+                  <div className="flex justify-between text-amber-700 dark:text-amber-400 font-medium">
+                    <span>Frais de retrait plateforme (1%) :</span>
+                    <span className="font-mono font-bold">
+                      - {Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01)).toLocaleString('fr-FR')} FCFA
+                    </span>
+                  </div>
+                  <div className="flex justify-between pt-1.5 border-t border-slate-200 dark:border-slate-800 font-bold">
+                    <span className="text-slate-800 dark:text-slate-200">Net viré sur votre {withdrawMethod} :</span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                      {(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalModalOpen(false)}
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-400 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    {translate("Annuler", "Cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer"
+                  >
+                    {translate(
+                      `Confirmer le Retrait via ${withdrawMethod} (${(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA Net)`,
+                      `Confirm Payout via ${withdrawMethod} (${(Number(withdrawAmount || 0) - Math.max(1, Math.round(Number(withdrawAmount || 0) * 0.01))).toLocaleString('fr-FR')} FCFA Net)`
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* CHANNEL 2: CARTE DE CRÉDIT (MODE BIENTÔT) */}
+            {withdrawalChannel === 'card' && (
+              <div className="space-y-4 pt-1">
+                <div className="p-4 bg-gradient-to-br from-blue-500/10 via-indigo-500/10 to-slate-900/40 rounded-2xl border border-blue-500/30 text-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-500 flex items-center justify-center border border-blue-500/30">
+                        <CreditCard className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Retrait Direct par Carte de Crédit / Débit</h4>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400">Cartes Bancaires Visa & Mastercard (UBA, Ecobank, SGCI, NSIA, BOA...)</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-xs">
+                      MODE BIENTÔT
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-bold mb-1">
+                        <span>💳</span>
+                        <span>Visa & Mastercard</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 dark:text-slate-400 leading-snug">
+                        Virement instantané vers votre carte de débit ou de crédit sans passer par une agence.
+                      </p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold mb-1">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Sécurité PCI-DSS</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 dark:text-slate-400 leading-snug">
+                        Homologation bancaire GIM-UEMOA et protocoles 3D-Secure 2.0 pour la zone UEMOA.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-500/20 text-amber-800 dark:text-amber-300 text-[11px] space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      Statut d'intégration : Tests finaux de passerelle bancaire en cours
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-400 text-[10.5px]">
+                      Le paiement direct sur carte bancaire est actuellement en phase pilote auprès de nos établissements bancaires partenaires. En attendant l'activation publique, veuillez effectuer vos retraits via <strong>Mobile Money (Wave, Orange, MTN, Moov)</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addToast(
+                        "Notification programmée",
+                        "Vous recevrez une alerte SMS dès l'ouverture des retraits directs sur Carte Bancaire Visa/Mastercard.",
+                        "info"
+                      );
+                    }}
+                    className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-800 cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Bell className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Me notifier au lancement</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalChannel('mobile_money')}
+                    className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>📱 Retirer via Mobile Money (Actif)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* CHANNEL 3: CRYPTO-MONNAIE (MODE BIENTÔT) */}
+            {withdrawalChannel === 'crypto' && (
+              <div className="space-y-4 pt-1">
+                <div className="p-4 bg-gradient-to-br from-purple-500/10 via-fuchsia-500/10 to-slate-900/40 rounded-2xl border border-purple-500/30 text-xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-500 flex items-center justify-center border border-purple-500/30">
+                        <Coins className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white">Retrait en Crypto-monnaie</h4>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400">USDT (TRC-20, ERC-20), Bitcoin (BTC), USDC</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500 text-white shadow-xs">
+                      MODE BIENTÔT
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400 font-bold mb-1">
+                        <span>💵</span>
+                        <span>Stablecoin USDT (TRC-20)</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 dark:text-slate-400 leading-snug">
+                        Valeur garantie indexée sur le Dollar américain (1 USDT = 1 USD) avec frais de réseau minimes.
+                      </p>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white/70 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold mb-1">
+                        <Globe className="w-3.5 h-3.5" />
+                        <span>Diaspora & International</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 dark:text-slate-400 leading-snug">
+                        Idéal pour nos vendeurs et acheteurs transfrontaliers sans frais de conversion bancaire.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-purple-50 dark:bg-purple-950/40 rounded-xl border border-purple-500/20 text-purple-800 dark:text-purple-300 text-[11px] space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      Statut d'intégration : Audit de sécurité des smart contracts de séquestre
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-400 text-[10.5px]">
+                      Le module Web3 Brad'CI permettra des versements automatisés vers votre wallet décentralisé (Binance, Trust Wallet, MetaMask). Pour vos retraits urgents, utilisez <strong>Mobile Money (Wave, Orange, MTN, Moov)</strong> disponible 24h/24.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addToast(
+                        "Notification programmée",
+                        "Vous recevrez une notification prioritaire dès le déploiement des retraits USDT TRC20 et Bitcoin.",
+                        "info"
+                      );
+                    }}
+                    className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-800 cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Bell className="w-3.5 h-3.5 text-purple-500" />
+                    <span>Me notifier au lancement</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawalChannel('mobile_money')}
+                    className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <span>📱 Retirer via Mobile Money (Actif)</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3029,6 +3318,30 @@ export const ClientDashboard: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Live Camera Viewfinder Modal */}
+      <LiveCameraCaptureModal
+        isOpen={cameraModalOpen}
+        onClose={() => setCameraModalOpen(false)}
+        onCapture={handleCameraCapture}
+        title={
+          cameraTarget === 'logo'
+            ? translate("Photo de Profil / Logo Boutique", "Shop Profile / Logo")
+            : cameraTarget === 'banner'
+            ? translate("Bannière de Couverture Vitrine", "Storefront Cover Banner")
+            : cameraTarget === 'kyc_doc'
+            ? translate("Pièce d'Identité CNI / Passeport", "ID Document / Passport")
+            : translate("Selfie de Vérification", "Verification Selfie")
+        }
+        subtitle={
+          cameraTarget === 'logo'
+            ? translate("Prenez une photo nette de votre logo ou de votre visage", "Take a clear picture of your logo or face")
+            : cameraTarget === 'banner'
+            ? translate("Cadrez la vitrine ou les articles phares de votre boutique", "Frame your shop storefront or featured items")
+            : translate("Assurez-vous que l'image est claire et bien éclairée", "Ensure the image is clear and well lit")
+        }
+        defaultFacingMode={cameraTarget === 'logo' || cameraTarget === 'kyc_selfie' ? 'user' : 'environment'}
+        aspectRatio={cameraTarget === 'banner' ? 'wide' : 'square'}
+      />
     </div>
   );
 };

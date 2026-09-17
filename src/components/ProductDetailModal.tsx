@@ -32,7 +32,8 @@ import {
   ShoppingCart,
   Package,
   BellRing,
-  Zap
+  Zap,
+  Heart
 } from 'lucide-react';
 import { PaymentMethod, VehicleType } from '../types';
 import { nativeBridge } from '../utils/nativeBridge';
@@ -72,7 +73,9 @@ export const ProductDetailModal: React.FC = () => {
     addToCart,
     setCartModalOpen,
     sellerSelectBidder,
-    triggerOutbidSimulation
+    triggerOutbidSimulation,
+    toggleFavorite,
+    isFavorite
   } = useApp();
 
   const [bidAmount, setBidAmount] = useState<number>(0);
@@ -222,10 +225,23 @@ export const ProductDetailModal: React.FC = () => {
         id="product-detail-modal-card" 
         className="w-full max-w-3xl bg-white dark:bg-[#0C121E] text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-8 shadow-2xl relative my-auto max-h-[92vh] overflow-y-auto"
       >
+        {/* Favoris Button */}
+        <button
+          onClick={() => prod && toggleFavorite(prod.id, prod.title)}
+          className={`absolute top-5 right-14 p-1.5 rounded-xl border transition-all z-10 cursor-pointer ${
+            prod && isFavorite(prod.id)
+              ? 'bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-500/30'
+              : 'text-slate-500 hover:text-rose-500 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-800'
+          }`}
+          title={prod && isFavorite(prod.id) ? 'Retirer des favoris' : 'Enregistrer dans mes favoris'}
+        >
+          <Heart className={`w-5 h-5 transition-transform ${prod && isFavorite(prod.id) ? 'fill-current scale-110 text-white' : ''}`} />
+        </button>
+
         {/* Close Button */}
         <button
           onClick={() => setProductDetailModal(null)}
-          className="absolute top-5 right-5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 transition-colors z-10"
+          className="absolute top-5 right-5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 transition-colors z-10 cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>

@@ -32,7 +32,7 @@ export const LogoIcon: React.FC<{
   className = "w-10 h-10", 
   size,
   id,
-  preferImage = false
+  preferImage = true
 }) => {
   const [imgFailed, setImgFailed] = React.useState(false);
 
@@ -257,7 +257,7 @@ export const Logo: React.FC<LogoProps> = ({
   variant = 'horizontal',
   showSubtitle = true,
   showIcon = true,
-  preferImage = false,
+  preferImage = true,
   subtitleText = "ENCHÈRES • PAIEMENT SÉQUESTRÉ • LIVRAISON GPS",
   onClick,
   id = "bradci-logo"

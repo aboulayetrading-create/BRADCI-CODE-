@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Product } from '../types';
 import {
@@ -24,7 +24,14 @@ import {
   Bell,
   Receipt,
   Sun,
-  Moon
+  Moon,
+  History,
+  Clock,
+  Trash2,
+  Eye,
+  ArrowUpRight,
+  Sparkles,
+  Heart
 } from 'lucide-react';
 import { AdminBackOffice } from './AdminBackOffice';
 import { B2BLiquidationHub } from './B2BLiquidationHub';
@@ -70,6 +77,7 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
     cart,
     addToCart,
     setCartModalOpen,
+    productDetailModal,
     setProductDetailModal,
     publishProduct,
     loginWithRole,
@@ -83,12 +91,178 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
   } = useApp();
 
   // Navigation interne de l'application mobile BRADCI
-  const [activeTab, setActiveTab] = useState<'home' | 'orders' | 'space' | 'contact' | 'admin' | 'b2b' | 'courier'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'favorites' | 'orders' | 'space' | 'contact' | 'admin' | 'b2b' | 'courier'>('home');
 
   // Filtres catalogue
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCommune, setSelectedCommune] = useState('Toutes les communes');
   const [selectedCategory, setSelectedCategory] = useState<'Tous' | 'High-Tech' | 'Mode & Luxe' | 'Maison & Électro' | 'Véhicules & Pièces' | 'Gaming' | 'Divers' | 'Déstockage B2B'>('Tous');
+
+  // Recherches récentes (Sauvegarde persistante dans localStorage)
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bradci_recent_searches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return ['iPhone 13 Pro', 'Sneakers Nike', 'Smart TV 55"', 'Moto Yamaha', 'PlayStation 5'];
+  });
+
+  // Articles consultés récemment (IDs sauvegardés dans localStorage)
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bradci_recently_viewed_ids');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return ['prod-1', 'prod-4', 'prod-2'];
+  });
+
+  // Synchronisation automatique des articles consultés quand la modal s'ouvre
+  useEffect(() => {
+    if (productDetailModal?.id) {
+      setRecentlyViewedIds(prev => {
+        const filtered = prev.filter(id => id !== productDetailModal.id);
+        const updated = [productDetailModal.id, ...filtered].slice(0, 8);
+        try {
+          localStorage.setItem('bradci_recently_viewed_ids', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+    }
+  }, [productDetailModal?.id]);
+
+  // Ajouter une recherche récente
+  const addRecentSearch = (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    setRecentSearches(prev => {
+      const filtered = prev.filter(s => s.toLowerCase() !== trimmed.toLowerCase());
+      const updated = [trimmed, ...filtered].slice(0, 8);
+      try {
+        localStorage.setItem('bradci_recent_searches', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  // Supprimer un mot-clé précis
+  const removeRecentSearch = (termToRemove: string) => {
+    setRecentSearches(prev => {
+      const updated = prev.filter(s => s.toLowerCase() !== termToRemove.toLowerCase());
+      try {
+        localStorage.setItem('bradci_recent_searches', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  // Vider tout l'historique de recherche
+  const clearAllRecentSearches = () => {
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem('bradci_recent_searches');
+    } catch {}
+  };
+
+  // Vider les articles consultés
+  const clearAllRecentlyViewed = () => {
+    setRecentlyViewedIds([]);
+    try {
+      localStorage.removeItem('bradci_recently_viewed_ids');
+    } catch {}
+  };
+
+  // Ouverture d'article avec mise en historique immédiate
+  const handleOpenProduct = (product: Product) => {
+    setRecentlyViewedIds(prev => {
+      const filtered = prev.filter(id => id !== product.id);
+      const updated = [product.id, ...filtered].slice(0, 8);
+      try {
+        localStorage.setItem('bradci_recently_viewed_ids', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setProductDetailModal(product);
+  };
+
+  // Récupérer la liste complète des objets produits récemment consultés
+  const recentlyViewedProducts = useMemo(() => {
+    return recentlyViewedIds
+      .map(id => appProducts.find(p => p.id === id))
+      .filter((p): p is Product => Boolean(p));
+  }, [recentlyViewedIds, appProducts]);
+
+  // Soumission de recherche
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (searchQuery.trim()) {
+      addRecentSearch(searchQuery);
+    }
+  };
+
+  // Favoris (IDs sauvegardés dans localStorage)
+  const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bradci_favorites');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return ['prod-1', 'prod-3']; // Favoris par défaut pour aperçu immédiat
+  });
+
+  // Basculer l'état favori d'un produit (Ajout / Retrait)
+  const toggleFavorite = (productId: string, productTitle?: string) => {
+    setFavoriteProductIds(prev => {
+      const exists = prev.includes(productId);
+      const updated = exists ? prev.filter(id => id !== productId) : [...prev, productId];
+      try {
+        localStorage.setItem('bradci_favorites', JSON.stringify(updated));
+      } catch {}
+      if (exists) {
+        addToast(
+          'Retiré des favoris',
+          productTitle ? `"${productTitle}" a été retiré de vos favoris.` : 'Article retiré de vos favoris.',
+          'info'
+        );
+      } else {
+        addToast(
+          'Ajouté aux favoris ❤️',
+          productTitle ? `"${productTitle}" a été ajouté à vos favoris.` : 'Article enregistré dans vos favoris.',
+          'success'
+        );
+      }
+      return updated;
+    });
+  };
+
+  // Vider tous les favoris
+  const clearAllFavorites = () => {
+    setFavoriteProductIds([]);
+    try {
+      localStorage.removeItem('bradci_favorites');
+    } catch {}
+    addToast('Favoris réinitialisés', 'Votre liste de favoris a été vidée.', 'info');
+  };
+
+  // Objets produits favoris résolus
+  const favoriteProducts = useMemo(() => {
+    return favoriteProductIds
+      .map(id => appProducts.find(p => p.id === id))
+      .filter((p): p is Product => Boolean(p));
+  }, [favoriteProductIds, appProducts]);
 
   // Checkout Direct Wave / Orange Money
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
@@ -414,6 +588,24 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
             )}
           </button>
 
+          {/* Favoris */}
+          <button
+            onClick={() => setActiveTab('favorites')}
+            className={`relative p-2 rounded-xl transition-colors cursor-pointer ${
+              activeTab === 'favorites'
+                ? 'bg-rose-50 dark:bg-rose-950/50 text-rose-500'
+                : 'text-slate-700 dark:text-slate-200 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+            title="Mes Favoris"
+          >
+            <Heart className={`w-4 h-4 ${favoriteProductIds.length > 0 ? 'fill-rose-500 text-rose-500' : ''}`} />
+            {favoriteProductIds.length > 0 && (
+              <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+                {favoriteProductIds.length}
+              </span>
+            )}
+          </button>
+
           {/* Panier */}
           <button
             onClick={() => setCartModalOpen(true)}
@@ -460,15 +652,34 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
         </div>
       </header>
 
-      {/* SOUS-BARRE DE NAVIGATION RAPIDE (ACCÈS DIRECT B2B / COURSIER / ADMIN) */}
-      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs font-bold">
+      {/* SOUS-BARRE DE NAVIGATION RAPIDE (ACCÈS DIRECT B2B / COURSIER / ADMIN / FAVORIS) */}
+      <div className="bg-white dark:bg-[#0E1B3E] border-b border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar text-xs font-bold">
         <button
           onClick={() => setActiveTab('home')}
           className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-all ${
-            activeTab === 'home' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            activeTab === 'home' ? 'bg-slate-900 dark:bg-white dark:text-slate-900 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
           }`}
         >
           🛍️ Articles & Enchères
+        </button>
+
+        <button
+          onClick={() => setActiveTab('favorites')}
+          className={`px-3 py-1.5 rounded-full whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+            activeTab === 'favorites'
+              ? 'bg-rose-500 text-white shadow-xs'
+              : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-900/50'
+          }`}
+        >
+          <Heart className={`w-3.5 h-3.5 ${favoriteProductIds.length > 0 ? 'fill-current' : ''}`} />
+          <span>Favoris</span>
+          {favoriteProductIds.length > 0 && (
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+              activeTab === 'favorites' ? 'bg-white/25 text-white' : 'bg-rose-200/80 dark:bg-rose-900 text-rose-800 dark:text-rose-200'
+            }`}>
+              {favoriteProductIds.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -521,39 +732,192 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
             </div>
 
             {/* Barre de Recherche & Sélecteur de Commune */}
-            <div className="space-y-2 bg-white rounded-2xl p-3 border border-slate-200 shadow-xs">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <div className="space-y-2.5 bg-white dark:bg-[#0E1B3E] rounded-2xl p-3 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <form onSubmit={handleSearchSubmit} className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Rechercher : iPhone, Smart TV, Moto, Sneakers..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold focus:outline-none focus:border-[#FF5B00]"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSearchSubmit();
+                    }
+                  }}
+                  className="w-full pl-9 pr-16 py-2.5 rounded-xl bg-[#F8FAFC] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold focus:outline-none focus:border-[#FF5B00] text-slate-900 dark:text-slate-100 placeholder-slate-400"
                 />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      title="Effacer la saisie"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {searchQuery.trim() && (
+                    <button
+                      type="submit"
+                      className="p-1.5 bg-[#FF5B00] hover:bg-[#E05000] text-white rounded-lg text-[10px] font-bold cursor-pointer transition-colors shadow-xs"
+                      title="Lancer la recherche"
+                    >
+                      <Search className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </form>
 
-              <div className="flex items-center gap-1.5 bg-[#F8FAFC] border border-slate-200 rounded-xl px-2.5 py-1.5">
+              <div className="flex items-center gap-1.5 bg-[#F8FAFC] dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-2.5 py-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#FF5B00] shrink-0" />
                 <select
                   value={selectedCommune}
                   onChange={(e) => setSelectedCommune(e.target.value)}
-                  className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none w-full cursor-pointer"
+                  className="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none w-full cursor-pointer"
                 >
                   {COMMUNES_LIST.map((commune) => (
-                    <option key={commune} value={commune}>
+                    <option key={commune} value={commune} className="dark:bg-slate-900 dark:text-slate-200">
                       {commune}
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* SECTION : RECHERCHES RÉCENTES */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-black text-slate-800 dark:text-slate-200">
+                    <History className="w-3.5 h-3.5 text-[#FF5B00]" />
+                    <span>Recherches récentes</span>
+                    {recentSearches.length > 0 && (
+                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-orange-100 dark:bg-orange-950/50 text-[#FF5B00]">
+                        {recentSearches.length}
+                      </span>
+                    )}
+                  </div>
+                  {recentSearches.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearAllRecentSearches}
+                      className="text-[11px] font-bold text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Effacer tout l'historique"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Effacer</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Chips des mots-clés récents */}
+                {recentSearches.length > 0 ? (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                    {recentSearches.map((term) => {
+                      const isCurrent = searchQuery.toLowerCase().trim() === term.toLowerCase().trim();
+                      return (
+                        <div
+                          key={term}
+                          className={`flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                            isCurrent
+                              ? 'bg-[#FF5B00] text-white shadow-xs'
+                              : 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/60'
+                          }`}
+                        >
+                          <span
+                            onClick={() => {
+                              setSearchQuery(term);
+                              addRecentSearch(term);
+                            }}
+                            className="flex items-center gap-1 cursor-pointer"
+                          >
+                            <Clock className="w-3 h-3 opacity-70 shrink-0" />
+                            <span className="whitespace-nowrap">{term}</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeRecentSearch(term);
+                            }}
+                            className="p-0.5 rounded-full hover:bg-black/15 dark:hover:bg-white/20 text-current transition-colors ml-0.5 cursor-pointer"
+                            title="Supprimer cette recherche"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 py-0.5">
+                    <span>Aucune recherche récente enregistrée.</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const defaults = ['iPhone 13 Pro', 'Sneakers Nike', 'Smart TV', 'Moto Yamaha'];
+                        setRecentSearches(defaults);
+                        try {
+                          localStorage.setItem('bradci_recent_searches', JSON.stringify(defaults));
+                        } catch {}
+                      }}
+                      className="text-[#FF5B00] font-bold hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Charger suggestions</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* SECTION : ARTICLES RÉCEMMENT CONSULTÉS (NAVIGATION RAPIDE) */}
+                {recentlyViewedProducts.length > 0 && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/60 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+                        <Eye className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Articles consultés</span>
+                        <span className="text-[10px] text-slate-400 font-mono">({recentlyViewedProducts.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearAllRecentlyViewed}
+                        className="text-[10px] text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 hover:underline cursor-pointer"
+                      >
+                        Effacer
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                      {recentlyViewedProducts.map((prod) => {
+                        const price = prod.buyNowPrice || prod.currentPrice || prod.startingPrice || 0;
+                        const img = prod.imageUrl || prod.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=80';
+                        return (
+                          <div
+                            key={prod.id}
+                            onClick={() => handleOpenProduct(prod)}
+                            className="group flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 hover:bg-orange-50/50 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl p-1.5 pr-2.5 shrink-0 cursor-pointer transition-all active:scale-95"
+                            title={`Consulter "${prod.title}"`}
+                          >
+                            <img
+                              src={img}
+                              alt={prod.title}
+                              className="w-9 h-9 rounded-lg object-cover bg-white dark:bg-slate-900 shrink-0 border border-slate-200 dark:border-slate-700"
+                            />
+                            <div className="text-left max-w-[120px]">
+                              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate group-hover:text-[#FF5B00] transition-colors">
+                                {prod.title}
+                              </p>
+                              <p className="text-[10.5px] font-black text-[#FF5B00] font-mono leading-tight">
+                                {price.toLocaleString('fr-FR')} F
+                              </p>
+                            </div>
+                            <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#FF5B00] shrink-0 transition-colors" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -597,16 +961,17 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
                   const price = product.buyNowPrice || product.currentPrice || product.startingPrice || 15000;
                   const commune = product.commune || 'Abidjan';
                   const mainImage = product.imageUrl || product.images?.[0] || 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=500&auto=format&fit=crop&q=80';
+                  const isFav = favoriteProductIds.includes(product.id);
 
                   return (
                     <div
                       key={product.id}
-                      className="bg-white rounded-2xl border border-slate-200 p-3 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row gap-3"
+                      className="bg-white dark:bg-[#0E1B3E] rounded-2xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row gap-3 relative group"
                     >
-                      {/* Photo avec Badge Commune */}
+                      {/* Photo avec Badge Commune & Bouton Cœur */}
                       <div
-                        onClick={() => setProductDetailModal(product)}
-                        className="relative w-full sm:w-32 h-40 sm:h-32 rounded-xl overflow-hidden bg-slate-100 shrink-0 cursor-pointer group"
+                        onClick={() => handleOpenProduct(product)}
+                        className="relative w-full sm:w-32 h-40 sm:h-32 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900 shrink-0 cursor-pointer"
                       >
                         <img
                           src={mainImage}
@@ -617,21 +982,39 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
                           <MapPin className="w-2.5 h-2.5" />
                           {commune}
                         </span>
+
+                        {/* Bouton Cœur Favoris Tactile */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(product.id, product.title);
+                          }}
+                          className={`absolute top-2 right-2 p-2 rounded-full backdrop-blur-md transition-all active:scale-90 cursor-pointer z-10 ${
+                            isFav
+                              ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30 ring-2 ring-white/70'
+                              : 'bg-white/85 dark:bg-slate-900/85 text-slate-500 dark:text-slate-300 hover:text-rose-500 hover:bg-white shadow-xs'
+                          }`}
+                          title={isFav ? 'Retirer des favoris' : 'Enregistrer dans mes favoris'}
+                          aria-label={isFav ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+                        >
+                          <Heart className={`w-4 h-4 transition-transform ${isFav ? 'fill-current scale-110' : ''}`} />
+                        </button>
                       </div>
 
                       {/* Détails Produit */}
                       <div className="flex-1 flex flex-col justify-between">
                         <div>
                           <div className="flex items-center justify-between text-[11px] text-slate-500 mb-0.5">
-                            <span className="font-semibold text-slate-600">{product.sellerName || 'Vendeur Certifié'}</span>
-                            <span className="font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">{product.sellerName || 'Vendeur Certifié'}</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">
                               {product.category}
                             </span>
                           </div>
 
                           <h3
-                            onClick={() => setProductDetailModal(product)}
-                            className="text-sm font-black text-slate-900 line-clamp-2 leading-snug cursor-pointer hover:text-[#FF5B00] transition-colors"
+                            onClick={() => handleOpenProduct(product)}
+                            className="text-sm font-black text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug cursor-pointer hover:text-[#FF5B00] transition-colors"
                           >
                             {product.title}
                           </h3>
@@ -644,16 +1027,16 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
                         </div>
 
                         {/* Boutons d'action tactiles */}
-                        <div className="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-slate-100">
+                        <div className="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
                           <button
                             type="button"
                             onClick={() => {
                               addToCart(product);
                               addToast('Ajouté au Panier', `"${product.title}" est dans votre panier.`, 'success');
                             }}
-                            className="py-2.5 px-2 rounded-xl border border-slate-300 text-slate-800 hover:bg-slate-50 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+                            className="py-2.5 px-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
                           >
-                            <ShoppingCart className="w-3.5 h-3.5 text-slate-600" />
+                            <ShoppingCart className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                             <span>Panier</span>
                           </button>
 
@@ -676,6 +1059,162 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
                 })
               )}
             </div>
+          </div>
+        )}
+
+        {/* ===================================================================
+            ONGLET DÉDIÉ : ARTICLES FAVORIS
+        =================================================================== */}
+        {activeTab === 'favorites' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                    <Heart className="w-4 h-4 fill-current" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-slate-900 dark:text-slate-100">Mes Favoris</h2>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Articles enregistrés pour suivre et commander plus tard</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 px-2.5 py-1 rounded-full border border-rose-200 dark:border-rose-900/50 font-mono">
+                  {favoriteProducts.length} article{favoriteProducts.length > 1 ? 's' : ''}
+                </span>
+                {favoriteProducts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearAllFavorites}
+                    className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Vider tous les favoris"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {favoriteProducts.length === 0 ? (
+              <div className="bg-white dark:bg-[#0E1B3E] rounded-3xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4 shadow-xs">
+                <div className="w-16 h-16 rounded-3xl bg-rose-50 dark:bg-rose-950/40 text-rose-500 flex items-center justify-center mx-auto shadow-inner">
+                  <Heart className="w-8 h-8 stroke-[1.5]" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-black text-slate-900 dark:text-slate-100">Aucun article dans vos favoris</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
+                    Appuyez sur le bouton cœur (❤️) présent sur chaque carte article du catalogue pour le sauvegarder et le retrouver facilement ici.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('home')}
+                  className="py-2.5 px-5 rounded-xl bg-[#FF5B00] hover:bg-[#e05000] text-white font-bold text-xs inline-flex items-center gap-2 shadow-md shadow-[#FF5B00]/20 cursor-pointer active:scale-95 transition-transform"
+                >
+                  <Store className="w-4 h-4" />
+                  <span>Explorer les articles disponibles</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {favoriteProducts.map((product) => {
+                  const price = product.buyNowPrice || product.currentPrice || product.startingPrice || 15000;
+                  const commune = product.commune || 'Abidjan';
+                  const mainImage = product.imageUrl || product.images?.[0] || 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=500&auto=format&fit=crop&q=80';
+
+                  return (
+                    <div
+                      key={`fav-${product.id}`}
+                      className="bg-white dark:bg-[#0E1B3E] rounded-2xl border border-slate-200 dark:border-slate-800 p-3 shadow-xs hover:shadow-md transition-all flex flex-col sm:flex-row gap-3 relative group"
+                    >
+                      {/* Photo avec Badge Commune & Cœur Actif */}
+                      <div
+                        onClick={() => handleOpenProduct(product)}
+                        className="relative w-full sm:w-32 h-40 sm:h-32 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900 shrink-0 cursor-pointer"
+                      >
+                        <img
+                          src={mainImage}
+                          alt={product.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <span className="absolute bottom-2 left-2 bg-emerald-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-xs">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {commune}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(product.id, product.title);
+                          }}
+                          className="absolute top-2 right-2 p-2 rounded-full backdrop-blur-md bg-rose-500 text-white shadow-md shadow-rose-500/30 ring-2 ring-white/70 hover:bg-rose-600 transition-all cursor-pointer z-10"
+                          title="Retirer des favoris"
+                          aria-label="Retirer des favoris"
+                        >
+                          <Heart className="w-4 h-4 fill-current scale-110" />
+                        </button>
+                      </div>
+
+                      {/* Détails Produit */}
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 mb-0.5">
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">{product.sellerName || 'Vendeur Certifié'}</span>
+                            <span className="font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px]">
+                              {product.category}
+                            </span>
+                          </div>
+
+                          <h3
+                            onClick={() => handleOpenProduct(product)}
+                            className="text-sm font-black text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug cursor-pointer hover:text-[#FF5B00] transition-colors"
+                          >
+                            {product.title}
+                          </h3>
+
+                          <div className="mt-1 flex items-baseline gap-1">
+                            <span className="text-base font-black text-[#FF5B00] font-mono">
+                              {price.toLocaleString('fr-FR')} FCFA
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Boutons d'action tactiles */}
+                        <div className="grid grid-cols-2 gap-2 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              addToCart(product);
+                              addToast('Ajouté au Panier', `"${product.title}" est dans votre panier.`, 'success');
+                            }}
+                            className="py-2.5 px-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-transform"
+                          >
+                            <ShoppingCart className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
+                            <span>Panier</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCheckoutProduct(product);
+                              setCheckoutCommune(commune);
+                              setCheckoutPhone(currentUser?.phone || '');
+                            }}
+                            className="py-2.5 px-2 rounded-xl bg-[#FF5B00] hover:bg-[#e05000] text-white font-black text-xs flex items-center justify-center gap-1 shadow-sm shadow-[#FF5B00]/25 cursor-pointer active:scale-95 transition-transform"
+                          >
+                            <Zap className="w-3.5 h-3.5 fill-current" />
+                            <span>Acheter Wave</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1135,12 +1674,12 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
       </main>
 
       {/* 2. NAVIGATION INFÉRIEURE MOBILE FIXE */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0E1B3E]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-3 pt-2 pb-4 shadow-lg max-w-xl mx-auto transition-colors duration-150">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#0E1B3E]/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-2 pt-2 pb-4 shadow-lg max-w-xl mx-auto transition-colors duration-150">
         <div className="flex items-center justify-around">
           <button
             onClick={() => setActiveTab('home')}
             className={`flex flex-col items-center justify-center flex-1 py-1 cursor-pointer transition-colors ${
-              activeTab === 'home' ? 'text-[#FF5B00] font-black' : 'text-slate-400 hover:text-slate-600'
+              activeTab === 'home' ? 'text-[#FF5B00] font-black' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
             }`}
           >
             <Store className="w-5 h-5" />
@@ -1148,14 +1687,29 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
           </button>
 
           <button
+            onClick={() => setActiveTab('favorites')}
+            className={`relative flex flex-col items-center justify-center flex-1 py-1 cursor-pointer transition-colors ${
+              activeTab === 'favorites' ? 'text-rose-500 font-black' : 'text-slate-400 hover:text-rose-500 dark:hover:text-slate-200'
+            }`}
+          >
+            <Heart className={`w-5 h-5 ${activeTab === 'favorites' || favoriteProductIds.length > 0 ? 'fill-current text-rose-500' : ''}`} />
+            {favoriteProductIds.length > 0 && (
+              <span className="absolute -top-0.5 right-2 sm:right-3 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+                {favoriteProductIds.length}
+              </span>
+            )}
+            <span className="text-[10px] mt-1">Favoris</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('orders')}
             className={`relative flex flex-col items-center justify-center flex-1 py-1 cursor-pointer transition-colors ${
-              activeTab === 'orders' ? 'text-[#FF5B00] font-black' : 'text-slate-400 hover:text-slate-600'
+              activeTab === 'orders' ? 'text-[#FF5B00] font-black' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
             }`}
           >
             <Package className="w-5 h-5" />
             {allDisplayOrders.length > 0 && (
-              <span className="absolute -top-0.5 right-4 w-4 h-4 rounded-full bg-[#FF5B00] text-white text-[9px] font-bold flex items-center justify-center">
+              <span className="absolute -top-0.5 right-2 sm:right-3 w-4 h-4 rounded-full bg-[#FF5B00] text-white text-[9px] font-bold flex items-center justify-center">
                 {allDisplayOrders.length}
               </span>
             )}
@@ -1165,7 +1719,7 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
           <button
             onClick={() => setActiveTab('space')}
             className={`flex flex-col items-center justify-center flex-1 py-1 cursor-pointer transition-colors ${
-              activeTab === 'space' ? 'text-[#1E53E5] font-black' : 'text-slate-400 hover:text-slate-600'
+              activeTab === 'space' ? 'text-[#1E53E5] font-black' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
             }`}
           >
             <ShoppingBag className="w-5 h-5" />
@@ -1175,7 +1729,7 @@ export const BradciMobileApp: React.FC<BradciMobileAppProps> = ({ onBackToFullPo
           <button
             onClick={() => setActiveTab('contact')}
             className={`flex flex-col items-center justify-center flex-1 py-1 cursor-pointer transition-colors ${
-              activeTab === 'contact' ? 'text-[#25D366] font-black' : 'text-slate-400 hover:text-slate-600'
+              activeTab === 'contact' ? 'text-[#25D366] font-black' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
             }`}
           >
             <MessageCircle className="w-5 h-5" />

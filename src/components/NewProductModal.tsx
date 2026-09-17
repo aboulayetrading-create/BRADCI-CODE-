@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   X, 
@@ -139,9 +139,13 @@ export const NewProductModal: React.FC = () => {
       addToast('Limite atteinte', 'Vous avez déjà ajouté 3 photos (maximum autorisé).', 'warning');
       return;
     }
+    if (source === 'camera') {
+      startCamera();
+      return;
+    }
     try {
       const result = await nativeBridge.capturePhoto({
-        source,
+        source: 'photos',
         direction: 'environment',
         quality: 90
       });
@@ -151,9 +155,6 @@ export const NewProductModal: React.FC = () => {
       }
     } catch (err: any) {
       console.warn('Native photo capture cancelled or failed:', err?.message);
-      if (!nativeBridge.isNative() && source === 'camera') {
-        startCamera();
-      }
     }
   };
 
@@ -178,6 +179,24 @@ export const NewProductModal: React.FC = () => {
   const selectedCommuneData = ALL_COMMUNES.find(c => c.name === commune) || ALL_COMMUNES[0];
   const estDeliveryFee = calculateDeliveryFee(commune, 'Le Plateau', requiredVehicle);
 
+  // Connect stream to video element when viewfinder mounts
+  useEffect(() => {
+    if (isCameraActive && streamRef.current && videoStreamRef.current) {
+      videoStreamRef.current.srcObject = streamRef.current;
+      videoStreamRef.current.play().catch(e => console.warn('Video play warning:', e));
+    }
+  }, [isCameraActive]);
+
+  // Clean up media stream on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
   // ================= CAMERA CAPTURE LOGIC =================
   const startCamera = async () => {
     setCameraError(null);
@@ -187,15 +206,27 @@ export const NewProductModal: React.FC = () => {
     }
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
-        streamRef.current = stream;
-        if (videoStreamRef.current) {
-          videoStreamRef.current.srcObject = stream;
-          videoStreamRef.current.play();
+        let stream: MediaStream | null = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+        } catch {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: facingMode }
+            });
+          } catch {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          }
         }
-        setIsCameraActive(true);
+
+        if (stream) {
+          streamRef.current = stream;
+          setIsCameraActive(true);
+        } else {
+          setCameraError("Impossible d'initialiser le flux caméra.");
+        }
       } else {
         setCameraError("La caméra n'est pas supportée sur ce navigateur. Veuillez importer un fichier.");
       }
@@ -218,15 +249,18 @@ export const NewProductModal: React.FC = () => {
     setFacingMode(newMode);
     setTimeout(async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: newMode }
-        });
-        streamRef.current = stream;
-        if (videoStreamRef.current) {
-          videoStreamRef.current.srcObject = stream;
-          videoStreamRef.current.play();
+        let stream: MediaStream | null = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: newMode }
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
         }
-        setIsCameraActive(true);
+        if (stream) {
+          streamRef.current = stream;
+          setIsCameraActive(true);
+        }
       } catch {
         setCameraError("Impossible de basculer la caméra.");
       }
@@ -1038,7 +1072,15 @@ export const NewProductModal: React.FC = () => {
               {isCameraActive && (
                 <div className="rounded-2xl overflow-hidden border-2 border-amber-500 bg-black relative aspect-[4/3] max-h-[380px] w-full max-w-md mx-auto flex items-center justify-center animate-in zoom-in-95">
                   <video 
-                    ref={videoStreamRef} 
+                    ref={(el) => {
+                      videoStreamRef.current = el;
+                      if (el && streamRef.current && el.srcObject !== streamRef.current) {
+                        el.srcObject = streamRef.current;
+                        el.muted = true;
+                        el.playsInline = true;
+                        el.play().catch(() => {});
+                      }
+                    }} 
                     autoPlay 
                     playsInline 
                     muted 

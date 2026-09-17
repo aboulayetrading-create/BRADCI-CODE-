@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   Search, 
@@ -27,7 +27,10 @@ import {
   Check,
   Eye,
   X,
-  RotateCcw
+  RotateCcw,
+  Heart,
+  Flame,
+  History
 } from 'lucide-react';
 import { Product, VehicleType } from '../types';
 import { 
@@ -56,16 +59,67 @@ export const VisitorFeed: React.FC = () => {
     currency,
     formatCurrency,
     addToCart,
-    setCartModalOpen
+    setCartModalOpen,
+    favoriteProductIds,
+    toggleFavorite,
+    isFavorite,
+    clearAllFavorites,
+    favoritesCount,
+    searchHistory,
+    addSearchQuery,
+    removeSearchQuery,
+    clearSearchHistory
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Tous');
   const [selectedCommune, setSelectedCommune] = useState<string>('Toutes');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('Tous');
-  const [selectedFeedType, setSelectedFeedType] = useState<'all' | 'auction' | 'shop' | 'five_bids' | 'b2b'>('all');
+  const [selectedFeedType, setSelectedFeedType] = useState<'all' | 'auction' | 'shop' | 'five_bids' | 'b2b' | 'favorites'>('all');
   const [driverOnlyFilter, setDriverOnlyFilter] = useState<boolean>(false);
   const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
+  const [searchFocused, setSearchFocused] = useState<boolean>(false);
+  const searchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Listen to external navigation filter events (e.g. from navbar "Favoris" button)
+  useEffect(() => {
+    const handleSetFeedFilter = (e: any) => {
+      if (e.detail) {
+        setSelectedFeedType(e.detail);
+        const filterEl = document.getElementById('feed-filter-bar');
+        if (filterEl) {
+          filterEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    };
+    window.addEventListener('bradci_set_feed_filter', handleSetFeedFilter);
+    return () => window.removeEventListener('bradci_set_feed_filter', handleSetFeedFilter);
+  }, []);
+
+  // Close search suggestions dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchDropdownRef.current && !searchDropdownRef.current.contains(e.target as Node)) {
+        setSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectQuery = (q: string) => {
+    setSearchQuery(q);
+    addSearchQuery(q);
+    setSearchFocused(false);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      addSearchQuery(searchQuery.trim());
+    }
+    setSearchFocused(false);
+  };
 
   const isDriver = currentUser?.role === 'driver';
   const isOnline = currentUser?.driverAvailability !== 'offline';
@@ -83,6 +137,16 @@ export const VisitorFeed: React.FC = () => {
     { key: 'Véhicules & Pièces', label: translate('Véhicules & Pièces', 'Vehicles & Parts') }
   ];
 
+  const popularSuggestions = [
+    'iPhone 15 Pro',
+    'PlayStation 5',
+    'Moto Scooter',
+    'Déstockage B2B',
+    'Cocody Angré',
+    'Sac de Luxe',
+    'TV Smart 4K'
+  ];
+
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -98,7 +162,8 @@ export const VisitorFeed: React.FC = () => {
                             (selectedFeedType === 'shop' && (p.listingType === 'shop' || p.shopId)) ||
                             (selectedFeedType === 'auction' && (p.listingType === 'auction' || (!p.shopId && p.listingType !== 'shop'))) ||
                             (selectedFeedType === 'five_bids' && (p.bids.length >= 5 || p.status === 'pending_choice')) ||
-                            (selectedFeedType === 'b2b' && (p.isB2BLot || p.category === 'Déstockage B2B'));
+                            (selectedFeedType === 'b2b' && (p.isB2BLot || p.category === 'Déstockage B2B')) ||
+                            (selectedFeedType === 'favorites' && favoriteProductIds.includes(p.id));
     return matchesSearch && matchesCategory && matchesCommune && matchesVehicle && matchesDriverFilter && matchesFeedType;
   });
 
@@ -185,29 +250,106 @@ export const VisitorFeed: React.FC = () => {
       <section className="bg-white dark:bg-[#0B111D] border border-slate-200 dark:border-slate-800/90 rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-sm dark:shadow-xl space-y-3.5">
         {/* Top line: Search Bar & Structured Commune Picker */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-          {/* Search bar with clear button */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              id="feed-search-input"
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={translate(
-                "Rechercher un article (iPhone, TV, PS5, Moto, Sac...), commune (Bassam, Cocody, Yopougon...)...",
-                "Search item (iPhone, TV, PS5, Bike, Bag...), commune (Bassam, Cocody, Yopougon...)..."
+          {/* Search bar with form, clear button, and suggestions popover */}
+          <div className="relative flex-1" ref={searchDropdownRef}>
+            <form onSubmit={handleSearchSubmit} className="relative w-full">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                id="feed-search-input"
+                type="text"
+                value={searchQuery}
+                onFocus={() => setSearchFocused(true)}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={translate(
+                  "Rechercher un article (iPhone, TV, PS5, Moto, Sac...), commune (Bassam, Cocody, Yopougon...)...",
+                  "Search item (iPhone, TV, PS5, Bike, Bag...), commune (Bassam, Cocody, Yopougon...)..."
+                )}
+                className="w-full bg-slate-50 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 focus:border-amber-500/60 rounded-xl pl-10 pr-9 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none transition-all shadow-inner"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md transition-colors"
+                  title={translate("Effacer la recherche", "Clear search")}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               )}
-              className="w-full bg-slate-50 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 focus:border-amber-500/60 rounded-xl pl-10 pr-9 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none transition-all shadow-inner"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900 dark:hover:text-white p-1 rounded-md transition-colors"
-                title={translate("Effacer la recherche", "Clear search")}
+            </form>
+
+            {/* Suggestions & Search History Dropdown Popover */}
+            {searchFocused && (
+              <div 
+                id="search-suggestions-dropdown"
+                className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-[#0B1120] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 max-h-80 overflow-y-auto"
               >
-                <X className="w-3.5 h-3.5" />
-              </button>
+                {/* Search History Section */}
+                {searchHistory.length > 0 && (
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between px-1 mb-1.5">
+                      <span className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                        <History className="w-3 h-3 text-amber-500" />
+                        <span>{translate("Recherches récentes", "Recent searches")}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={clearSearchHistory}
+                        className="text-[10px] text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                      >
+                        {translate("Tout effacer", "Clear all")}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {searchHistory.map((query, idx) => (
+                        <div
+                          key={idx}
+                          className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 hover:bg-amber-50 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 transition-colors"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleSelectQuery(query)}
+                            className="cursor-pointer hover:text-amber-600 dark:hover:text-amber-400"
+                          >
+                            {query}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeSearchQuery(query);
+                            }}
+                            className="text-slate-400 hover:text-rose-500 p-0.5 rounded cursor-pointer"
+                            title={translate("Supprimer", "Delete")}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Popular Searches & Trends */}
+                <div>
+                  <div className="px-1 mb-1.5 text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                    <Flame className="w-3 h-3 text-[#FF5B00]" />
+                    <span>{translate("Tendances populaires", "Trending searches")}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {popularSuggestions.map((sug, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleSelectQuery(sug)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/20 transition-all cursor-pointer flex items-center gap-1"
+                      >
+                        <span>{sug}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -263,9 +405,54 @@ export const VisitorFeed: React.FC = () => {
           </div>
         </div>
 
+        {/* Persistent Recent Searches Strip - Directly visible under search bar */}
+        {searchHistory.length > 0 && (
+          <div id="recent-searches-strip" className="flex items-center gap-2 pt-1 pb-1 text-xs overflow-x-auto no-scrollbar">
+            <span className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-400 shrink-0">
+              <History className="w-3.5 h-3.5 text-amber-500" />
+              <span>{translate("Recherches récentes :", "Recent searches:")}</span>
+            </span>
+            {searchHistory.map((item, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-amber-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold border border-slate-200 dark:border-slate-700 transition-colors shrink-0 shadow-2xs"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery(item);
+                    addSearchQuery(item);
+                  }}
+                  className="hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
+                >
+                  {item}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeSearchQuery(item);
+                  }}
+                  className="text-slate-400 hover:text-rose-500 p-0.5 rounded transition-colors cursor-pointer"
+                  title={translate("Supprimer de l'historique", "Delete from history")}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={clearSearchHistory}
+              className="text-[11px] text-slate-400 hover:text-rose-500 transition-colors shrink-0 underline cursor-pointer ml-1"
+            >
+              {translate("Effacer tout", "Clear all")}
+            </button>
+          </div>
+        )}
+
         {/* Middle line: Feed Type Tabs & Vehicle Filter in a clean row */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-800/60">
-          {/* Feed Types: All, Boutiques, Enchères, 5 Offres, B2B */}
+        <div id="feed-filter-bar" className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-800/60">
+          {/* Feed Types: All, Favoris, Boutiques, B2B */}
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <button
               id="feed-filter-all"
@@ -282,6 +469,26 @@ export const VisitorFeed: React.FC = () => {
                 selectedFeedType === 'all' ? 'bg-slate-700 text-white dark:bg-slate-200 dark:text-slate-950' : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
               }`}>
                 {products.length}
+              </span>
+            </button>
+
+            {/* Favoris Tab Filter */}
+            <button
+              id="feed-filter-favorites"
+              type="button"
+              onClick={() => setSelectedFeedType('favorites')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                selectedFeedType === 'favorites'
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-500/25 scale-[1.02]'
+                  : 'bg-rose-50 dark:bg-slate-900/90 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-slate-800 border border-rose-200 dark:border-rose-900/60'
+              }`}
+            >
+              <Heart className={`w-3.5 h-3.5 ${selectedFeedType === 'favorites' ? 'fill-current' : 'text-rose-500'}`} />
+              <span>{translate("❤️ Mes Favoris", "❤️ My Favorites")}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono-num font-extrabold ${
+                selectedFeedType === 'favorites' ? 'bg-rose-800 text-white' : 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-200'
+              }`}>
+                {favoritesCount}
               </span>
             </button>
 
@@ -388,15 +595,17 @@ export const VisitorFeed: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white font-display flex items-center gap-2">
               <span>
-                {selectedFeedType === 'shop' 
-                  ? translate('🏪 Annonces des Boutiques Officielles', '🏪 Official Stores Listings') 
-                  : selectedFeedType === 'auction' 
-                    ? translate('🔨 Enchères Express en Direct', '🔨 Live Express Auctions') 
-                    : selectedFeedType === 'b2b'
-                      ? translate('🏢 Lots & Déstockage Professionnel', '🏢 Professional B2B Lots')
-                      : isDriver 
-                        ? translate('Articles & Courses Enchères Associées', 'Products & Deliveries Board') 
-                        : translate('Articles & Enchères Disponibles', 'Available Items & Auctions')}
+                {selectedFeedType === 'favorites'
+                  ? translate('❤️ Mes Articles Favoris', '❤️ My Favorite Items')
+                  : selectedFeedType === 'shop' 
+                    ? translate('🏪 Annonces des Boutiques Officielles', '🏪 Official Stores Listings') 
+                    : selectedFeedType === 'auction' 
+                      ? translate('🔨 Enchères Express en Direct', '🔨 Live Express Auctions') 
+                      : selectedFeedType === 'b2b'
+                        ? translate('🏢 Lots & Déstockage Professionnel', '🏢 Professional B2B Lots')
+                        : isDriver 
+                          ? translate('Articles & Courses Enchères Associées', 'Products & Deliveries Board') 
+                          : translate('Articles & Enchères Disponibles', 'Available Items & Auctions')}
               </span>
               <span className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-amber-400 border border-slate-300 dark:border-slate-700 px-2.5 py-0.5 rounded-full font-mono-num font-bold">
                 {filteredProducts.length} {translate("articles", "items")}
@@ -411,6 +620,15 @@ export const VisitorFeed: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            {selectedFeedType === 'favorites' && favoriteProductIds.length > 0 && (
+              <button
+                type="button"
+                onClick={clearAllFavorites}
+                className="text-xs text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:underline font-bold px-2 py-1 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 cursor-pointer"
+              >
+                {translate("Vider mes favoris", "Clear all favorites")}
+              </button>
+            )}
             <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-semibold">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>{translate("Paiement Direct à la Livraison Garanti", "Direct Pay on Delivery Guaranteed")}</span>
@@ -420,19 +638,43 @@ export const VisitorFeed: React.FC = () => {
 
         {/* Empty State */}
         {filteredProducts.length === 0 ? (
-          <div className="p-12 text-center bg-slate-50 dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800">
-            <MapPin className="w-10 h-10 text-slate-400 dark:text-slate-600 mx-auto mb-2" />
-            <p className="text-slate-600 dark:text-slate-400 text-sm">
-              {translate(`Aucun article ne correspond à vos critères dans cette zone (${selectedCommune}).`, `No items match your criteria in this zone (${selectedCommune}).`)}
-            </p>
-            <button
-              type="button"
-              onClick={() => { setSearchQuery(''); setSelectedCategory('Tous'); setSelectedCommune('Toutes'); setSelectedFeedType('all'); setSelectedVehicle('Tous'); }}
-              className="mt-3 text-xs text-amber-600 dark:text-amber-400 hover:underline font-bold cursor-pointer"
-            >
-              {translate("Réinitialiser tous les filtres", "Reset all filters")}
-            </button>
-          </div>
+          selectedFeedType === 'favorites' ? (
+            <div id="favorites-empty-state" className="p-10 sm:p-12 text-center bg-rose-50/50 dark:bg-rose-950/20 rounded-3xl border border-rose-200 dark:border-rose-900/50 space-y-3">
+              <div className="w-14 h-14 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-500 mx-auto flex items-center justify-center">
+                <Heart className="w-7 h-7" />
+              </div>
+              <h4 className="text-base font-bold text-slate-900 dark:text-white">
+                {translate("Aucun article favori pour le moment", "No favorite items yet")}
+              </h4>
+              <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm max-w-md mx-auto">
+                {translate(
+                  "Cliquez sur le coeur (❤️) présent en haut à droite de n'importe quel article pour l'ajouter à vos favoris et le retrouver ici en un clic !",
+                  "Click the heart (❤️) in the top-right of any product to add it to your favorites and access it here anytime!"
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelectedFeedType('all')}
+                className="mt-2 px-4 py-2 bg-[#FF5B00] text-white rounded-xl text-xs font-bold shadow-md hover:bg-[#e05000] transition-colors cursor-pointer"
+              >
+                {translate("Découvrir tous les articles & enchères", "Discover all items & auctions")}
+              </button>
+            </div>
+          ) : (
+            <div className="p-12 text-center bg-slate-50 dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800">
+              <MapPin className="w-10 h-10 text-slate-400 dark:text-slate-600 mx-auto mb-2" />
+              <p className="text-slate-600 dark:text-slate-400 text-sm">
+                {translate(`Aucun article ne correspond à vos critères dans cette zone (${selectedCommune}).`, `No items match your criteria in this zone (${selectedCommune}).`)}
+              </p>
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(''); setSelectedCategory('Tous'); setSelectedCommune('Toutes'); setSelectedFeedType('all'); setSelectedVehicle('Tous'); }}
+                className="mt-3 text-xs text-amber-600 dark:text-amber-400 hover:underline font-bold cursor-pointer"
+              >
+                {translate("Réinitialiser tous les filtres", "Reset all filters")}
+              </button>
+            </div>
+          )
         ) : (
           /* Product Grid: Ultra Propre Articles & Buttons */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -523,10 +765,31 @@ export const VisitorFeed: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Top-Right Vehicle Badge */}
-                    <div className="absolute top-2.5 right-2.5 bg-slate-950/85 backdrop-blur-md px-2 py-1 rounded-lg border border-slate-700/80 text-[11px] font-bold text-slate-200 flex items-center gap-1 shadow-sm">
-                      {getVehicleIcon(product.requiredVehicle)}
-                      <span className="capitalize text-[10px] hidden xs:inline">{product.requiredVehicle}</span>
+                    {/* Top-Right Badges: Favorite Button & Vehicle Badge */}
+                    <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
+                      {/* Heart (Favorites) Button */}
+                      <button
+                        id={`btn-card-fav-${product.id}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(product.id, product.title);
+                        }}
+                        className={`p-1.5 rounded-xl backdrop-blur-md border transition-all cursor-pointer shadow-md active:scale-90 ${
+                          isFavorite(product.id)
+                            ? 'bg-rose-600 text-white border-rose-400 scale-105 shadow-rose-600/30'
+                            : 'bg-slate-950/70 hover:bg-slate-900 text-slate-300 hover:text-rose-400 border-slate-700/80 hover:border-rose-400/50'
+                        }`}
+                        title={isFavorite(product.id) ? translate("Retirer des favoris", "Remove from favorites") : translate("Ajouter aux favoris", "Add to favorites")}
+                      >
+                        <Heart className={`w-3.5 h-3.5 ${isFavorite(product.id) ? 'fill-current text-white' : 'text-slate-200'}`} />
+                      </button>
+
+                      {/* Vehicle Badge */}
+                      <div className="bg-slate-950/85 backdrop-blur-md px-2 py-1 rounded-lg border border-slate-700/80 text-[11px] font-bold text-slate-200 flex items-center gap-1 shadow-sm">
+                        {getVehicleIcon(product.requiredVehicle)}
+                        <span className="capitalize text-[10px] hidden xs:inline">{product.requiredVehicle}</span>
+                      </div>
                     </div>
 
                     {/* Bottom-Left Image Badges: Delivery Fee or Live Alert */}

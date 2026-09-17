@@ -1,6 +1,17 @@
-// Service Worker officiel BRAD'CI (Web, Mobile PWA & APK) - Cache & Push Notifications Adaptive Icon v14
-const CACHE_NAME = 'bradci-adaptive-icon-v14';
-const ASSETS = ['./', './index.html', './icon.png', './manifest.json'];
+// Service Worker officiel BRAD'CI (Web, Mobile PWA & APK) - Cache & Push Notifications Adaptive Icon v16
+const CACHE_NAME = 'bradci-adaptive-icon-v16';
+const ASSETS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png',
+  '/icon-maskable-512x512.png',
+  '/apple-touch-icon.png',
+  '/favicon-32x32.png',
+  '/icon.png',
+  '/logo.png'
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
